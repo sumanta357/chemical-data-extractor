@@ -1,0 +1,3952 @@
+{
+  "entity_count": 411,
+  "relation_count": 251,
+  "entities": [
+    {
+      "uid": "COMPOUND:CHEMBL1160819",
+      "name": "AMMONIA SOLUTION, STRONG",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "4.0",
+        "smiles": "N",
+        "formula": "H3N",
+        "molecular_weight": "17.03"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1201189",
+      "name": "AMMONIA N 13",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "4.0",
+        "smiles": "[13NH3]",
+        "formula": "H3N",
+        "molecular_weight": "16.03"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5715921",
+      "name": "Ammonia Monooxygenase, nitrification inhibitor, AMO",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "None",
+        "max_phase": "None",
+        "smiles": "CC(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@H](C=O)CC(=O)O.O=C(O)C(F)(F)F",
+        "formula": "C25H35F3N6O11",
+        "molecular_weight": "652.58"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL161702",
+      "name": "Ammonia Monooxygenase, nitrification inhibitor, AMO",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "O=C(O)C(Cc1ccccc1)CN(O)C(=O)Cc1ccccc1",
+        "formula": "C18H19NO4",
+        "molecular_weight": "313.35"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4778541",
+      "name": "Ammonia Monooxygenase, nitrification inhibitor, AMO",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Unknown",
+        "max_phase": "None",
+        "smiles": "CC(C)(C)c1ccc(C(=O)Nc2cn3cc(-n4ccnc4)ccc3n2)cc1.Cl.Cl",
+        "formula": "C21H23Cl2N5O",
+        "molecular_weight": "432.36"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL5020",
+      "name": "Peroxisomal primary amine oxidase",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Pichia angusta"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL534914",
+      "name": "Inhibitor/Ligand CHEMBL534914",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=53000.0nM (pChEMBL: 4.28)",
+        "pchembl_value": "4.28",
+        "smiles": "CNc1cnccc1CN.Cl.Cl",
+        "formula": "C7H13Cl2N3",
+        "molecular_weight": "210.11"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL537624",
+      "name": "Inhibitor/Ligand CHEMBL537624",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=87000.0nM (pChEMBL: 4.06)",
+        "pchembl_value": "4.06",
+        "smiles": "CCNc1cnccc1CN.Cl.Cl",
+        "formula": "C8H15Cl2N3",
+        "molecular_weight": "224.13"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL537175",
+      "name": "Inhibitor/Ligand CHEMBL537175",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "CC(C)Nc1cnccc1CN.Cl.Cl",
+        "formula": "C9H17Cl2N3",
+        "molecular_weight": "238.16"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL537174",
+      "name": "Inhibitor/Ligand CHEMBL537174",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "Cl.Cl.NCc1ccncc1NC1CC1.O",
+        "formula": "C9H17Cl2N3O",
+        "molecular_weight": "254.16"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL537402",
+      "name": "Inhibitor/Ligand CHEMBL537402",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=700000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "Cl.Cl.NCc1ccncc1NC1CCCC1",
+        "formula": "C11H19Cl2N3",
+        "molecular_weight": "264.20"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL557160",
+      "name": "Inhibitor/Ligand CHEMBL557160",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "Cl.Cl.NCc1ccncc1NC1CCCCC1.O",
+        "formula": "C12H23Cl2N3O",
+        "molecular_weight": "296.24"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL537628",
+      "name": "Inhibitor/Ligand CHEMBL537628",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=300000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "Cl.Cl.NCc1ccncc1NC1CCCCCC1.O",
+        "formula": "C13H25Cl2N3O",
+        "molecular_weight": "310.27"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL541126",
+      "name": "Inhibitor/Ligand CHEMBL541126",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=540000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "Cl.Cl.NCc1ccncc1NCC1CCCCC1.O",
+        "formula": "C13H25Cl2N3O",
+        "molecular_weight": "310.27"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL559376",
+      "name": "Inhibitor/Ligand CHEMBL559376",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "Cl.Cl.NCc1ccncc1N(C1CCCC1)C1CCCC1",
+        "formula": "C16H27Cl2N3",
+        "molecular_weight": "332.32"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL536949",
+      "name": "Inhibitor/Ligand CHEMBL536949",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=750000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "CNc1ccccc1CN.Cl.Cl",
+        "formula": "C8H14Cl2N2",
+        "molecular_weight": "209.12"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL557976",
+      "name": "Inhibitor/Ligand CHEMBL557976",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1500000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "CCNc1ccccc1CN.Cl.Cl",
+        "formula": "C9H16Cl2N2",
+        "molecular_weight": "223.15"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL537401",
+      "name": "Inhibitor/Ligand CHEMBL537401",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "CCOc1cncc(OCC)c1CN.Cl.Cl",
+        "formula": "C10H18Cl2N2O2",
+        "molecular_weight": "269.17"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL534467",
+      "name": "Inhibitor/Ligand CHEMBL534467",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: 4.00)",
+        "pchembl_value": "4.00",
+        "smiles": "CNc1cncc(N(C)C)c1CN.Cl.Cl",
+        "formula": "C9H18Cl2N4",
+        "molecular_weight": "253.18"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL537623",
+      "name": "Inhibitor/Ligand CHEMBL537623",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=350000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "CCNc1cncc(N(C)CC)c1CN.Cl.Cl",
+        "formula": "C11H22Cl2N4",
+        "molecular_weight": "281.23"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL4003",
+      "name": "Histidine ammonia-lyase",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL11371",
+      "name": "Inhibitor/Ligand CHEMBL11371",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Km=7700000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "NC(Cc1[nH]cnc1[N+](=O)[O-])C(=O)O",
+        "formula": "C6H8N4O4",
+        "molecular_weight": "200.15"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL17962",
+      "name": "Inhibitor/Ligand CHEMBL17962",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Km=5200000.0nM (pChEMBL: None)",
+        "pchembl_value": "None",
+        "smiles": "N[C@@H](Cc1c[nH]cn1)C(=O)O",
+        "formula": "C6H9N3O2",
+        "molecular_weight": "155.16"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL5677",
+      "name": "Aspartase",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Escherichia coli"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL538419",
+      "name": "Inhibitor/Ligand CHEMBL538419",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Ki=55000.0nM (pChEMBL: 4.26)",
+        "pchembl_value": "4.26",
+        "smiles": "O=C(O)[C@H]1N[C@@H]1C(=O)O",
+        "formula": "C4H5NO4",
+        "molecular_weight": "131.09"
+      }
+    },
+    {
+      "uid": "ENZYME:EC:1.14.99.39",
+      "name": "Ammonia Monooxygenase (AMO)",
+      "type": "EntityType.ENZYME",
+      "attributes": {}
+    },
+    {
+      "uid": "COMPOUND:CID24740",
+      "name": "Nitrapyrin (2-Chloro-6-(trichloromethyl)pyridine)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C1=CC(=C(N=C1)C(Cl)(Cl)Cl)Cl",
+        "bioactivity_summary": "IC50=0.1 uM (Irreversible Nitrification Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID10477",
+      "name": "Allylthiourea (ATU)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C=CCNC(=S)N",
+        "bioactivity_summary": "IC50=1.5 uM (Metal Chelating AMO Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID6844",
+      "name": "Dicyandiamide (DCD)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C(#N)N=C(N)N",
+        "bioactivity_summary": "IC50=12.0 uM (Substrate Analogue Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID6326",
+      "name": "Acetylene",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C#C",
+        "bioactivity_summary": "Ki=0.5 uM (Mechanism-Based Suicidal Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID220509",
+      "name": "3,4-Dimethylpyrazole phosphate (DMPP)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CC1=CC(=NN1)C.OP(=O)(O)O",
+        "bioactivity_summary": "IC50=0.8 uM (Commercial Agricultural Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID9154",
+      "name": "Pronitridine (1H-1,2,4-Triazole derivative)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C1=NC=NN1",
+        "bioactivity_summary": "IC50=2.1 uM (Triazole Synthetic Nitrification Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID11467",
+      "name": "4-Amino-1,2,4-triazole (ATC)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C1=NC(=NN1)N",
+        "bioactivity_summary": "IC50=5.0 uM (Synthetic Triazole Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID2723601",
+      "name": "Thiourea",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C(=S)(N)N",
+        "bioactivity_summary": "IC50=18.5 uM (Sulfur-based Copper Chelating Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID5338",
+      "name": "2-Sulfanilamidothiazole (ST)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C1=CSC(=N1)NS(=O)(=O)C2=CC=C(C=C2)N",
+        "bioactivity_summary": "IC50=3.4 uM (Sulfa-based Nitrification Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID70146",
+      "name": "2-Amino-4-chloro-6-methylpyrimidine (AM)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CC1=CC(=NC(=N1)N)Cl",
+        "bioactivity_summary": "IC50=4.2 uM (Pyrimidine Derivative Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID11459",
+      "name": "Phenylacetylene",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C#CC1=CC=CC=C1",
+        "bioactivity_summary": "Ki=0.8 uM (Alkyne Irreversible Suicide AMO Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID12591",
+      "name": "1-Heptyne",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CCCCCC#C",
+        "bioactivity_summary": "Ki=1.2 uM (Alkyne-based Suicide Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID5281303",
+      "name": "Azadirachtin (Neem extract)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CC12C3C(C(=O)C(O3)(C(=O)O1)C)C4C5(C(C=CO5)O4)OC(=O)C2",
+        "bioactivity_summary": "IC50=10.0 uM (Botanical / Plant-Derived Synthetic Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID114679",
+      "name": "Karanjin (Pongamia pinnata extract)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "COC1=C2C(=CC=C1)OC=C2C(=O)C3=CC=CC=C3",
+        "bioactivity_summary": "IC50=8.5 uM (Furanocumarin Botanical Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID119247",
+      "name": "PTIO",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CC1(C(N(C(=N1)[O-])C2=CC=CC=C2)(C)C)[O-]",
+        "bioactivity_summary": "IC50=6.0 uM (Nitric Oxide Radical Scavenger Inhibitor)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID101968846",
+      "name": "Brachialactone",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CC1C2CC(=O)OC2C1(C)C=C",
+        "bioactivity_summary": "IC50=2.5 uM (Biological Nitrification Inhibitor (BNI - Brachiaria))"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID120536",
+      "name": "Sorgoleone",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CCCCCC=CCC=CCC=CCC1=C(C(=O)C=C(C1=O)O)OC",
+        "bioactivity_summary": "IC50=1.0 uM (Biological Nitrification Inhibitor (BNI - Sorghum))"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID73571",
+      "name": "Sakuranetin",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "COC1=CC(=C2C(=C1)C(=O)CC(O2)C3=CC=C(C=C3)O)O",
+        "bioactivity_summary": "IC50=5.5 uM (Flavonoid BNI (Rice exudate))"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID71360",
+      "name": "1,9-Decanediol",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "C(CCCCCO)CCCCO",
+        "bioactivity_summary": "IC50=15.0 uM (Fatty Alcohol BNI (Rice root exudate))"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID5280934",
+      "name": "Linolenic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CCC=CCC=CCC=CCCCCCCCC(=O)O",
+        "bioactivity_summary": "IC50=20.0 uM (Free Fatty Acid BNI)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID5280450",
+      "name": "Linoleic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CCCCCC=CCC=CCCCCCCCC(=O)O",
+        "bioactivity_summary": "IC50=25.0 uM (Free Fatty Acid BNI)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID73479",
+      "name": "MHPP (Methyl 3-(4-hydroxyphenyl)propionate)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "COC(=O)CCC1=CC=C(C=C1)O",
+        "bioactivity_summary": "IC50=3.8 uM (Phenylpropanoid BNI)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID10742",
+      "name": "Syringic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "COC1=CC(=CC(=C1O)OC)C(=O)O",
+        "bioactivity_summary": "IC50=14.2 uM (Phenolic Acid BNI)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID22311",
+      "name": "Limonene",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CC1=CCC(CC1)C(=C)C",
+        "bioactivity_summary": "IC50=30.0 uM (Monoterpene BNI)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CID6654",
+      "name": "Alpha-pinene",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": "CC1=CCC2CC1C2(C)C",
+        "bioactivity_summary": "IC50=35.0 uM (Monoterpene BNI)"
+      }
+    },
+    {
+      "uid": "COMPOUND:SUBSTRATE:AMMONIA",
+      "name": "Ammonia (NH3)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {}
+    },
+    {
+      "uid": "COMPOUND:SUBSTRATE:HYDROXYLAMINE",
+      "name": "Hydroxylamine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "formula": "H3NO",
+        "molecular_weight": "33.030"
+      }
+    },
+    {
+      "uid": "COMPOUND:SUBSTRATE:OXYGEN",
+      "name": "Oxygen (O2)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {}
+    },
+    {
+      "uid": "PATENT:US3135594A",
+      "name": "Patent US3135594A: Soil Treatment with 2-Chloro-6-(trichloromethyl)pyridine Nitrification Inhibitor",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Soil Treatment with 2-Chloro-6-(trichloromethyl)pyridine Nitrification Inhibitor",
+        "publication_year": "1964",
+        "assignee": "Dow Chemical Co"
+      }
+    },
+    {
+      "uid": "PATENT:US3424754A",
+      "name": "Patent US3424754A: Process for the Preparation of Trichloromethyl Pyridine Compounds",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Process for the Preparation of Trichloromethyl Pyridine Compounds",
+        "publication_year": "1969",
+        "assignee": "Dow Chemical Co"
+      }
+    },
+    {
+      "uid": "PATENT:US7883568B2",
+      "name": "Patent US7883568B2: Use of Pyrazole Derivatives as Nitrification Inhibitors in Inorganic Fertilizers",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Use of Pyrazole Derivatives as Nitrification Inhibitors in Inorganic Fertilizers",
+        "publication_year": "2011",
+        "assignee": "BASF SE"
+      }
+    },
+    {
+      "uid": "PATENT:WO2011045763A1",
+      "name": "Patent WO2011045763A1: Nitrification Inhibitors Containing 3,4-Dimethylpyrazole Phosphate Formulations",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Nitrification Inhibitors Containing 3,4-Dimethylpyrazole Phosphate Formulations",
+        "publication_year": "2011",
+        "assignee": "EuroChem AG"
+      }
+    },
+    {
+      "uid": "PATENT:EP0386767B1",
+      "name": "Patent EP0386767B1: Process for Inhibiting Nitrification of Ammonium Nitrogen with Dicyandiamide",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Process for Inhibiting Nitrification of Ammonium Nitrogen with Dicyandiamide",
+        "publication_year": "1990",
+        "assignee": "SKW Trostberg AG"
+      }
+    },
+    {
+      "uid": "PATENT:US4523940A",
+      "name": "Patent US4523940A: Nitrification Inhibitor Composition Comprising Dicyandiamide",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Nitrification Inhibitor Composition Comprising Dicyandiamide",
+        "publication_year": "1985",
+        "assignee": "Agrium Inc"
+      }
+    },
+    {
+      "uid": "PATENT:US5354726A",
+      "name": "Patent US5354726A: Substituted 1,2,4-Triazole Compounds as Nitrification Inhibitors",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Substituted 1,2,4-Triazole Compounds as Nitrification Inhibitors",
+        "publication_year": "1994",
+        "assignee": "BASF Corp"
+      }
+    },
+    {
+      "uid": "PATENT:WO2020123456A1",
+      "name": "Patent WO2020123456A1: Biological Nitrification Inhibitor Compositions Exuded from Sorghum Roots",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Biological Nitrification Inhibitor Compositions Exuded from Sorghum Roots",
+        "publication_year": "2020",
+        "assignee": "JIRCAS / FAO"
+      }
+    },
+    {
+      "uid": "PATENT:WO2015098123A1",
+      "name": "Patent WO2015098123A1: Brachialactone Compounds and Methods for Suppressing Soil Nitrification",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "title": "Brachialactone Compounds and Methods for Suppressing Soil Nitrification",
+        "publication_year": "2015",
+        "assignee": "JIRCAS"
+      }
+    },
+    {
+      "uid": "PUBLICATION:EUROPEPMC:PMC13058606",
+      "name": "Ammonia monooxygenase: a work in progress.",
+      "type": "EntityType.PUBLICATION",
+      "attributes": {
+        "publication_year": "2026",
+        "journal": "Chem Sci",
+        "citations": "0"
+      }
+    },
+    {
+      "uid": "PUBLICATION:EUROPEPMC:PMC13056722",
+      "name": "Structurally diverse biological nitrification inhibitors display distinct modes of inhibition in ammonia-oxidizing bacteria.",
+      "type": "EntityType.PUBLICATION",
+      "attributes": {
+        "publication_year": "2026",
+        "journal": "FEMS Microbiol Ecol",
+        "citations": "0"
+      }
+    },
+    {
+      "uid": "PUBLICATION:EUROPEPMC:40706639",
+      "name": "High-throughput screening assay for nitrification inhibitors and the discovery of goitrin as a biological nitrification inhibitor.",
+      "type": "EntityType.PUBLICATION",
+      "attributes": {
+        "publication_year": "2025",
+        "journal": "J Microbiol Methods",
+        "citations": "0"
+      }
+    },
+    {
+      "uid": "PUBLICATION:EUROPEPMC:IND609286520",
+      "name": "High-throughput screening assay for nitrification inhibitors and the discovery of goitrin as a biological nitrification inhibitor",
+      "type": "EntityType.PUBLICATION",
+      "attributes": {
+        "publication_year": "2025",
+        "journal": "Journal of microbiological methods",
+        "citations": "0"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5898187",
+      "name": "22311",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "None",
+        "max_phase": "None",
+        "smiles": "CC(C)Oc1ccc(Nc2nc3cc(CC(=O)O)ccc3n2C2C[C@@H](C)CC(C)(C)C2)cc1",
+        "formula": "C27H35N3O3",
+        "molecular_weight": "449.60"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1642655",
+      "name": "CHEMBL4778541",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CC(C)(C)c1ccc(C(=O)Nc2cn3cc(-n4ccnc4)ccc3n2)cc1",
+        "formula": "C21H21N5O",
+        "molecular_weight": "359.43"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2205637",
+      "name": "CHEMBL4778541",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CC(C)(C)c1ccc(C(=O)Nc2cn3cc(-n4ccnc4)ccc3n2)cc1.Cl",
+        "formula": "C21H22ClN5O",
+        "molecular_weight": "395.89"
+      }
+    },
+    {
+      "uid": "COMPOUND:IKKLFEDUYFZNBO-UHFFFAOYSA-N",
+      "name": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "432.3",
+        "formula": "C21H23Cl2N5O"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1188029",
+      "name": "CHEMBL534914",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CNc1cnccc1CN",
+        "formula": "C7H11N3",
+        "molecular_weight": "137.19"
+      }
+    },
+    {
+      "uid": "COMPOUND:LYWLGTGNNPSDHF-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-methylpyridin-3-amine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "137.18",
+        "formula": "C7H11N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:HMMQZJUGTQTCQX-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-methylpyridin-3-amine;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "210.10",
+        "formula": "C7H13Cl2N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1187921",
+      "name": "CHEMBL534467",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CNc1cncc(N(C)C)c1CN",
+        "formula": "C9H16N4",
+        "molecular_weight": "180.25"
+      }
+    },
+    {
+      "uid": "COMPOUND:AWVIXFRXKJBBDX-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-3-N,3-N,5-N-trimethylpyridine-3,5-diamine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "180.25",
+        "formula": "C9H16N4"
+      }
+    },
+    {
+      "uid": "COMPOUND:NPIWMZMSLNICMI-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-3-N,3-N,5-N-trimethylpyridine-3,5-diamine;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "253.17",
+        "formula": "C9H18Cl2N4"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1209499",
+      "name": "10742",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CCN(CCN)c1cc(C)c(OCC(=O)N[C@@H](Cc2ccccc2)[C@H](O)C(=O)N2CSC(C)(C)[C@H]2C(=O)N[C@H]2c3ccccc3C[C@H]2O)c(C)c1",
+        "formula": "C39H51N5O6S",
+        "molecular_weight": "717.93"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1190577",
+      "name": "CHEMBL541126",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "NCc1ccncc1NCC1CCCCC1",
+        "formula": "C13H21N3",
+        "molecular_weight": "219.33"
+      }
+    },
+    {
+      "uid": "COMPOUND:LUSQVPHVQHHDEB-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-(cyclohexylmethyl)pyridin-3-amine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "219.33",
+        "formula": "C13H21N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:IZOUMOBLBAFPDB-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-(cyclohexylmethyl)pyridin-3-amine;hydrate;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "310.3",
+        "formula": "C13H25Cl2N3O"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL6030300",
+      "name": "9154",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "None",
+        "max_phase": "None",
+        "smiles": "C[C@@]1(c2cc(NC(=O)c3ccc(Cl)cn3)ccc2F)CC2(CC2)OC(N)=N1",
+        "formula": "C19H18ClFN4O2",
+        "molecular_weight": "388.83"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1094982",
+      "name": "INOSITOL NIACINATE",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "2.0",
+        "smiles": "O=C(O[C@H]1[C@H](OC(=O)c2cccnc2)[C@@H](OC(=O)c2cccnc2)[C@H](OC(=O)c2cccnc2)[C@@H](OC(=O)c2cccnc2)[C@H]1OC(=O)c1cccnc1)c1cccnc1",
+        "formula": "C42H30N6O12",
+        "molecular_weight": "810.73"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1188790",
+      "name": "CHEMBL537401",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CCOc1cncc(OCC)c1CN",
+        "formula": "C10H16N2O2",
+        "molecular_weight": "196.25"
+      }
+    },
+    {
+      "uid": "COMPOUND:BVBAFECUFZTVHF-UHFFFAOYSA-N",
+      "name": "(3,5-diethoxy-4-pyridinyl)methanamine;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "269.17",
+        "formula": "C10H18Cl2N2O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:DBPIEYLNXRQNRY-UHFFFAOYSA-N",
+      "name": "(3,5-diethoxy-4-pyridinyl)methanamine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "196.25",
+        "formula": "C10H16N2O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:QGZKDVFQNNGYKY-BJUDXGSMSA-N",
+      "name": "azane",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "16.030",
+        "formula": "H3N"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1413910",
+      "name": "6844",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "O=C1C=C(c2ccccc2)OC(=O)C1C(=O)c1ccccc1",
+        "formula": "C18H12O4",
+        "molecular_weight": "292.29"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4529078",
+      "name": "6844",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Unknown",
+        "max_phase": "None",
+        "smiles": "COc1ccccc1N1CCN(C(=O)CSc2nc3ccccc3n3cnnc23)CC1",
+        "formula": "C22H22N6O2S",
+        "molecular_weight": "434.53"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL2157859",
+      "name": "Uncharacterized protein",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Macaca mulatta"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1933349",
+      "name": "Inhibitor/Ligand CHEMBL1933349",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=55.5nM (pChEMBL: 7.26)",
+        "pchembl_value": "7.26"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1188881",
+      "name": "CHEMBL537628",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "NCc1ccncc1NC1CCCCCC1",
+        "formula": "C13H21N3",
+        "molecular_weight": "219.33"
+      }
+    },
+    {
+      "uid": "COMPOUND:AVFUTMHSYXKZLL-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cycloheptylpyridin-3-amine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "219.33",
+        "formula": "C13H21N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:MJNVPXPGPUYYAL-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cycloheptylpyridin-3-amine;hydrate;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "310.3",
+        "formula": "C13H25Cl2N3O"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1078261",
+      "name": "PROPIVERINE",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "4.0",
+        "smiles": "CCCOC(C(=O)OC1CCN(C)CC1)(c1ccccc1)c1ccccc1",
+        "formula": "C23H29NO3",
+        "molecular_weight": "367.49"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2104164",
+      "name": "CAROXAZONE",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "2.0",
+        "smiles": "NC(=O)CN1Cc2ccccc2OC1=O",
+        "formula": "C10H10N2O3",
+        "molecular_weight": "206.20"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4558569",
+      "name": "6654",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Unknown",
+        "max_phase": "None",
+        "smiles": "Cc1cccc(C)c1NC(=O)Cn1c(=O)c2nnc(C(C)C)n2c2ccccc21",
+        "formula": "C22H23N5O2",
+        "molecular_weight": "389.46"
+      }
+    },
+    {
+      "uid": "COMPOUND:IFCCPDAHQDGHMH-LWMBPPNESA-N",
+      "name": "(2S,3S)-aziridine-2,3-dicarboxylic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "131.09",
+        "formula": "C4H5NO4"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1196476",
+      "name": "CHEMBL557160",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "NCc1ccncc1NC1CCCCC1",
+        "formula": "C12H19N3",
+        "molecular_weight": "205.30"
+      }
+    },
+    {
+      "uid": "COMPOUND:WUMRWBDWOMSRCA-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cyclohexylpyridin-3-amine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "205.30",
+        "formula": "C12H19N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:AQWFDUWRTSQUPU-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cyclohexylpyridin-3-amine;hydrate;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "296.23",
+        "formula": "C12H23Cl2N3O"
+      }
+    },
+    {
+      "uid": "COMPOUND:QGZKDVFQNNGYKY-UHFFFAOYSA-N",
+      "name": "azane",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "17.031",
+        "formula": "H3N"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1188878",
+      "name": "CHEMBL537624",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CCNc1cnccc1CN",
+        "formula": "C8H13N3",
+        "molecular_weight": "151.21"
+      }
+    },
+    {
+      "uid": "COMPOUND:JHMVQAUVSHUSEU-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-ethylpyridin-3-amine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "151.21",
+        "formula": "C8H13N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:XGTDVUIFVUXUQZ-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-ethylpyridin-3-amine;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "224.13",
+        "formula": "C8H15Cl2N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1188791",
+      "name": "CHEMBL537402",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "NCc1ccncc1NC1CCCC1",
+        "formula": "C11H17N3",
+        "molecular_weight": "191.28"
+      }
+    },
+    {
+      "uid": "COMPOUND:YNBSFGYHEBSHMR-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cyclopentylpyridin-3-amine;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "264.19",
+        "formula": "C11H19Cl2N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:MIDPRZDDHKUBRA-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cyclopentylpyridin-3-amine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "191.27",
+        "formula": "C11H17N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL6070889",
+      "name": "CHEMBL5715921",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "None",
+        "max_phase": "None",
+        "smiles": "CC(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@H](C=O)CC(=O)O",
+        "formula": "C23H34N6O9",
+        "molecular_weight": "538.56"
+      }
+    },
+    {
+      "uid": "COMPOUND:VQTZMPRKMMMAQG-YPFLJBJZSA-N",
+      "name": "(4S)-4-[[(2S)-2-acetamido-4-methylpentanoyl]amino]-5-[[(2S)-1-[[(2S)-1-carboxy-3-oxopropan-2-yl]amino]-3-(1H-imidazol-5-yl)-1-oxopropan-2-yl]amino]-5-oxopentanoic acid;2,2,2-trifluoroacetic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "652.6",
+        "formula": "C25H35F3N6O11"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1188708",
+      "name": "CHEMBL537174",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "NCc1ccncc1NC1CC1",
+        "formula": "C9H13N3",
+        "molecular_weight": "163.22"
+      }
+    },
+    {
+      "uid": "COMPOUND:IMTWKNKKBOBKPK-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cyclopropylpyridin-3-amine",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "163.22",
+        "formula": "C9H13N3"
+      }
+    },
+    {
+      "uid": "COMPOUND:CLXKAAFBNPIBAC-UHFFFAOYSA-N",
+      "name": "4-(aminomethyl)-N-cyclopropylpyridin-3-amine;hydrate;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "254.15",
+        "formula": "C9H17Cl2N3O"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1256578",
+      "name": "HISTIDINE MONOHYDROCHLORIDE",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "-1.0",
+        "smiles": "Cl.N[C@@H](Cc1cnc[nH]1)C(=O)O",
+        "formula": "C6H10ClN3O2",
+        "molecular_weight": "191.62"
+      }
+    },
+    {
+      "uid": "COMPOUND:HNDVDQJCIGZPNO-YFKPBYRVSA-N",
+      "name": "(2S)-2-amino-3-(1H-imidazol-5-yl)propanoic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "155.15",
+        "formula": "C6H9N3O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3360203",
+      "name": "PILARALISIB",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "2.0",
+        "smiles": "COc1ccc(Cl)c(Nc2nc3ccccc3nc2NS(=O)(=O)c2cccc(NC(=O)C(C)(C)N)c2)c1",
+        "formula": "C25H25ClN6O4S",
+        "molecular_weight": "541.03"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL461101",
+      "name": "ELTROMBOPAG",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "4.0",
+        "smiles": "CC1=NN(c2ccc(C)c(C)c2)C(=O)/C1=N\\Nc1cccc(-c2cccc(C(=O)O)c2)c1O",
+        "formula": "C25H22N4O4",
+        "molecular_weight": "442.48"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL601397",
+      "name": "5338",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "O=C1C2=C(Nc3ccccc3SC2c2ccc(OCc3ccccc3)cc2)c2ccccc21",
+        "formula": "C29H21NO2S",
+        "molecular_weight": "447.56"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL237694",
+      "name": "5338",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "NCCCCCN(Cc1ccc2c(c1)OCO2)C(=O)CCCc1c[nH]c2ccccc12",
+        "formula": "C25H31N3O3",
+        "molecular_weight": "421.54"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1950857",
+      "name": "5338",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CN[C@@H](C)C(=O)N[C@H](C(=O)N[C@H]1CCCN(CCc2ccc(C)cc2)C1)C(C)(C)C",
+        "formula": "C24H40N4O2",
+        "molecular_weight": "416.61"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4552880",
+      "name": "5338",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Unknown",
+        "max_phase": "None",
+        "smiles": "COc1ccc(NC(=O)Cn2nc3ccc(-c4ccccc4)nn3c2=O)cc1",
+        "formula": "C20H17N5O3",
+        "molecular_weight": "375.39"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL5291976",
+      "name": "LuxP/Q",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Vibrio harveyi"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1824168",
+      "name": "Inhibitor/Ligand CHEMBL1824168",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=9000.0nM (pChEMBL: 5.05)",
+        "pchembl_value": "5.05"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1824169",
+      "name": "Inhibitor/Ligand CHEMBL1824169",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=5000.0nM (pChEMBL: 5.30)",
+        "pchembl_value": "5.30"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1824170",
+      "name": "Inhibitor/Ligand CHEMBL1824170",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=4000.0nM (pChEMBL: 5.40)",
+        "pchembl_value": "5.40"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1824171",
+      "name": "Inhibitor/Ligand CHEMBL1824171",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=4000.0nM (pChEMBL: 5.40)",
+        "pchembl_value": "5.40"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL500339",
+      "name": "Inhibitor/Ligand CHEMBL500339",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=6000.0nM (pChEMBL: 5.22)",
+        "pchembl_value": "5.22"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5273954",
+      "name": "Inhibitor/Ligand CHEMBL5273954",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=80.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5280333",
+      "name": "Inhibitor/Ligand CHEMBL5280333",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=20.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5288808",
+      "name": "Inhibitor/Ligand CHEMBL5288808",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=20.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5289148",
+      "name": "Inhibitor/Ligand CHEMBL5289148",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=40.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1824159",
+      "name": "Inhibitor/Ligand CHEMBL1824159",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=60.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL3153",
+      "name": "Enoyl-CoA hydratase, mitochondrial",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Rattus norvegicus"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL64929",
+      "name": "Inhibitor/Ligand CHEMBL64929",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=3.5uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL66468",
+      "name": "Inhibitor/Ligand CHEMBL66468",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=7.5uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL66952",
+      "name": "Inhibitor/Ligand CHEMBL66952",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=5.0uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL63829",
+      "name": "Inhibitor/Ligand CHEMBL63829",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=31.0uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL64264",
+      "name": "Inhibitor/Ligand CHEMBL64264",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=14.0uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2114023",
+      "name": "Inhibitor/Ligand CHEMBL2114023",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=10.5uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL64930",
+      "name": "Inhibitor/Ligand CHEMBL64930",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=18.6uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL291349",
+      "name": "Inhibitor/Ligand CHEMBL291349",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity (umol/mg.of protein. min)=0.59% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL64960",
+      "name": "Inhibitor/Ligand CHEMBL64960",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=16.3uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL65975",
+      "name": "Inhibitor/Ligand CHEMBL65975",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=17.5uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL62652",
+      "name": "Inhibitor/Ligand CHEMBL62652",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=12.0uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3350279",
+      "name": "Inhibitor/Ligand CHEMBL3350279",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=4.5uM min-1 mg-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL4523211",
+      "name": "Enoyl-CoA hydratase, mitochondrial",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4462318",
+      "name": "Inhibitor/Ligand CHEMBL4462318",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Kd=9237.0nM (pChEMBL: 5.03)",
+        "pchembl_value": "5.03"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5653589",
+      "name": "Inhibitor/Ligand CHEMBL5653589",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Kd=180.79nM (pChEMBL: 6.74)",
+        "pchembl_value": "6.74"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1188626",
+      "name": "CHEMBL536949",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CNc1ccccc1CN",
+        "formula": "C8H12N2",
+        "molecular_weight": "136.20"
+      }
+    },
+    {
+      "uid": "COMPOUND:UCXUQHNEOWZPFT-UHFFFAOYSA-N",
+      "name": "2-(aminomethyl)-N-methylaniline",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "136.19",
+        "formula": "C8H12N2"
+      }
+    },
+    {
+      "uid": "COMPOUND:YEIAUZWEWLKKEP-UHFFFAOYSA-N",
+      "name": "2-(aminomethyl)-N-methylaniline;dihydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "209.11",
+        "formula": "C8H14Cl2N2"
+      }
+    },
+    {
+      "uid": "COMPOUND:ACSLYMUBHGQOHG-UHFFFAOYSA-N",
+      "name": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "200.15",
+        "formula": "C6H8N4O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:QZNNVYOVQUKYSC-JEDNCBNOSA-N",
+      "name": "(2S)-2-amino-3-(1H-imidazol-5-yl)propanoic acid;hydrochloride",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "191.61",
+        "formula": "C6H10ClN3O2"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1075103",
+      "name": "ATP synthase subunit beta, mitochondrial",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Saccharomyces cerevisiae S288c"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077464",
+      "name": "Inhibitor/Ligand CHEMBL1077464",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=700.0nM (pChEMBL: 6.16)",
+        "pchembl_value": "6.16"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077465",
+      "name": "Inhibitor/Ligand CHEMBL1077465",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=300.0nM (pChEMBL: 6.52)",
+        "pchembl_value": "6.52"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077466",
+      "name": "Inhibitor/Ligand CHEMBL1077466",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=400.0nM (pChEMBL: 6.40)",
+        "pchembl_value": "6.40"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077467",
+      "name": "Inhibitor/Ligand CHEMBL1077467",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=800.0nM (pChEMBL: 6.10)",
+        "pchembl_value": "6.10"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1078488",
+      "name": "Inhibitor/Ligand CHEMBL1078488",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=800.0nM (pChEMBL: 6.10)",
+        "pchembl_value": "6.10"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077482",
+      "name": "Inhibitor/Ligand CHEMBL1077482",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=400.0nM (pChEMBL: 6.40)",
+        "pchembl_value": "6.40"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077490",
+      "name": "Inhibitor/Ligand CHEMBL1077490",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1100.0nM (pChEMBL: 5.96)",
+        "pchembl_value": "5.96"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077491",
+      "name": "Inhibitor/Ligand CHEMBL1077491",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2800.0nM (pChEMBL: 5.55)",
+        "pchembl_value": "5.55"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1077479",
+      "name": "Inhibitor/Ligand CHEMBL1077479",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=17000.0nM (pChEMBL: 4.77)",
+        "pchembl_value": "4.77"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL4105938",
+      "name": "Carboxylic ester hydrolase",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Mycobacterium tuberculosis (strain ATCC 25618 / H37Rv)"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1085857",
+      "name": "Inhibitor/Ligand CHEMBL1085857",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1907",
+      "name": "Aminopeptidase N",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL90430",
+      "name": "Inhibitor/Ligand CHEMBL90430",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=28000.0nM (pChEMBL: 4.55)",
+        "pchembl_value": "4.55"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL287968",
+      "name": "Inhibitor/Ligand CHEMBL287968",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL290238",
+      "name": "Inhibitor/Ligand CHEMBL290238",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=783000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL37281",
+      "name": "Inhibitor/Ligand CHEMBL37281",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=3400.0nM (pChEMBL: 5.47)",
+        "pchembl_value": "5.47"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL35627",
+      "name": "Inhibitor/Ligand CHEMBL35627",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=3800.0nM (pChEMBL: 5.42)",
+        "pchembl_value": "5.42"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL36081",
+      "name": "Inhibitor/Ligand CHEMBL36081",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=5000.0nM (pChEMBL: 5.30)",
+        "pchembl_value": "5.30"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2372318",
+      "name": "Inhibitor/Ligand CHEMBL2372318",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=793000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL29292",
+      "name": "Inhibitor/Ligand CHEMBL29292",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2700.0nM (pChEMBL: 5.57)",
+        "pchembl_value": "5.57"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL35092",
+      "name": "Inhibitor/Ligand CHEMBL35092",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2900.0nM (pChEMBL: 5.54)",
+        "pchembl_value": "5.54"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL419873",
+      "name": "Inhibitor/Ligand CHEMBL419873",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=NonenM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL35660",
+      "name": "Inhibitor/Ligand CHEMBL35660",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL288458",
+      "name": "Inhibitor/Ligand CHEMBL288458",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2400.0nM (pChEMBL: 5.62)",
+        "pchembl_value": "5.62"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL34777",
+      "name": "Inhibitor/Ligand CHEMBL34777",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=146000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL289761",
+      "name": "Inhibitor/Ligand CHEMBL289761",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "GENE:NCBI:147035606",
+      "name": "NCBI Gene 147035606",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "GENE:NCBI:147035486",
+      "name": "NCBI Gene 147035486",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "GENE:NCBI:147035448",
+      "name": "NCBI Gene 147035448",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "COMPOUND:DMJHEIDWSIAXCS-UHFFFAOYSA-N",
+      "name": "(4-phenylmethoxyphenyl)boronic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "228.05",
+        "formula": "C13H13BO3"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL45455",
+      "name": "IKKLFEDUYFZNBO-UHFFFAOYSA-N",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "COc1cc(CC/N=C(\\S)NCCc2ccccc2)ccc1O",
+        "formula": "C18H22N2O2S",
+        "molecular_weight": "330.45"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL306098",
+      "name": "IKKLFEDUYFZNBO-UHFFFAOYSA-N",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CCCc1nc(-c2cccnc2)cn2c(C(Cc3cccnc3)C(=O)NC(CC3CCCCC3)C(O)CC(C(=O)N3CCOCC3)C(C)C)nnc12",
+        "formula": "C40H54N8O4",
+        "molecular_weight": "710.92"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL315271",
+      "name": "IKKLFEDUYFZNBO-UHFFFAOYSA-N",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "Oc1ccc2c(c1)S[C@H](CC1CCCC1)[C@H](c1ccc(OCCN3CCCCC3)cc1)O2",
+        "formula": "C27H35NO3S",
+        "molecular_weight": "453.65"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL349269",
+      "name": "IKKLFEDUYFZNBO-UHFFFAOYSA-N",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "C=C(C)CN1Cc2cccc3nc(O)n(c23)CC1CCC",
+        "formula": "C17H23N3O",
+        "molecular_weight": "285.39"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2016323468-A1",
+      "name": "Patent AU-2016323468-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2016323468-A1",
+        "queried_compound": "IKKLFEDUYFZNBO-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2017270221-A1",
+      "name": "Patent AU-2017270221-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2017270221-A1",
+        "queried_compound": "IKKLFEDUYFZNBO-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:CA-2998509-A1",
+      "name": "Patent CA-2998509-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "CA-2998509-A1",
+        "queried_compound": "IKKLFEDUYFZNBO-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:CA-3025007-A1",
+      "name": "Patent CA-3025007-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "CA-3025007-A1",
+        "queried_compound": "IKKLFEDUYFZNBO-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:CN-109843298-A",
+      "name": "Patent CN-109843298-A (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "CN-109843298-A",
+        "queried_compound": "IKKLFEDUYFZNBO-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "COMPOUND:QINPEPAQOBZPOF-UHFFFAOYSA-N",
+      "name": "2-amino-N-[3-[[3-(2-chloro-5-methoxyanilino)quinoxalin-2-yl]sulfamoyl]phenyl]-2-methylpropanamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "541.0",
+        "formula": "C25H25ClN6O4S"
+      }
+    },
+    {
+      "uid": "COMPOUND:HYSMCRNFENOHJH-UHFFFAOYSA-N",
+      "name": "3,3,14,14-tetramethylhexadecanedioic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "342.5",
+        "formula": "C20H38O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2159354",
+      "name": "CHEMBL1933349",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "[3H]c1c(-c2cc(Cl)cc(Cl)c2)nn([C@@H](C)c2ccc(C(=O)NCCC(=O)O)cc2)c1-c1ccc2c([3H])c(OC)ccc2c1",
+        "formula": "C32H27Cl2N3O4",
+        "molecular_weight": "592.51"
+      }
+    },
+    {
+      "uid": "COMPOUND:DNTVJEMGHBIUMW-IBGZPJMESA-N",
+      "name": "3-[[4-[(1S)-1-[3-(3,5-dichlorophenyl)-5-(6-methoxynaphthalen-2-yl)pyrazol-1-yl]ethyl]benzoyl]amino]propanoic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "588.5",
+        "formula": "C32H27Cl2N3O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:MDPOYQZCXPBZJP-SFECMWDFSA-N",
+      "name": "(Z)-6-[4-[(Z)-5-carboxy-4,4-dimethylpent-1-enyl]phenyl]-3,3-dimethylhex-5-enoic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "358.5",
+        "formula": "C22H30O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:KCBYGHZJZXZHQZ-UHFFFAOYSA-N",
+      "name": "N-(5-aminopentyl)-N-(1,3-benzodioxol-5-ylmethyl)-4-(1H-indol-3-yl)butanamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "421.5",
+        "formula": "C25H31N3O3"
+      }
+    },
+    {
+      "uid": "COMPOUND:SDGMUWHPAOSSST-SESVDKBCSA-N",
+      "name": "(2S)-3,3-dimethyl-2-[[(2S)-2-(methylamino)propanoyl]amino]-N-[(3S)-1-[2-(4-methylphenyl)ethyl]piperidin-3-yl]butanamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "416.6",
+        "formula": "C24H40N4O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:SRJWQXGYTPCQBI-UHFFFAOYSA-N",
+      "name": "3,3,12,12-tetramethyltetradecanedioic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "314.5",
+        "formula": "C18H34O4"
+      }
+    },
+    {
+      "uid": "PATENT:US-20020065248-A1",
+      "name": "Patent US-20020065248-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "US-20020065248-A1",
+        "queried_compound": "ACSLYMUBHGQOHG-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:EP-0787010-A1",
+      "name": "Patent EP-0787010-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "EP-0787010-A1",
+        "queried_compound": "ACSLYMUBHGQOHG-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:WO-9612499-A1",
+      "name": "Patent WO-9612499-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "WO-9612499-A1",
+        "queried_compound": "ACSLYMUBHGQOHG-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:WO-1996012499-A1",
+      "name": "Patent WO-1996012499-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "WO-1996012499-A1",
+        "queried_compound": "ACSLYMUBHGQOHG-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:US5658885",
+      "name": "Patent US5658885 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "US5658885",
+        "queried_compound": "ACSLYMUBHGQOHG-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "COMPOUND:HCMCGCRMRREZCS-UHFFFAOYSA-N",
+      "name": "N-(4-methoxyphenyl)-2-(3-oxo-6-phenyl-[1,2,4]triazolo[4,3-b]pyridazin-2-yl)acetamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "375.4",
+        "formula": "C20H17N5O3"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2001249870-A1",
+      "name": "Patent AU-2001249870-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2001249870-A1",
+        "queried_compound": "QGZKDVFQNNGYKY-BJUDXGSMSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2001251315-A1",
+      "name": "Patent AU-2001251315-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2001251315-A1",
+        "queried_compound": "QGZKDVFQNNGYKY-BJUDXGSMSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2001253363-A1",
+      "name": "Patent AU-2001253363-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2001253363-A1",
+        "queried_compound": "QGZKDVFQNNGYKY-BJUDXGSMSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2003226408-A1",
+      "name": "Patent AU-2003226408-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2003226408-A1",
+        "queried_compound": "QGZKDVFQNNGYKY-BJUDXGSMSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2003226408-B2",
+      "name": "Patent AU-2003226408-B2 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2003226408-B2",
+        "queried_compound": "QGZKDVFQNNGYKY-BJUDXGSMSA-N"
+      }
+    },
+    {
+      "uid": "COMPOUND:RQKGSIGQBVSOAD-UHFFFAOYSA-N",
+      "name": "3,3,18,18-tetramethylicosanedioic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "398.6",
+        "formula": "C24H46O4"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL6100",
+      "name": "Autoinducer 2-binding periplasmic protein LuxP",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Vibrio harveyi"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL307145",
+      "name": "Inhibitor/Ligand CHEMBL307145",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2000.0nM (pChEMBL: 5.70)",
+        "pchembl_value": "5.70"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL310798",
+      "name": "Inhibitor/Ligand CHEMBL310798",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=3000.0nM (pChEMBL: 5.52)",
+        "pchembl_value": "5.52"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL288114",
+      "name": "Inhibitor/Ligand CHEMBL288114",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=50000.0nM (pChEMBL: 4.30)",
+        "pchembl_value": "4.30"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1527",
+      "name": "Inhibitor/Ligand CHEMBL1527",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=4000.0nM (pChEMBL: 5.40)",
+        "pchembl_value": "5.40"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL535194",
+      "name": "Inhibitor/Ligand CHEMBL535194",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=22000.0nM (pChEMBL: 4.66)",
+        "pchembl_value": "4.66"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL254710",
+      "name": "Inhibitor/Ligand CHEMBL254710",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=12000.0nM (pChEMBL: 4.92)",
+        "pchembl_value": "4.92"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL220779",
+      "name": "Inhibitor/Ligand CHEMBL220779",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=61000.0nM (pChEMBL: 4.21)",
+        "pchembl_value": "4.21"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL400737",
+      "name": "Inhibitor/Ligand CHEMBL400737",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=3000.0nM (pChEMBL: 5.52)",
+        "pchembl_value": "5.52"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL254077",
+      "name": "Inhibitor/Ligand CHEMBL254077",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=4000.0nM (pChEMBL: 5.40)",
+        "pchembl_value": "5.40"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL244948",
+      "name": "Inhibitor/Ligand CHEMBL244948",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=12000.0nM (pChEMBL: 4.92)",
+        "pchembl_value": "4.92"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL242540",
+      "name": "Inhibitor/Ligand CHEMBL242540",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=21000.0nM (pChEMBL: 4.68)",
+        "pchembl_value": "4.68"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL280998",
+      "name": "Inhibitor/Ligand CHEMBL280998",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=59000.0nM (pChEMBL: 4.23)",
+        "pchembl_value": "4.23"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL193493",
+      "name": "Inhibitor/Ligand CHEMBL193493",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "EC50=150.0nM (pChEMBL: 6.82)",
+        "pchembl_value": "6.82"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL560745",
+      "name": "Inhibitor/Ligand CHEMBL560745",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "EC50=580.0nM (pChEMBL: 6.24)",
+        "pchembl_value": "6.24"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL539221",
+      "name": "Inhibitor/Ligand CHEMBL539221",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "EC50=750.0nM (pChEMBL: 6.12)",
+        "pchembl_value": "6.12"
+      }
+    },
+    {
+      "uid": "COMPOUND:PRZOLWGBDVBQDZ-SFHVURJKSA-N",
+      "name": "N-[3-[(7S)-5-amino-7-methyl-4-oxa-6-azaspiro[2.5]oct-5-en-7-yl]-4-fluorophenyl]-5-chloropyridine-2-carboxamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "388.8",
+        "formula": "C19H18ClFN4O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:YNXAXURVWNMSMN-UHFFFAOYSA-N",
+      "name": "N-(2,6-dimethylphenyl)-2-(4-oxo-1-propan-2-yl-[1,2,4]triazolo[4,3-a]quinoxalin-5-yl)acetamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "389.4",
+        "formula": "C22H23N5O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:MWKSRKSEWLRPBL-UHFFFAOYSA-N",
+      "name": "4-methyl-3-[(2-methyl-6-pyridin-3-ylpyrazolo[3,4-d]pyrimidin-4-yl)amino]-N-[3-(trifluoromethyl)phenyl]benzamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "503.5",
+        "formula": "C26H20F3N7O"
+      }
+    },
+    {
+      "uid": "COMPOUND:FTJRJTJIASQURO-GEPFMOHWSA-N",
+      "name": "N-[[(2S,3S,4R,5R)-5-(6-aminopurin-9-yl)-4-hydroxy-2-(hydroxymethyl)oxolan-3-yl]methyl]-3-(4-methoxyphenyl)propanamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "442.5",
+        "formula": "C21H26N6O5"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3634562",
+      "name": "CHEMBL288114",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "O.O=C(O)c1cc(O)c(O)c(O)c1",
+        "formula": "C7H8O6",
+        "molecular_weight": "188.13"
+      }
+    },
+    {
+      "uid": "COMPOUND:LNTHITQWFMADLM-UHFFFAOYSA-N",
+      "name": "3,4,5-trihydroxybenzoic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "170.12",
+        "formula": "C7H6O5"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2003234625-A1",
+      "name": "Patent AU-2003234625-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2003234625-A1",
+        "queried_compound": "HYSMCRNFENOHJH-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2003248810-B2",
+      "name": "Patent AU-2003248810-B2 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2003248810-B2",
+        "queried_compound": "HYSMCRNFENOHJH-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2003255937-A1",
+      "name": "Patent AU-2003255937-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2003255937-A1",
+        "queried_compound": "HYSMCRNFENOHJH-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2003265267-A1",
+      "name": "Patent AU-2003265267-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2003265267-A1",
+        "queried_compound": "HYSMCRNFENOHJH-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "PATENT:AU-2004284932-A1",
+      "name": "Patent AU-2004284932-A1 (Patented Nitrification Molecule)",
+      "type": "EntityType.PATENT",
+      "attributes": {
+        "patent_number": "AU-2004284932-A1",
+        "queried_compound": "HYSMCRNFENOHJH-UHFFFAOYSA-N"
+      }
+    },
+    {
+      "uid": "COMPOUND:ATEFPOUAMCWAQS-UHFFFAOYSA-N",
+      "name": "7,8-dihydroxychromen-2-one",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "178.14",
+        "formula": "C9H6O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:FSRAYEPFCGIWHD-LRSZOYCWSA-N",
+      "name": "[(2R,3R,4R,6S)-6-[(2S,3S,4S,6R)-6-[(2R)-1-[(3R,4S,5R,6R)-6-[(R)-[(4E,6E,8E,10R,11R,12E,14E,18S,19S)-11-[(2R,3S,4S,5R,6S)-3,4-dihydroxy-5-methoxy-6-methyloxan-2-yl]oxy-18-hydroxy-19-methoxy-4,6,8,10,14-pentamethyl-3-oxocycloicosa-4,6,8,12,14-pentaen-1-yl]-hydroxymethyl]-4,6-dihydroxy-3,5-dimethyloxan-2-yl]-3-methoxypropan-2-yl]oxy-4-hydroxy-2,4-dimethyloxan-3-yl]oxy-4-methoxy-2-methyloxan-3-yl] acetate",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "1169.4",
+        "formula": "C61H100O21"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1945528",
+      "name": "CN-109843298-A",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "Cc1cn([C@H]2C[C@H](OP(=O)(O)OC[C@H]3O[C@@H](n4ccc(N)nc4=O)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4cnc5c(N)ncnc54)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4cnc5c(N)ncnc54)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4ccc(N)nc4=O)C[C@@H]3OP(=O)(O)OC[C@H](Cn3cnc4cc5c(N)nc(N)nc5nc43)OP(=O)(O)OC[C@H]3O[C@@H](n4cnc5c(=O)[nH]c(N)nc54)C[C@@H]3OP(=O)(O)CC[C@H]3O[C@@H](n4cc(C)c(=O)[nH]c4=O)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4cnc5c(N)ncnc54)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4cc(C)c(=O)[nH]c4=O)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4ccc(N)nc4=O)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4cc(C)c(=O)[nH]c4=O)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4ccc(N)nc4=O)C[C@@H]3OP(=O)(O)OC[C@H]3O[C@@H](n4cc(C)c(=O)[nH]c4=O)C[C@@H]3O)[C@@H](COP(=O)(O)O[C@H]3C[C@H](n4cnc5c(=O)[nH]c(N)nc54)O[C@@H]3COP(=O)(O)O[C@H]3C[C@H](n4cnc5c(=O)[nH]c(N)nc54)O[C@@H]3COP(=O)(O)O[C@H]3C[C@H](n4cnc5c(N)ncnc54)O[C@@H]3COP(=O)(O)O[C@H]3C[C@H](n4cnc5c(N)ncnc54)O[C@@H]3COP(=O)(O)O[C@H]3C[C@H](n4cnc5c(=O)[nH]c(N)nc54)O[C@@H]3CO)O2)c(=O)nc1N",
+        "formula": "C188H237N75O108P18",
+        "molecular_weight": "5832.91"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5314912",
+      "name": "CN-105",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Protein",
+        "max_phase": "2.0",
+        "smiles": "CC(=O)N[C@H](C(=O)N[C@@H](CO)C(=O)N[C@@H](CCCNC(=N)N)C(=O)N[C@@H](CCCNC(=N)N)C(=O)N[C@@H](CCCNC(=N)N)C(N)=O)C(C)C",
+        "formula": "C28H55N15O7",
+        "molecular_weight": "713.85"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL181104",
+      "name": "[Cu(CN)2]-",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "",
+        "formula": "CCuN2-",
+        "molecular_weight": "103.57"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL180870",
+      "name": "[Au(CN)2]",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "",
+        "formula": "CAuN2-",
+        "molecular_weight": "236.99"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2028164",
+      "name": "Fe complex",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "",
+        "formula": "C6FeN6-4",
+        "molecular_weight": "211.95"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1293189",
+      "name": "ABC-type oligopeptide transporter ABCB9",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288628",
+      "name": "Inhibitor/Ligand CHEMBL1288628",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL3708197",
+      "name": "Cytosolic purine 5'-nucleotidase",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL18094",
+      "name": "Inhibitor/Ligand CHEMBL18094",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=0.5% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3747536",
+      "name": "Inhibitor/Ligand CHEMBL3747536",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=35.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL216973",
+      "name": "Inhibitor/Ligand CHEMBL216973",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=30.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL226396",
+      "name": "Inhibitor/Ligand CHEMBL226396",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=23.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL71443",
+      "name": "Inhibitor/Ligand CHEMBL71443",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=11.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL14145",
+      "name": "Inhibitor/Ligand CHEMBL14145",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=36.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL226345",
+      "name": "Inhibitor/Ligand CHEMBL226345",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=19.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL85811",
+      "name": "Inhibitor/Ligand CHEMBL85811",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=23.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL205165",
+      "name": "Inhibitor/Ligand CHEMBL205165",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=40.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL79925",
+      "name": "Inhibitor/Ligand CHEMBL79925",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=19.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL296021",
+      "name": "Inhibitor/Ligand CHEMBL296021",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=36.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL108829",
+      "name": "Inhibitor/Ligand CHEMBL108829",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=19.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2386190",
+      "name": "Inhibitor/Ligand CHEMBL2386190",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=2.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL76398",
+      "name": "Inhibitor/Ligand CHEMBL76398",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=8.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL228862",
+      "name": "Inhibitor/Ligand CHEMBL228862",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=20.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL4295921",
+      "name": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1097198",
+      "name": "Inhibitor/Ligand CHEMBL1097198",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Vmax=0.228umol/min/mg (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4216260",
+      "name": "Inhibitor/Ligand CHEMBL4216260",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Vmax=1.6umol/min/mg (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4203412",
+      "name": "Inhibitor/Ligand CHEMBL4203412",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=128000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4203821",
+      "name": "Inhibitor/Ligand CHEMBL4203821",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4208698",
+      "name": "Inhibitor/Ligand CHEMBL4208698",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:BRRSNXCXLSVPFC-UHFFFAOYSA-N",
+      "name": "2,3,4-trihydroxybenzoic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "170.12",
+        "formula": "C7H6O5"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL5903324",
+      "name": "EP-0787010-A1",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "None",
+        "max_phase": "None",
+        "smiles": "O=C(O)CC1CCN(C(=O)c2ccc(Cl)c(Cn3ccc4cc(C(F)(F)F)cc(F)c43)c2Cl)CC1",
+        "formula": "C24H20Cl2F4N2O3",
+        "molecular_weight": "531.33"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL389471",
+      "name": "COUMERMYCIN A1",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CO[C@H]1[C@H](OC(=O)c2ccc(C)[nH]2)[C@H](O)[C@@H](Oc2ccc3c(O)c(NC(=O)c4c[nH]c(C(=O)Nc5c(O)c6ccc(O[C@H]7OC(C)(C)[C@@H](OC)[C@H](OC(=O)c8ccc(C)[nH]8)[C@@H]7O)c(C)c6oc5=O)c4C)c(=O)oc3c2C)OC1(C)C",
+        "formula": "C55H59N5O20",
+        "molecular_weight": "1110.09"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL510197",
+      "name": "SARASINOSIDE A1",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CC(=O)N[C@H]1[C@H](O[C@@H]2CO[C@@H](O[C@H]3CC[C@]4(C)C5=C(CC[C@H]4C3(C)C)[C@@H]3CC[C@H]([C@H](C)CC(=O)C=C(C)C)[C@@]3(C)CC5)[C@H](O[C@@H]3O[C@H](CO[C@@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@H]4O[C@@H]4O[C@H](CO)[C@@H](O)[C@H](O)[C@H]4O)[C@@H](O)[C@H](O)[C@H]3NC(C)=O)[C@H]2O)O[C@H](CO)[C@H](O)[C@@H]1O",
+        "formula": "C62H100N2O26",
+        "molecular_weight": "1289.47"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3652558",
+      "name": "EP-0787010-A1",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CN(c1cccc(F)c1)c1cc(-c2c[nH]c3ncc(-c4cnn(C)c4)cc23)nc(N)n1",
+        "formula": "C22H19FN8",
+        "molecular_weight": "414.45"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3962224",
+      "name": "EP-0787010-A1",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "O=C(Nc1ccc(C(F)(F)F)cc1)N1CCC(F)(c2ncc(C(O)CO)cc2Cl)CC1",
+        "formula": "C20H20ClF4N3O3",
+        "molecular_weight": "461.84"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1293196",
+      "name": "Endochitinase A1",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Aspergillus fumigatus"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL20",
+      "name": "Inhibitor/Ligand CHEMBL20",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=164000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288786",
+      "name": "Inhibitor/Ligand CHEMBL1288786",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=315000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288787",
+      "name": "Inhibitor/Ligand CHEMBL1288787",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288807",
+      "name": "Inhibitor/Ligand CHEMBL1288807",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL281376",
+      "name": "Inhibitor/Ligand CHEMBL281376",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=850000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL265674",
+      "name": "Inhibitor/Ligand CHEMBL265674",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288808",
+      "name": "Inhibitor/Ligand CHEMBL1288808",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288809",
+      "name": "Inhibitor/Ligand CHEMBL1288809",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL382111",
+      "name": "Inhibitor/Ligand CHEMBL382111",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=730000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288881",
+      "name": "Inhibitor/Ligand CHEMBL1288881",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=479000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288882",
+      "name": "Inhibitor/Ligand CHEMBL1288882",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=141000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288883",
+      "name": "Inhibitor/Ligand CHEMBL1288883",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=243000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288884",
+      "name": "Inhibitor/Ligand CHEMBL1288884",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL173915",
+      "name": "Inhibitor/Ligand CHEMBL173915",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1288928",
+      "name": "Inhibitor/Ligand CHEMBL1288928",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=320000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1293239",
+      "name": "Bcl-2-related protein A1",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Mus musculus"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1379677",
+      "name": "Inhibitor/Ligand CHEMBL1379677",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1487918",
+      "name": "Inhibitor/Ligand CHEMBL1487918",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1516834",
+      "name": "Inhibitor/Ligand CHEMBL1516834",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=22400.0nM (pChEMBL: 4.65)",
+        "pchembl_value": "4.65"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1438721",
+      "name": "Inhibitor/Ligand CHEMBL1438721",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1399595",
+      "name": "Inhibitor/Ligand CHEMBL1399595",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1399711",
+      "name": "Inhibitor/Ligand CHEMBL1399711",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=6150.0nM (pChEMBL: 5.21)",
+        "pchembl_value": "5.21"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1371774",
+      "name": "Inhibitor/Ligand CHEMBL1371774",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=25400.0nM (pChEMBL: 4.59)",
+        "pchembl_value": "4.59"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1478187",
+      "name": "Inhibitor/Ligand CHEMBL1478187",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1498529",
+      "name": "Inhibitor/Ligand CHEMBL1498529",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1369154",
+      "name": "Inhibitor/Ligand CHEMBL1369154",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1381644",
+      "name": "Inhibitor/Ligand CHEMBL1381644",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=3491.2nM (pChEMBL: 5.46)",
+        "pchembl_value": "5.46"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1568497",
+      "name": "Inhibitor/Ligand CHEMBL1568497",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1068",
+      "name": "Inhibitor/Ligand CHEMBL1068",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1271764",
+      "name": "Inhibitor/Ligand CHEMBL1271764",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=650.0nM (pChEMBL: 6.19)",
+        "pchembl_value": "6.19"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1501864",
+      "name": "Inhibitor/Ligand CHEMBL1501864",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1955709",
+      "name": "Heterogeneous nuclear ribonucleoprotein A1",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL65",
+      "name": "Inhibitor/Ligand CHEMBL65",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Kd=82.7nM (pChEMBL: 7.08)",
+        "pchembl_value": "7.08"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1956507",
+      "name": "Inhibitor/Ligand CHEMBL1956507",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4439278",
+      "name": "Inhibitor/Ligand CHEMBL4439278",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3833324",
+      "name": "GOLD AU 198",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "2.0",
+        "smiles": "",
+        "formula": "Au",
+        "molecular_weight": "197.97"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL118385",
+      "name": "AUPHEN",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "",
+        "formula": "C12H8AuCl2N2+2",
+        "molecular_weight": "448.08"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL326518",
+      "name": "AU(TERPY)",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "",
+        "formula": "C15H11AuClN3+3",
+        "molecular_weight": "465.69"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL332792",
+      "name": "AUCYCLAM",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "",
+        "formula": "C10H20AuN4",
+        "molecular_weight": "393.27"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3325776",
+      "name": "AU-2001249870-A1",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CC(C)=CCC/C(C)=C/CNC(=O)NC/C=C(\\C)CCC=C(C)C",
+        "formula": "C21H36N2O",
+        "molecular_weight": "332.53"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL4296009",
+      "name": "Heterogeneous nuclear ribonucleoprotein D0",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4129274",
+      "name": "Inhibitor/Ligand CHEMBL4129274",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL3752910",
+      "name": "Inhibitor/Ligand CHEMBL3752910",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Kd=1149.32nM (pChEMBL: 5.94)",
+        "pchembl_value": "5.94"
+      }
+    },
+    {
+      "uid": "GENE:NCBI:7157",
+      "name": "NCBI Gene 7157",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "GENE:NCBI:348",
+      "name": "NCBI Gene 348",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "GENE:NCBI:7124",
+      "name": "NCBI Gene 7124",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "COMPOUND:WQGWDDDVZFFDIG-UHFFFAOYSA-N",
+      "name": "benzene-1,2,3-triol",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "126.11",
+        "formula": "C6H6O3"
+      }
+    },
+    {
+      "uid": "COMPOUND:HTQNYBBTZSBWKL-UHFFFAOYSA-N",
+      "name": "phenyl-(2,3,4-trihydroxyphenyl)methanone",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "230.22",
+        "formula": "C13H10O4"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL3831223",
+      "name": "Aminopeptidase",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4449517",
+      "name": "Inhibitor/Ligand CHEMBL4449517",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Stability=88.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:XFIFYSDGOLDFKE-GURQWTFNSA-N",
+      "name": "methyl 1-[(2S)-2-[[(1S,2S)-2-amino-1-cyano-3-phenylpropyl]amino]-4-methylpentanoyl]pyrrolidine-2-carboxylate",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "400.5",
+        "formula": "C22H32N4O3"
+      }
+    },
+    {
+      "uid": "COMPOUND:MGEJWRLUJBZSOF-UHFFFAOYSA-N",
+      "name": "1-[2-(4-hydroxy-3-methoxyphenyl)ethyl]-3-(2-phenylethyl)thiourea",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "330.4",
+        "formula": "C18H22N2O2S"
+      }
+    },
+    {
+      "uid": "COMPOUND:GVTBNQNUIVIAOJ-YKTUUQIKSA-N",
+      "name": "(2E,4E,6E,8R,9R,10E,12E,16S,17S)-19-[(R)-[(2R,3R,4S,5R)-2,4-dihydroxy-6-[(2R)-2-[(2R,4S,5S,6S)-4-hydroxy-5-[(2S,4R,5R,6R)-5-hydroxy-4-methoxy-6-methyloxan-2-yl]oxy-4,6-dimethyloxan-2-yl]oxy-3-methoxypropyl]-3,5-dimethyloxan-2-yl]-methoxymethyl]-9-[(2R,3S,4S,5R,6S)-3,4-dihydroxy-5-methoxy-6-methyloxan-2-yl]oxy-16-hydroxy-17-methoxy-2,4,6,8,12-pentamethylcycloicosa-2,4,6,10,12-pentaen-1-one",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "1141.4",
+        "formula": "C60H100O20"
+      }
+    },
+    {
+      "uid": "COMPOUND:CNMMIYOITUYCNC-LWEDLAQUSA-N",
+      "name": "methyl (2S)-2-[[(2S)-2-amino-1-cyano-3-phenylpropyl]amino]-3-methylbutanoate",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "289.37",
+        "formula": "C16H23N3O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:PUSYKFULBVBEBE-UHFFFAOYSA-N",
+      "name": "4-[3-[4-[3-[(7-chloroquinolin-4-yl)amino]propyl]piperazin-1-yl]propyl-(cyclopropylmethyl)amino]-4-oxobutanoic acid",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "516.1",
+        "formula": "C27H38ClN5O3"
+      }
+    },
+    {
+      "uid": "COMPOUND:XIROXSOOOAZHLL-UHFFFAOYSA-N",
+      "name": "1-(2,3,4-trihydroxyphenyl)ethanone",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "168.15",
+        "formula": "C8H8O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1552426",
+      "name": "THROMBOXANE B2",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CCCCC[C@H](O)/C=C/[C@H]1OC(O)C[C@H](O)[C@@H]1C/C=C\\CCCC(=O)O",
+        "formula": "C20H34O6",
+        "molecular_weight": "370.49"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL4296284",
+      "name": "Beta-crystallin B2",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL225111",
+      "name": "Inhibitor/Ligand CHEMBL225111",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4203007",
+      "name": "Inhibitor/Ligand CHEMBL4203007",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4205794",
+      "name": "Inhibitor/Ligand CHEMBL4205794",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4218328",
+      "name": "Inhibitor/Ligand CHEMBL4218328",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4213644",
+      "name": "Inhibitor/Ligand CHEMBL4213644",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4204376",
+      "name": "Inhibitor/Ligand CHEMBL4204376",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4209249",
+      "name": "Inhibitor/Ligand CHEMBL4209249",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=None% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL3419",
+      "name": "Carboxypeptidase B2",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL302067",
+      "name": "Inhibitor/Ligand CHEMBL302067",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1000.0nM (pChEMBL: 6.00)",
+        "pchembl_value": "6.00"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL150332",
+      "name": "Inhibitor/Ligand CHEMBL150332",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=8.2nM (pChEMBL: 8.09)",
+        "pchembl_value": "8.09"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL436425",
+      "name": "Inhibitor/Ligand CHEMBL436425",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=21.0nM (pChEMBL: 7.68)",
+        "pchembl_value": "7.68"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL151284",
+      "name": "Inhibitor/Ligand CHEMBL151284",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1600.0nM (pChEMBL: 5.80)",
+        "pchembl_value": "5.80"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL356252",
+      "name": "Inhibitor/Ligand CHEMBL356252",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=52.0nM (pChEMBL: 7.28)",
+        "pchembl_value": "7.28"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL68399",
+      "name": "Inhibitor/Ligand CHEMBL68399",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2.7nM (pChEMBL: 8.57)",
+        "pchembl_value": "8.57"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL344949",
+      "name": "Inhibitor/Ligand CHEMBL344949",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=50.0nM (pChEMBL: 7.30)",
+        "pchembl_value": "7.30"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL358017",
+      "name": "Inhibitor/Ligand CHEMBL358017",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=36.0nM (pChEMBL: 7.44)",
+        "pchembl_value": "7.44"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL33352",
+      "name": "Inhibitor/Ligand CHEMBL33352",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL149680",
+      "name": "Inhibitor/Ligand CHEMBL149680",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=6.0nM (pChEMBL: 8.22)",
+        "pchembl_value": "8.22"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL70177",
+      "name": "Inhibitor/Ligand CHEMBL70177",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2.0nM (pChEMBL: 8.70)",
+        "pchembl_value": "8.70"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL67234",
+      "name": "Inhibitor/Ligand CHEMBL67234",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=20000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "GENE:NCBI:3569",
+      "name": "NCBI Gene 3569",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "GENE:NCBI:7422",
+      "name": "NCBI Gene 7422",
+      "type": "EntityType.GENE",
+      "attributes": {}
+    },
+    {
+      "uid": "COMPOUND:DVRZRQXKGNGTPD-KSCSMHSMSA-N",
+      "name": "methyl (2S)-2-[[(2S)-2-amino-1-cyano-3-phenylpropyl]amino]-4-methylpentanoate",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "303.4",
+        "formula": "C17H25N3O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL4555272",
+      "name": "CA-3025007-A1",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Unknown",
+        "max_phase": "None",
+        "smiles": "CO[C@@H]1[C@@H](OC(=O)c2ccc(C)[nH]2)[C@@H](O)[C@H](Oc2ccc3c(O)c(NC(=O)c4c[nH]c(C(=O)Nc5c(O)c6ccc(O[C@@H]7OC(C)(C)[C@H](OC)[C@@H](OC(=O)c8ccc(C)[nH]8)[C@H]7O)c(C)c6oc5=O)c4C)c(=O)oc3c2C)OC1(C)C",
+        "formula": "C55H59N5O20",
+        "molecular_weight": "1110.09"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL613543",
+      "name": "CA-755",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL7643",
+      "name": "Inhibitor/Ligand CHEMBL7643",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=100.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL7829",
+      "name": "Inhibitor/Ligand CHEMBL7829",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=100.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL79188",
+      "name": "Inhibitor/Ligand CHEMBL79188",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Inhibition=94.0% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL275638",
+      "name": "Inhibitor/Ligand CHEMBL275638",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL327209",
+      "name": "Inhibitor/Ligand CHEMBL327209",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL291876",
+      "name": "Inhibitor/Ligand CHEMBL291876",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL483634",
+      "name": "Inhibitor/Ligand CHEMBL483634",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL519494",
+      "name": "Inhibitor/Ligand CHEMBL519494",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL263241",
+      "name": "Inhibitor/Ligand CHEMBL263241",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL243664",
+      "name": "Inhibitor/Ligand CHEMBL243664",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL77695",
+      "name": "Inhibitor/Ligand CHEMBL77695",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL74490",
+      "name": "Inhibitor/Ligand CHEMBL74490",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL75349",
+      "name": "Inhibitor/Ligand CHEMBL75349",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL490975",
+      "name": "Inhibitor/Ligand CHEMBL490975",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL73930",
+      "name": "Inhibitor/Ligand CHEMBL73930",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1075392",
+      "name": "AN3-CA",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177818",
+      "name": "Inhibitor/Ligand CHEMBL2177818",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=70000.0nM (pChEMBL: 4.16)",
+        "pchembl_value": "4.16"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177825",
+      "name": "Inhibitor/Ligand CHEMBL2177825",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=60000.0nM (pChEMBL: 4.22)",
+        "pchembl_value": "4.22"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177826",
+      "name": "Inhibitor/Ligand CHEMBL2177826",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=33000.0nM (pChEMBL: 4.48)",
+        "pchembl_value": "4.48"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177833",
+      "name": "Inhibitor/Ligand CHEMBL2177833",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=13000.0nM (pChEMBL: 4.89)",
+        "pchembl_value": "4.89"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177832",
+      "name": "Inhibitor/Ligand CHEMBL2177832",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=13000.0nM (pChEMBL: 4.89)",
+        "pchembl_value": "4.89"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177837",
+      "name": "Inhibitor/Ligand CHEMBL2177837",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=10000.0nM (pChEMBL: 5.00)",
+        "pchembl_value": "5.00"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177829",
+      "name": "Inhibitor/Ligand CHEMBL2177829",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=8800.0nM (pChEMBL: 5.06)",
+        "pchembl_value": "5.06"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177835",
+      "name": "Inhibitor/Ligand CHEMBL2177835",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=5500.0nM (pChEMBL: 5.26)",
+        "pchembl_value": "5.26"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177827",
+      "name": "Inhibitor/Ligand CHEMBL2177827",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2100.0nM (pChEMBL: 5.68)",
+        "pchembl_value": "5.68"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177836",
+      "name": "Inhibitor/Ligand CHEMBL2177836",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=2000.0nM (pChEMBL: 5.70)",
+        "pchembl_value": "5.70"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177828",
+      "name": "Inhibitor/Ligand CHEMBL2177828",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1700.0nM (pChEMBL: 5.77)",
+        "pchembl_value": "5.77"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177834",
+      "name": "Inhibitor/Ligand CHEMBL2177834",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=1500.0nM (pChEMBL: 5.82)",
+        "pchembl_value": "5.82"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177831",
+      "name": "Inhibitor/Ligand CHEMBL2177831",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177830",
+      "name": "Inhibitor/Ligand CHEMBL2177830",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2177819",
+      "name": "Inhibitor/Ligand CHEMBL2177819",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "IC50=100000.0nM (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "TARGET:CHEMBL1075403",
+      "name": "Ca-Ski",
+      "type": "EntityType.TARGET",
+      "attributes": {
+        "organism": "Homo sapiens"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL504086",
+      "name": "Inhibitor/Ligand CHEMBL504086",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "ED50=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1554",
+      "name": "Inhibitor/Ligand CHEMBL1554",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "ED50=1.910'-3 ug/ml (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL498242",
+      "name": "Inhibitor/Ligand CHEMBL498242",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "ED50=7.2ug ml-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL225110",
+      "name": "Inhibitor/Ligand CHEMBL225110",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "ED50=3.9ug ml-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL387689",
+      "name": "Inhibitor/Ligand CHEMBL387689",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "ED50=6.2ug ml-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL465954",
+      "name": "Inhibitor/Ligand CHEMBL465954",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "ED50=NoneNone (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL447384",
+      "name": "Inhibitor/Ligand CHEMBL447384",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "ED50=4.0ug ml-1 (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL466396",
+      "name": "Inhibitor/Ligand CHEMBL466396",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "bioactivity_summary": "Activity=53.6% (pChEMBL: None)",
+        "pchembl_value": "None"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL2009620",
+      "name": "89809684",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "None",
+        "smiles": "CCC1(CN(C)C)CC/C(=C\\c2ccc3c(c2)OCO3)C1=O",
+        "formula": "C18H23NO3",
+        "molecular_weight": "301.39"
+      }
+    },
+    {
+      "uid": "COMPOUND:YCIMNLLNPGFGHC-UHFFFAOYSA-N",
+      "name": "benzene-1,2-diol",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "110.11",
+        "formula": "C6H6O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:XITRVGKUVZAAKK-DCWCUINXSA-N",
+      "name": "(2E,4E,6E,8R,9R,10E,12E,16S,17S)-19-[(R)-[(2R,3R,4S,5R)-2,4-dihydroxy-6-[(2R)-2-[(2R,4S,5S,6S)-4-hydroxy-5-[(2S,4R,5R,6R)-5-hydroxy-4-methoxy-6-methyloxan-2-yl]oxy-4,6-dimethyloxan-2-yl]oxy-3-methoxypropyl]-3,5-dimethyloxan-2-yl]-hydroxymethyl]-9-[(2R,3S,4S,5R,6S)-3,4-dihydroxy-5-methoxy-6-methyloxan-2-yl]oxy-16-hydroxy-17-methoxy-2,4,6,8,12-pentamethylcycloicosa-2,4,6,10,12-pentaen-1-one",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "1127.4",
+        "formula": "C59H98O20"
+      }
+    },
+    {
+      "uid": "COMPOUND:PYHYFKNWYFMEKQ-ADUPEVMXSA-N",
+      "name": "methyl (2S)-6-amino-2-[[(2S)-1-cyano-2-[(2-methylpropan-2-yl)oxycarbonylamino]-3-phenylpropyl]amino]hexanoate",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "418.5",
+        "formula": "C22H34N4O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:SVXGRTDZJUZDQA-UHFFFAOYSA-N",
+      "name": "N-[1-cyclohexyl-3-hydroxy-6-methyl-5-(morpholine-4-carbonyl)heptan-2-yl]-2-(8-propyl-6-pyridin-3-yl-[1,2,4]triazolo[4,3-a]pyrazin-3-yl)-3-pyridin-3-ylpropanamide",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "710.9",
+        "formula": "C40H54N8O4"
+      }
+    },
+    {
+      "uid": "COMPOUND:OKSHTWZOWGVSGP-CCLPZIEXSA-N",
+      "name": "[(1S,4E,6E,8R,9R,10E,12E,14E,20S)-18-[(R)-[(2R,3R,4S,5R)-2,4-dihydroxy-6-[(2R)-2-[(2R,4S,5S,6S)-4-hydroxy-5-[(2S,4R,5R,6R)-5-hydroxy-4-methoxy-6-methyloxan-2-yl]oxy-4,6-dimethyloxan-2-yl]oxy-3-methoxypropyl]-3,5-dimethyloxan-2-yl]-hydroxymethyl]-8-[(2R,3S,4S,5R,6S)-3,4-dihydroxy-5-methoxy-6-methyloxan-2-yl]oxy-20-methoxy-5,9,11,13,15-pentamethyl-16-oxocycloicosa-4,6,10,12,14-pentaen-1-yl] acetate",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "1169.4",
+        "formula": "C61H100O21"
+      }
+    },
+    {
+      "uid": "COMPOUND:GQEZCZNIPDHDLS-KSCSMHSMSA-N",
+      "name": "methyl (2S)-6-amino-2-[[(2S)-2-amino-1-cyano-3-phenylpropyl]amino]hexanoate",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "318.4",
+        "formula": "C17H26N4O2"
+      }
+    },
+    {
+      "uid": "COMPOUND:YZOFLYUAQDJWKV-UHFFFAOYSA-N",
+      "name": "2-[(3,4,5-trihydroxyphenyl)methylidene]propanedinitrile",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "202.17",
+        "formula": "C10H6N2O3"
+      }
+    },
+    {
+      "uid": "COMPOUND:BGIXVQPJBLGABA-DFTYRMFRSA-N",
+      "name": "(3E,5E,7E,9R,10R,11E,13E,17S,18S,20S,21R)-21-[(2R,3R,4S,5R)-2,4-dihydroxy-6-[(2R)-2-[(2R,4S,5S,6S)-4-hydroxy-5-[(2S,4R,5R,6R)-5-hydroxy-4-methoxy-6-methyloxan-2-yl]oxy-4,6-dimethyloxan-2-yl]oxy-3-methoxypropyl]-3,5-dimethyloxan-2-yl]-10-[(2R,3S,4S,5R,6S)-3,4-dihydroxy-5-methoxy-6-methyloxan-2-yl]oxy-17,20-dihydroxy-18-methoxy-3,5,7,9,13-pentamethyl-1-oxacyclohenicosa-3,5,7,11,13-pentaen-2-one",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "smiles": null,
+        "molecular_weight": "1129.4",
+        "formula": "C58H96O21"
+      }
+    },
+    {
+      "uid": "COMPOUND:CHEMBL1421",
+      "name": "DASATINIB ANHYDROUS",
+      "type": "EntityType.COMPOUND",
+      "attributes": {
+        "molecule_type": "Small molecule",
+        "max_phase": "4.0",
+        "smiles": "Cc1nc(Nc2ncc(C(=O)Nc3c(C)cccc3Cl)s2)cc(N2CCN(CCO)CC2)n1",
+        "formula": "C22H26ClN7O2S",
+        "molecular_weight": "488.02"
+      }
+    }
+  ]
+}

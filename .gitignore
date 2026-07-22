@@ -1,0 +1,7 @@
+scigraph_data/
+__pycache__/
+.pytest_cache/
+exports_BKP/
+*.pyc
+*.duckdb
+*.sqlite

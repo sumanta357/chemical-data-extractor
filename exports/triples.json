@@ -1,0 +1,3365 @@
+[
+  {
+    "head": "Inhibitor/Ligand CHEMBL534914",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL534914 inhibits Peroxisomal primary amine oxidase (Activity: IC50=53000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "53000.0",
+      "units": "nM",
+      "pchembl_value": "4.28",
+      "assay_id": "CHEMBL830894",
+      "mechanism_of_action": "IC50 53000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL537624",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL537624 inhibits Peroxisomal primary amine oxidase (Activity: IC50=87000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "87000.0",
+      "units": "nM",
+      "pchembl_value": "4.06",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 87000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL537175",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL537175 inhibits Peroxisomal primary amine oxidase (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL537174",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL537174 inhibits Peroxisomal primary amine oxidase (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL537402",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL537402 inhibits Peroxisomal primary amine oxidase (Activity: IC50=700000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "700000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 700000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL557160",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL557160 inhibits Peroxisomal primary amine oxidase (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL537628",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL537628 inhibits Peroxisomal primary amine oxidase (Activity: IC50=300000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "300000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 300000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL541126",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL541126 inhibits Peroxisomal primary amine oxidase (Activity: IC50=540000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "540000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 540000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL559376",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL559376 inhibits Peroxisomal primary amine oxidase (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL536949",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL536949 inhibits Peroxisomal primary amine oxidase (Activity: IC50=750000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "750000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 750000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL557976",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL557976 inhibits Peroxisomal primary amine oxidase (Activity: IC50=1500000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1500000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL832275",
+      "mechanism_of_action": "IC50 1500000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL537401",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL537401 inhibits Peroxisomal primary amine oxidase (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL534467",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL534467 inhibits Peroxisomal primary amine oxidase (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "4.00",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL537623",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Peroxisomal primary amine oxidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL537623 inhibits Peroxisomal primary amine oxidase (Activity: IC50=350000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "350000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL830021",
+      "mechanism_of_action": "IC50 350000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL11371",
+    "relation": "RelationType.BINDS",
+    "tail": "Histidine ammonia-lyase",
+    "triple_string": "Inhibitor/Ligand CHEMBL11371 binds Histidine ammonia-lyase (Activity: Vmax=5.3)",
+    "attributes": {
+      "activity_type": "Vmax",
+      "activity_value": "5.3",
+      "units": "IU mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL690517",
+      "mechanism_of_action": "Vmax 5.3 IU mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL17962",
+    "relation": "RelationType.BINDS",
+    "tail": "Histidine ammonia-lyase",
+    "triple_string": "Inhibitor/Ligand CHEMBL17962 binds Histidine ammonia-lyase (Activity: Km=7500000.0)",
+    "attributes": {
+      "activity_type": "Km",
+      "activity_value": "7500000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL858416",
+      "mechanism_of_action": "Km 7500000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL538419",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aspartase",
+    "triple_string": "Inhibitor/Ligand CHEMBL538419 inhibits Aspartase (Activity: Ki=55000.0)",
+    "attributes": {
+      "activity_type": "Ki",
+      "activity_value": "55000.0",
+      "units": "nM",
+      "pchembl_value": "4.26",
+      "assay_id": "CHEMBL1058333",
+      "mechanism_of_action": "Ki 55000.0 nM"
+    }
+  },
+  {
+    "head": "Nitrapyrin (2-Chloro-6-(trichloromethyl)pyridine)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Nitrapyrin (2-Chloro-6-(trichloromethyl)pyridine) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=0.1)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "0.1",
+      "units": "uM",
+      "mechanism_of_action": "Irreversible Nitrification Inhibitor"
+    }
+  },
+  {
+    "head": "Allylthiourea (ATU)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Allylthiourea (ATU) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=1.5)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1.5",
+      "units": "uM",
+      "mechanism_of_action": "Metal Chelating AMO Inhibitor"
+    }
+  },
+  {
+    "head": "Dicyandiamide (DCD)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Dicyandiamide (DCD) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=12.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "12.0",
+      "units": "uM",
+      "mechanism_of_action": "Substrate Analogue Inhibitor"
+    }
+  },
+  {
+    "head": "Acetylene",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Acetylene inhibits Ammonia Monooxygenase (AMO) (Activity: Ki=0.5)",
+    "attributes": {
+      "activity_type": "Ki",
+      "activity_value": "0.5",
+      "units": "uM",
+      "mechanism_of_action": "Mechanism-Based Suicidal Inhibitor"
+    }
+  },
+  {
+    "head": "3,4-Dimethylpyrazole phosphate (DMPP)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "3,4-Dimethylpyrazole phosphate (DMPP) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=0.8)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "0.8",
+      "units": "uM",
+      "mechanism_of_action": "Commercial Agricultural Inhibitor"
+    }
+  },
+  {
+    "head": "Pronitridine (1H-1,2,4-Triazole derivative)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Pronitridine (1H-1,2,4-Triazole derivative) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=2.1)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2.1",
+      "units": "uM",
+      "mechanism_of_action": "Triazole Synthetic Nitrification Inhibitor"
+    }
+  },
+  {
+    "head": "4-Amino-1,2,4-triazole (ATC)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "4-Amino-1,2,4-triazole (ATC) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=5.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "5.0",
+      "units": "uM",
+      "mechanism_of_action": "Synthetic Triazole Inhibitor"
+    }
+  },
+  {
+    "head": "Thiourea",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Thiourea inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=18.5)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "18.5",
+      "units": "uM",
+      "mechanism_of_action": "Sulfur-based Copper Chelating Inhibitor"
+    }
+  },
+  {
+    "head": "2-Sulfanilamidothiazole (ST)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "2-Sulfanilamidothiazole (ST) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=3.4)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "3.4",
+      "units": "uM",
+      "mechanism_of_action": "Sulfa-based Nitrification Inhibitor"
+    }
+  },
+  {
+    "head": "2-Amino-4-chloro-6-methylpyrimidine (AM)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "2-Amino-4-chloro-6-methylpyrimidine (AM) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=4.2)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "4.2",
+      "units": "uM",
+      "mechanism_of_action": "Pyrimidine Derivative Inhibitor"
+    }
+  },
+  {
+    "head": "Phenylacetylene",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Phenylacetylene inhibits Ammonia Monooxygenase (AMO) (Activity: Ki=0.8)",
+    "attributes": {
+      "activity_type": "Ki",
+      "activity_value": "0.8",
+      "units": "uM",
+      "mechanism_of_action": "Alkyne Irreversible Suicide AMO Inhibitor"
+    }
+  },
+  {
+    "head": "1-Heptyne",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "1-Heptyne inhibits Ammonia Monooxygenase (AMO) (Activity: Ki=1.2)",
+    "attributes": {
+      "activity_type": "Ki",
+      "activity_value": "1.2",
+      "units": "uM",
+      "mechanism_of_action": "Alkyne-based Suicide Inhibitor"
+    }
+  },
+  {
+    "head": "Azadirachtin (Neem extract)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Azadirachtin (Neem extract) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=10.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "10.0",
+      "units": "uM",
+      "mechanism_of_action": "Botanical / Plant-Derived Synthetic Inhibitor"
+    }
+  },
+  {
+    "head": "Karanjin (Pongamia pinnata extract)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Karanjin (Pongamia pinnata extract) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=8.5)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "8.5",
+      "units": "uM",
+      "mechanism_of_action": "Furanocumarin Botanical Inhibitor"
+    }
+  },
+  {
+    "head": "PTIO",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "PTIO inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=6.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "6.0",
+      "units": "uM",
+      "mechanism_of_action": "Nitric Oxide Radical Scavenger Inhibitor"
+    }
+  },
+  {
+    "head": "Brachialactone",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Brachialactone inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=2.5)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2.5",
+      "units": "uM",
+      "mechanism_of_action": "Biological Nitrification Inhibitor (BNI - Brachiaria)"
+    }
+  },
+  {
+    "head": "Sorgoleone",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Sorgoleone inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=1.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1.0",
+      "units": "uM",
+      "mechanism_of_action": "Biological Nitrification Inhibitor (BNI - Sorghum)"
+    }
+  },
+  {
+    "head": "Sakuranetin",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Sakuranetin inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=5.5)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "5.5",
+      "units": "uM",
+      "mechanism_of_action": "Flavonoid BNI (Rice exudate)"
+    }
+  },
+  {
+    "head": "1,9-Decanediol",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "1,9-Decanediol inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=15.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "15.0",
+      "units": "uM",
+      "mechanism_of_action": "Fatty Alcohol BNI (Rice root exudate)"
+    }
+  },
+  {
+    "head": "Linolenic acid",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Linolenic acid inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=20.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "20.0",
+      "units": "uM",
+      "mechanism_of_action": "Free Fatty Acid BNI"
+    }
+  },
+  {
+    "head": "Linoleic acid",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Linoleic acid inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=25.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "25.0",
+      "units": "uM",
+      "mechanism_of_action": "Free Fatty Acid BNI"
+    }
+  },
+  {
+    "head": "MHPP (Methyl 3-(4-hydroxyphenyl)propionate)",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "MHPP (Methyl 3-(4-hydroxyphenyl)propionate) inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=3.8)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "3.8",
+      "units": "uM",
+      "mechanism_of_action": "Phenylpropanoid BNI"
+    }
+  },
+  {
+    "head": "Syringic acid",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Syringic acid inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=14.2)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "14.2",
+      "units": "uM",
+      "mechanism_of_action": "Phenolic Acid BNI"
+    }
+  },
+  {
+    "head": "Limonene",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Limonene inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=30.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "30.0",
+      "units": "uM",
+      "mechanism_of_action": "Monoterpene BNI"
+    }
+  },
+  {
+    "head": "Alpha-pinene",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Alpha-pinene inhibits Ammonia Monooxygenase (AMO) (Activity: IC50=35.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "35.0",
+      "units": "uM",
+      "mechanism_of_action": "Monoterpene BNI"
+    }
+  },
+  {
+    "head": "Ammonia (NH3)",
+    "relation": "RelationType.SUBSTRATE_OF",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Ammonia (NH3) substrate_of Ammonia Monooxygenase (AMO)",
+    "attributes": {}
+  },
+  {
+    "head": "Hydroxylamine",
+    "relation": "RelationType.SUBSTRATE_OF",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Hydroxylamine substrate_of Ammonia Monooxygenase (AMO)",
+    "attributes": {}
+  },
+  {
+    "head": "Oxygen (O2)",
+    "relation": "RelationType.SUBSTRATE_OF",
+    "tail": "Ammonia Monooxygenase (AMO)",
+    "triple_string": "Oxygen (O2) substrate_of Ammonia Monooxygenase (AMO)",
+    "attributes": {}
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1933349",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Uncharacterized protein",
+    "triple_string": "Inhibitor/Ligand CHEMBL1933349 inhibits Uncharacterized protein (Activity: IC50=55.5)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "55.5",
+      "units": "nM",
+      "pchembl_value": "7.26",
+      "assay_id": "CHEMBL2160602",
+      "mechanism_of_action": "IC50 55.5 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1824168",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL1824168 inhibits LuxP/Q (Activity: IC50=9000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "9000.0",
+      "units": "nM",
+      "pchembl_value": "5.05",
+      "assay_id": "CHEMBL5265250",
+      "mechanism_of_action": "IC50 9000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1824169",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL1824169 inhibits LuxP/Q (Activity: Inhibition=80.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "80.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL5265254",
+      "mechanism_of_action": "Inhibition 80.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1824170",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL1824170 inhibits LuxP/Q (Activity: IC50=4000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "4000.0",
+      "units": "nM",
+      "pchembl_value": "5.40",
+      "assay_id": "CHEMBL5265250",
+      "mechanism_of_action": "IC50 4000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1824171",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL1824171 inhibits LuxP/Q (Activity: IC50=4000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "4000.0",
+      "units": "nM",
+      "pchembl_value": "5.40",
+      "assay_id": "CHEMBL5265250",
+      "mechanism_of_action": "IC50 4000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL500339",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL500339 inhibits LuxP/Q (Activity: IC50=6000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "6000.0",
+      "units": "nM",
+      "pchembl_value": "5.22",
+      "assay_id": "CHEMBL5265250",
+      "mechanism_of_action": "IC50 6000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5273954",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL5273954 inhibits LuxP/Q (Activity: Inhibition=80.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "80.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL5265254",
+      "mechanism_of_action": "Inhibition 80.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5280333",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL5280333 inhibits LuxP/Q (Activity: Inhibition=20.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "20.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL5265254",
+      "mechanism_of_action": "Inhibition 20.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5288808",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL5288808 inhibits LuxP/Q (Activity: Inhibition=20.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "20.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL5265254",
+      "mechanism_of_action": "Inhibition 20.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5289148",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL5289148 inhibits LuxP/Q (Activity: Inhibition=40.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "40.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL5265254",
+      "mechanism_of_action": "Inhibition 40.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1824159",
+    "relation": "RelationType.INHIBITS",
+    "tail": "LuxP/Q",
+    "triple_string": "Inhibitor/Ligand CHEMBL1824159 inhibits LuxP/Q (Activity: Inhibition=60.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "60.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL5265254",
+      "mechanism_of_action": "Inhibition 60.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL64929",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL64929 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=3.5)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "3.5",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766099",
+      "mechanism_of_action": "Activity 3.5 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL66468",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL66468 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=7.5)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "7.5",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766099",
+      "mechanism_of_action": "Activity 7.5 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL66952",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL66952 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=5.0)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "5.0",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766099",
+      "mechanism_of_action": "Activity 5.0 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL63829",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL63829 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=10.7)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "10.7",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766100",
+      "mechanism_of_action": "Activity 10.7 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL64264",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL64264 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=14.0)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "14.0",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766100",
+      "mechanism_of_action": "Activity 14.0 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2114023",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL2114023 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=10.5)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "10.5",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766100",
+      "mechanism_of_action": "Activity 10.5 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL64930",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL64930 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=18.6)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "18.6",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766100",
+      "mechanism_of_action": "Activity 18.6 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL291349",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL291349 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity (umol/mg.of protein. min)=0.6)",
+    "attributes": {
+      "activity_type": "Activity (umol/mg.of protein. min)",
+      "activity_value": "0.6",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL764460",
+      "mechanism_of_action": "Activity (umol/mg.of protein. min) 0.6 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL64960",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL64960 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=16.3)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "16.3",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766099",
+      "mechanism_of_action": "Activity 16.3 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL65975",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL65975 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=17.5)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "17.5",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766099",
+      "mechanism_of_action": "Activity 17.5 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL62652",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL62652 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=12.0)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "12.0",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766100",
+      "mechanism_of_action": "Activity 12.0 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL3350279",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL3350279 binds Enoyl-CoA hydratase, mitochondrial (Activity: Activity=4.5)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "4.5",
+      "units": "uM min-1 mg-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL766100",
+      "mechanism_of_action": "Activity 4.5 uM min-1 mg-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4462318",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL4462318 inhibits Enoyl-CoA hydratase, mitochondrial (Activity: Kd=9237.0)",
+    "attributes": {
+      "activity_type": "Kd",
+      "activity_value": "9237.0",
+      "units": "nM",
+      "pchembl_value": "5.03",
+      "assay_id": "CHEMBL4371461",
+      "mechanism_of_action": "Kd 9237.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5653589",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL5653589 inhibits Enoyl-CoA hydratase, mitochondrial (Activity: Kd=180.79)",
+    "attributes": {
+      "activity_type": "Kd",
+      "activity_value": "180.79",
+      "units": "nM",
+      "pchembl_value": "6.74",
+      "assay_id": "CHEMBL5651322",
+      "mechanism_of_action": "Kd 180.79 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5653589",
+    "relation": "RelationType.BINDS",
+    "tail": "Enoyl-CoA hydratase, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL5653589 binds Enoyl-CoA hydratase, mitochondrial (Activity: ED50=180.79)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "180.79",
+      "units": "nM",
+      "pchembl_value": "6.74",
+      "assay_id": "CHEMBL5651322",
+      "mechanism_of_action": "ED50 180.79 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077464",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077464 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=700.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "700.0",
+      "units": "nM",
+      "pchembl_value": "6.16",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 700.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077465",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077465 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=300.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "300.0",
+      "units": "nM",
+      "pchembl_value": "6.52",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 300.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077466",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077466 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=400.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "400.0",
+      "units": "nM",
+      "pchembl_value": "6.40",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 400.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077467",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077467 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=800.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "800.0",
+      "units": "nM",
+      "pchembl_value": "6.10",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 800.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1078488",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1078488 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=800.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "800.0",
+      "units": "nM",
+      "pchembl_value": "6.10",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 800.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077482",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077482 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=400.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "400.0",
+      "units": "nM",
+      "pchembl_value": "6.40",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 400.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077490",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077490 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=1100.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1100.0",
+      "units": "nM",
+      "pchembl_value": "5.96",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 1100.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077491",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077491 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=2800.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2800.0",
+      "units": "nM",
+      "pchembl_value": "5.55",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 2800.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1077479",
+    "relation": "RelationType.INHIBITS",
+    "tail": "ATP synthase subunit beta, mitochondrial",
+    "triple_string": "Inhibitor/Ligand CHEMBL1077479 inhibits ATP synthase subunit beta, mitochondrial (Activity: IC50=17000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "17000.0",
+      "units": "nM",
+      "pchembl_value": "4.77",
+      "assay_id": "CHEMBL1106722",
+      "mechanism_of_action": "IC50 17000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1085857",
+    "relation": "RelationType.BINDS",
+    "tail": "Carboxylic ester hydrolase",
+    "triple_string": "Inhibitor/Ligand CHEMBL1085857 binds Carboxylic ester hydrolase (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3992581",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL90430",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL90430 inhibits Aminopeptidase N (Activity: IC50=28000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "28000.0",
+      "units": "nM",
+      "pchembl_value": "4.55",
+      "assay_id": "CHEMBL644741",
+      "mechanism_of_action": "IC50 28000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL287968",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL287968 inhibits Aminopeptidase N (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL290238",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL290238 inhibits Aminopeptidase N (Activity: IC50=783000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "783000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL884019",
+      "mechanism_of_action": "IC50 783000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL37281",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL37281 inhibits Aminopeptidase N (Activity: IC50=3400.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "3400.0",
+      "units": "nM",
+      "pchembl_value": "5.47",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 3400.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL35627",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL35627 inhibits Aminopeptidase N (Activity: IC50=3800.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "3800.0",
+      "units": "nM",
+      "pchembl_value": "5.42",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 3800.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL36081",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL36081 inhibits Aminopeptidase N (Activity: IC50=5000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "5000.0",
+      "units": "nM",
+      "pchembl_value": "5.30",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 5000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2372318",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL2372318 inhibits Aminopeptidase N (Activity: IC50=793000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "793000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 793000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL29292",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL29292 inhibits Aminopeptidase N (Activity: IC50=19400.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "19400.0",
+      "units": "nM",
+      "pchembl_value": "4.71",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 19400.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL35092",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL35092 inhibits Aminopeptidase N (Activity: IC50=2900.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2900.0",
+      "units": "nM",
+      "pchembl_value": "5.54",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 2900.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL419873",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL419873 inhibits Aminopeptidase N (Activity: IC50=None)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "None",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL644742",
+      "mechanism_of_action": "IC50 None nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL35660",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL35660 inhibits Aminopeptidase N (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL288458",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL288458 inhibits Aminopeptidase N (Activity: IC50=2400.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2400.0",
+      "units": "nM",
+      "pchembl_value": "5.62",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 2400.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL34777",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL34777 inhibits Aminopeptidase N (Activity: IC50=146000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "146000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 146000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL289761",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Aminopeptidase N",
+    "triple_string": "Inhibitor/Ligand CHEMBL289761 inhibits Aminopeptidase N (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL646399",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2016323468-A1 (Patented Nitrification Molecule)",
+    "triple_string": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride patented_in Patent AU-2016323468-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2016323468-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2017270221-A1 (Patented Nitrification Molecule)",
+    "triple_string": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride patented_in Patent AU-2017270221-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2017270221-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent CA-2998509-A1 (Patented Nitrification Molecule)",
+    "triple_string": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride patented_in Patent CA-2998509-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "CA-2998509-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent CA-3025007-A1 (Patented Nitrification Molecule)",
+    "triple_string": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride patented_in Patent CA-3025007-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "CA-3025007-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent CN-109843298-A (Patented Nitrification Molecule)",
+    "triple_string": "4-tert-butyl-N-(6-imidazol-1-ylimidazo[1,2-a]pyridin-2-yl)benzamide;dihydrochloride patented_in Patent CN-109843298-A (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "CN-109843298-A",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent US-20020065248-A1 (Patented Nitrification Molecule)",
+    "triple_string": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid patented_in Patent US-20020065248-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "US-20020065248-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent EP-0787010-A1 (Patented Nitrification Molecule)",
+    "triple_string": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid patented_in Patent EP-0787010-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "EP-0787010-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent WO-9612499-A1 (Patented Nitrification Molecule)",
+    "triple_string": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid patented_in Patent WO-9612499-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "WO-9612499-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent WO-1996012499-A1 (Patented Nitrification Molecule)",
+    "triple_string": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid patented_in Patent WO-1996012499-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "WO-1996012499-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent US5658885 (Patented Nitrification Molecule)",
+    "triple_string": "2-amino-3-(5-nitro-1H-imidazol-4-yl)propanoic acid patented_in Patent US5658885 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "US5658885",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "azane",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2001249870-A1 (Patented Nitrification Molecule)",
+    "triple_string": "azane patented_in Patent AU-2001249870-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2001249870-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "azane",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2001251315-A1 (Patented Nitrification Molecule)",
+    "triple_string": "azane patented_in Patent AU-2001251315-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2001251315-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "azane",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2001253363-A1 (Patented Nitrification Molecule)",
+    "triple_string": "azane patented_in Patent AU-2001253363-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2001253363-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "azane",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2003226408-A1 (Patented Nitrification Molecule)",
+    "triple_string": "azane patented_in Patent AU-2003226408-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2003226408-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "azane",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2003226408-B2 (Patented Nitrification Molecule)",
+    "triple_string": "azane patented_in Patent AU-2003226408-B2 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2003226408-B2",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL307145",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL307145 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=2000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2000.0",
+      "units": "nM",
+      "pchembl_value": "5.70",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 2000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL310798",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL310798 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=3000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "3000.0",
+      "units": "nM",
+      "pchembl_value": "5.52",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 3000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL288114",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL288114 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=50000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "50000.0",
+      "units": "nM",
+      "pchembl_value": "4.30",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 50000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1527",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL1527 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=4000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "4000.0",
+      "units": "nM",
+      "pchembl_value": "5.40",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 4000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL535194",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL535194 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=22000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "22000.0",
+      "units": "nM",
+      "pchembl_value": "4.66",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 22000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL254710",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL254710 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=12000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "12000.0",
+      "units": "nM",
+      "pchembl_value": "4.92",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 12000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL220779",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL220779 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=61000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "61000.0",
+      "units": "nM",
+      "pchembl_value": "4.21",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 61000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL400737",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL400737 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=3000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "3000.0",
+      "units": "nM",
+      "pchembl_value": "5.52",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 3000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL254077",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL254077 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=4000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "4000.0",
+      "units": "nM",
+      "pchembl_value": "5.40",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 4000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL244948",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL244948 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=12000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "12000.0",
+      "units": "nM",
+      "pchembl_value": "4.92",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 12000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL242540",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL242540 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=21000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "21000.0",
+      "units": "nM",
+      "pchembl_value": "4.68",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 21000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL280998",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL280998 inhibits Autoinducer 2-binding periplasmic protein LuxP (Activity: IC50=59000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "59000.0",
+      "units": "nM",
+      "pchembl_value": "4.23",
+      "assay_id": "CHEMBL929603",
+      "mechanism_of_action": "IC50 59000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL193493",
+    "relation": "RelationType.BINDS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL193493 binds Autoinducer 2-binding periplasmic protein LuxP (Activity: EC50=150.0)",
+    "attributes": {
+      "activity_type": "EC50",
+      "activity_value": "150.0",
+      "units": "nM",
+      "pchembl_value": "6.82",
+      "assay_id": "CHEMBL1052740",
+      "mechanism_of_action": "EC50 150.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL560745",
+    "relation": "RelationType.BINDS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL560745 binds Autoinducer 2-binding periplasmic protein LuxP (Activity: EC50=580.0)",
+    "attributes": {
+      "activity_type": "EC50",
+      "activity_value": "580.0",
+      "units": "nM",
+      "pchembl_value": "6.24",
+      "assay_id": "CHEMBL1052740",
+      "mechanism_of_action": "EC50 580.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL539221",
+    "relation": "RelationType.BINDS",
+    "tail": "Autoinducer 2-binding periplasmic protein LuxP",
+    "triple_string": "Inhibitor/Ligand CHEMBL539221 binds Autoinducer 2-binding periplasmic protein LuxP (Activity: EC50=750.0)",
+    "attributes": {
+      "activity_type": "EC50",
+      "activity_value": "750.0",
+      "units": "nM",
+      "pchembl_value": "6.12",
+      "assay_id": "CHEMBL1052740",
+      "mechanism_of_action": "EC50 750.0 nM"
+    }
+  },
+  {
+    "head": "3,3,14,14-tetramethylhexadecanedioic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2003234625-A1 (Patented Nitrification Molecule)",
+    "triple_string": "3,3,14,14-tetramethylhexadecanedioic acid patented_in Patent AU-2003234625-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2003234625-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "3,3,14,14-tetramethylhexadecanedioic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2003248810-B2 (Patented Nitrification Molecule)",
+    "triple_string": "3,3,14,14-tetramethylhexadecanedioic acid patented_in Patent AU-2003248810-B2 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2003248810-B2",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "3,3,14,14-tetramethylhexadecanedioic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2003255937-A1 (Patented Nitrification Molecule)",
+    "triple_string": "3,3,14,14-tetramethylhexadecanedioic acid patented_in Patent AU-2003255937-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2003255937-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "3,3,14,14-tetramethylhexadecanedioic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2003265267-A1 (Patented Nitrification Molecule)",
+    "triple_string": "3,3,14,14-tetramethylhexadecanedioic acid patented_in Patent AU-2003265267-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2003265267-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "3,3,14,14-tetramethylhexadecanedioic acid",
+    "relation": "RelationType.PATENTED_IN",
+    "tail": "Patent AU-2004284932-A1 (Patented Nitrification Molecule)",
+    "triple_string": "3,3,14,14-tetramethylhexadecanedioic acid patented_in Patent AU-2004284932-A1 (Patented Nitrification Molecule)",
+    "attributes": {
+      "patent_id": "AU-2004284932-A1",
+      "evidence_type": "PubChem Patent XRef"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288628",
+    "relation": "RelationType.BINDS",
+    "tail": "ABC-type oligopeptide transporter ABCB9",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288628 binds ABC-type oligopeptide transporter ABCB9 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1292655",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL18094",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL18094 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=0.5)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "0.5",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 0.5 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL3747536",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL3747536 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=35.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "35.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 35.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL216973",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL216973 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=30.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "30.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 30.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL226396",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL226396 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=23.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "23.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 23.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL71443",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL71443 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=11.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "11.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 11.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL14145",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL14145 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=36.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "36.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 36.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL226345",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL226345 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=19.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "19.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 19.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL85811",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL85811 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=23.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "23.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 23.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL205165",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL205165 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=40.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "40.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 40.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL79925",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL79925 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=19.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "19.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 19.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL296021",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL296021 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=36.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "36.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 36.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL108829",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL108829 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=19.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "19.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 19.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2386190",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL2386190 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=2.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "2.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 2.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL76398",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL76398 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=8.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "8.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 8.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL228862",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Cytosolic purine 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL228862 inhibits Cytosolic purine 5'-nucleotidase (Activity: Inhibition=20.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "20.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL3750425",
+      "mechanism_of_action": "Inhibition 20.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1097198",
+    "relation": "RelationType.BINDS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL1097198 binds 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Vmax=0.228)",
+    "attributes": {
+      "activity_type": "Vmax",
+      "activity_value": "0.228",
+      "units": "umol/min/mg",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182521",
+      "mechanism_of_action": "Vmax 0.228 umol/min/mg"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4216260",
+    "relation": "RelationType.BINDS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4216260 binds 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Vmax=1.6)",
+    "attributes": {
+      "activity_type": "Vmax",
+      "activity_value": "1.6",
+      "units": "umol/min/mg",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182521",
+      "mechanism_of_action": "Vmax 1.6 umol/min/mg"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4203412",
+    "relation": "RelationType.INHIBITS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4203412 inhibits 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Inhibition=51.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "51.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182509",
+      "mechanism_of_action": "Inhibition 51.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4203821",
+    "relation": "RelationType.INHIBITS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4203821 inhibits 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182509",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4208698",
+    "relation": "RelationType.INHIBITS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4208698 inhibits 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182509",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4216260",
+    "relation": "RelationType.INHIBITS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4216260 inhibits 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182508",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4203821",
+    "relation": "RelationType.BINDS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4203821 binds 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182511",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4208698",
+    "relation": "RelationType.BINDS",
+    "tail": "7-methylguanosine phosphate-specific 5'-nucleotidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4208698 binds 7-methylguanosine phosphate-specific 5'-nucleotidase (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4182511",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL20",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL20 inhibits Endochitinase A1 (Activity: IC50=164000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "164000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 164000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288786",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288786 inhibits Endochitinase A1 (Activity: IC50=315000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "315000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 315000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288787",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288787 inhibits Endochitinase A1 (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288807",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288807 inhibits Endochitinase A1 (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL281376",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL281376 inhibits Endochitinase A1 (Activity: IC50=850000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "850000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 850000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL265674",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL265674 inhibits Endochitinase A1 (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288808",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288808 inhibits Endochitinase A1 (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288809",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288809 inhibits Endochitinase A1 (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL382111",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL382111 inhibits Endochitinase A1 (Activity: IC50=730000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "730000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 730000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288881",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288881 inhibits Endochitinase A1 (Activity: IC50=479000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "479000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 479000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288882",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288882 inhibits Endochitinase A1 (Activity: IC50=141000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "141000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 141000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288883",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288883 inhibits Endochitinase A1 (Activity: IC50=243000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "243000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 243000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288884",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288884 inhibits Endochitinase A1 (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL173915",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL173915 inhibits Endochitinase A1 (Activity: IC50=1000000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1000000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 1000000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1288928",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Endochitinase A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1288928 inhibits Endochitinase A1 (Activity: IC50=320000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "320000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1291257",
+      "mechanism_of_action": "IC50 320000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1379677",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1379677 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1487918",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1487918 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1516834",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1516834 inhibits Bcl-2-related protein A1 (Activity: IC50=22400.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "22400.0",
+      "units": "nM",
+      "pchembl_value": "4.65",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 22400.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1438721",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1438721 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1399595",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1399595 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1399711",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1399711 inhibits Bcl-2-related protein A1 (Activity: IC50=6150.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "6150.0",
+      "units": "nM",
+      "pchembl_value": "5.21",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 6150.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1371774",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1371774 inhibits Bcl-2-related protein A1 (Activity: IC50=25400.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "25400.0",
+      "units": "nM",
+      "pchembl_value": "4.59",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 25400.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1478187",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1478187 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1498529",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1498529 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1369154",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1369154 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1381644",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1381644 inhibits Bcl-2-related protein A1 (Activity: IC50=3491.2)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "3491.2",
+      "units": "nM",
+      "pchembl_value": "5.46",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 3491.2 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1568497",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1568497 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1068",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1068 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1271764",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1271764 inhibits Bcl-2-related protein A1 (Activity: IC50=650.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "650.0",
+      "units": "nM",
+      "pchembl_value": "6.19",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 650.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1501864",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Bcl-2-related protein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1501864 inhibits Bcl-2-related protein A1 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1613985",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL65",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL65 inhibits Heterogeneous nuclear ribonucleoprotein A1 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1960747",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL65",
+    "relation": "RelationType.BINDS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL65 binds Heterogeneous nuclear ribonucleoprotein A1 (Activity: Bmax=67.0)",
+    "attributes": {
+      "activity_type": "Bmax",
+      "activity_value": "67.0",
+      "units": "pg/mm2",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1960739",
+      "mechanism_of_action": "Bmax 67.0 pg/mm2"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1956507",
+    "relation": "RelationType.BINDS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL1956507 binds Heterogeneous nuclear ribonucleoprotein A1 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1960738",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4439278",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein A1",
+    "triple_string": "Inhibitor/Ligand CHEMBL4439278 inhibits Heterogeneous nuclear ribonucleoprotein A1 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4329778",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4129274",
+    "relation": "RelationType.BINDS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein D0",
+    "triple_string": "Inhibitor/Ligand CHEMBL4129274 binds Heterogeneous nuclear ribonucleoprotein D0 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4119042",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5653589",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein D0",
+    "triple_string": "Inhibitor/Ligand CHEMBL5653589 inhibits Heterogeneous nuclear ribonucleoprotein D0 (Activity: Kd=26.66)",
+    "attributes": {
+      "activity_type": "Kd",
+      "activity_value": "26.66",
+      "units": "nM",
+      "pchembl_value": "7.57",
+      "assay_id": "CHEMBL5651571",
+      "mechanism_of_action": "Kd 26.66 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL5653589",
+    "relation": "RelationType.BINDS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein D0",
+    "triple_string": "Inhibitor/Ligand CHEMBL5653589 binds Heterogeneous nuclear ribonucleoprotein D0 (Activity: ED50=26.66)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "26.66",
+      "units": "nM",
+      "pchembl_value": "7.57",
+      "assay_id": "CHEMBL5651571",
+      "mechanism_of_action": "ED50 26.66 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL3752910",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein D0",
+    "triple_string": "Inhibitor/Ligand CHEMBL3752910 inhibits Heterogeneous nuclear ribonucleoprotein D0 (Activity: Kd=1149.32)",
+    "attributes": {
+      "activity_type": "Kd",
+      "activity_value": "1149.32",
+      "units": "nM",
+      "pchembl_value": "5.94",
+      "assay_id": "CHEMBL5651571",
+      "mechanism_of_action": "Kd 1149.32 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL3752910",
+    "relation": "RelationType.BINDS",
+    "tail": "Heterogeneous nuclear ribonucleoprotein D0",
+    "triple_string": "Inhibitor/Ligand CHEMBL3752910 binds Heterogeneous nuclear ribonucleoprotein D0 (Activity: ED50=1149.32)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "1149.32",
+      "units": "nM",
+      "pchembl_value": "5.94",
+      "assay_id": "CHEMBL5651571",
+      "mechanism_of_action": "ED50 1149.32 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4449517",
+    "relation": "RelationType.BINDS",
+    "tail": "Aminopeptidase",
+    "triple_string": "Inhibitor/Ligand CHEMBL4449517 binds Aminopeptidase (Activity: Stability=88.0)",
+    "attributes": {
+      "activity_type": "Stability",
+      "activity_value": "88.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4334276",
+      "mechanism_of_action": "Stability 88.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL225111",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Beta-crystallin B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL225111 inhibits Beta-crystallin B2 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4201167",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4203007",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Beta-crystallin B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL4203007 inhibits Beta-crystallin B2 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4201171",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4205794",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Beta-crystallin B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL4205794 inhibits Beta-crystallin B2 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4201171",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4218328",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Beta-crystallin B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL4218328 inhibits Beta-crystallin B2 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4201177",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4213644",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Beta-crystallin B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL4213644 inhibits Beta-crystallin B2 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4201177",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4204376",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Beta-crystallin B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL4204376 inhibits Beta-crystallin B2 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4201177",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL4209249",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Beta-crystallin B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL4209249 inhibits Beta-crystallin B2 (Activity: Inhibition=None)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "None",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL4201177",
+      "mechanism_of_action": "Inhibition None %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL302067",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL302067 inhibits Carboxypeptidase B2 (Activity: IC50=35.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "35.0",
+      "units": "nM",
+      "pchembl_value": "7.46",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 35.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL150332",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL150332 inhibits Carboxypeptidase B2 (Activity: IC50=8.2)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "8.2",
+      "units": "nM",
+      "pchembl_value": "8.09",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 8.2 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL436425",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL436425 inhibits Carboxypeptidase B2 (Activity: IC50=21.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "21.0",
+      "units": "nM",
+      "pchembl_value": "7.68",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 21.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL151284",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL151284 inhibits Carboxypeptidase B2 (Activity: IC50=1600.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1600.0",
+      "units": "nM",
+      "pchembl_value": "5.80",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 1600.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL356252",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL356252 inhibits Carboxypeptidase B2 (Activity: IC50=52.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "52.0",
+      "units": "nM",
+      "pchembl_value": "7.28",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 52.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL68399",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL68399 inhibits Carboxypeptidase B2 (Activity: IC50=4.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "4.0",
+      "units": "nM",
+      "pchembl_value": "8.40",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 4.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL344949",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL344949 inhibits Carboxypeptidase B2 (Activity: IC50=50.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "50.0",
+      "units": "nM",
+      "pchembl_value": "7.30",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 50.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL358017",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL358017 inhibits Carboxypeptidase B2 (Activity: IC50=36.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "36.0",
+      "units": "nM",
+      "pchembl_value": "7.44",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 36.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL33352",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL33352 inhibits Carboxypeptidase B2 (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL149680",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL149680 inhibits Carboxypeptidase B2 (Activity: IC50=6.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "6.0",
+      "units": "nM",
+      "pchembl_value": "8.22",
+      "assay_id": "CHEMBL655449",
+      "mechanism_of_action": "IC50 6.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL70177",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL70177 inhibits Carboxypeptidase B2 (Activity: IC50=2.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2.0",
+      "units": "nM",
+      "pchembl_value": "8.70",
+      "assay_id": "CHEMBL880226",
+      "mechanism_of_action": "IC50 2.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL67234",
+    "relation": "RelationType.INHIBITS",
+    "tail": "Carboxypeptidase B2",
+    "triple_string": "Inhibitor/Ligand CHEMBL67234 inhibits Carboxypeptidase B2 (Activity: IC50=20000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "20000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL880226",
+      "mechanism_of_action": "IC50 20000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL7643",
+    "relation": "RelationType.INHIBITS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL7643 inhibits CA-755 (Activity: Inhibition=100.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "100.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL651028",
+      "mechanism_of_action": "Inhibition 100.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL7829",
+    "relation": "RelationType.INHIBITS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL7829 inhibits CA-755 (Activity: Inhibition=100.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "100.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL651027",
+      "mechanism_of_action": "Inhibition 100.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL79188",
+    "relation": "RelationType.INHIBITS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL79188 inhibits CA-755 (Activity: Inhibition=94.0)",
+    "attributes": {
+      "activity_type": "Inhibition",
+      "activity_value": "94.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL651027",
+      "mechanism_of_action": "Inhibition 94.0 %"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL275638",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL275638 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL327209",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL327209 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL291876",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL291876 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL483634",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL483634 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL519494",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL519494 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL263241",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL263241 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL243664",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL243664 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL77695",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL77695 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL74490",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL74490 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL75349",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL75349 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL490975",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL490975 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL73930",
+    "relation": "RelationType.BINDS",
+    "tail": "CA-755",
+    "triple_string": "Inhibitor/Ligand CHEMBL73930 binds CA-755 (Activity: Activity=None)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL999163",
+      "mechanism_of_action": "Activity None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177818",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177818 inhibits AN3-CA (Activity: IC50=70000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "70000.0",
+      "units": "nM",
+      "pchembl_value": "4.16",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 70000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177825",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177825 inhibits AN3-CA (Activity: IC50=60000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "60000.0",
+      "units": "nM",
+      "pchembl_value": "4.22",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 60000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177826",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177826 inhibits AN3-CA (Activity: IC50=33000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "33000.0",
+      "units": "nM",
+      "pchembl_value": "4.48",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 33000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177833",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177833 inhibits AN3-CA (Activity: IC50=13000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "13000.0",
+      "units": "nM",
+      "pchembl_value": "4.89",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 13000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177832",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177832 inhibits AN3-CA (Activity: IC50=13000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "13000.0",
+      "units": "nM",
+      "pchembl_value": "4.89",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 13000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177837",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177837 inhibits AN3-CA (Activity: IC50=10000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "10000.0",
+      "units": "nM",
+      "pchembl_value": "5.00",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 10000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177829",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177829 inhibits AN3-CA (Activity: IC50=8800.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "8800.0",
+      "units": "nM",
+      "pchembl_value": "5.06",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 8800.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177835",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177835 inhibits AN3-CA (Activity: IC50=5500.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "5500.0",
+      "units": "nM",
+      "pchembl_value": "5.26",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 5500.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177827",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177827 inhibits AN3-CA (Activity: IC50=2100.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2100.0",
+      "units": "nM",
+      "pchembl_value": "5.68",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 2100.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177836",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177836 inhibits AN3-CA (Activity: IC50=2000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "2000.0",
+      "units": "nM",
+      "pchembl_value": "5.70",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 2000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177828",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177828 inhibits AN3-CA (Activity: IC50=1700.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1700.0",
+      "units": "nM",
+      "pchembl_value": "5.77",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 1700.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177834",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177834 inhibits AN3-CA (Activity: IC50=1500.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "1500.0",
+      "units": "nM",
+      "pchembl_value": "5.82",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 1500.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177831",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177831 inhibits AN3-CA (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177830",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177830 inhibits AN3-CA (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL2177819",
+    "relation": "RelationType.INHIBITS",
+    "tail": "AN3-CA",
+    "triple_string": "Inhibitor/Ligand CHEMBL2177819 inhibits AN3-CA (Activity: IC50=100000.0)",
+    "attributes": {
+      "activity_type": "IC50",
+      "activity_value": "100000.0",
+      "units": "nM",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL2186220",
+      "mechanism_of_action": "IC50 100000.0 nM"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL504086",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL504086 binds Ca-Ski (Activity: ED50=None)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL979628",
+      "mechanism_of_action": "ED50 None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL1554",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL1554 binds Ca-Ski (Activity: ED50=1.9)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "1.9",
+      "units": "10'-3 ug/ml",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL979628",
+      "mechanism_of_action": "ED50 1.9 10'-3 ug/ml"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL498242",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL498242 binds Ca-Ski (Activity: ED50=7.2)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "7.2",
+      "units": "ug ml-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL979628",
+      "mechanism_of_action": "ED50 7.2 ug ml-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL225110",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL225110 binds Ca-Ski (Activity: ED50=3.9)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "3.9",
+      "units": "ug ml-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL979628",
+      "mechanism_of_action": "ED50 3.9 ug ml-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL387689",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL387689 binds Ca-Ski (Activity: ED50=6.2)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "6.2",
+      "units": "ug ml-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL979628",
+      "mechanism_of_action": "ED50 6.2 ug ml-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL465954",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL465954 binds Ca-Ski (Activity: ED50=None)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "None",
+      "units": "None",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL979628",
+      "mechanism_of_action": "ED50 None None"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL447384",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL447384 binds Ca-Ski (Activity: ED50=4.0)",
+    "attributes": {
+      "activity_type": "ED50",
+      "activity_value": "4.0",
+      "units": "ug ml-1",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1005684",
+      "mechanism_of_action": "ED50 4.0 ug ml-1"
+    }
+  },
+  {
+    "head": "Inhibitor/Ligand CHEMBL466396",
+    "relation": "RelationType.BINDS",
+    "tail": "Ca-Ski",
+    "triple_string": "Inhibitor/Ligand CHEMBL466396 binds Ca-Ski (Activity: Activity=6.0)",
+    "attributes": {
+      "activity_type": "Activity",
+      "activity_value": "6.0",
+      "units": "%",
+      "pchembl_value": "None",
+      "assay_id": "CHEMBL1017856",
+      "mechanism_of_action": "Activity 6.0 %"
+    }
+  }
+]
