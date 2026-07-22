@@ -1081,10 +1081,20 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
     
     headers1 = ["UID", "Name", "Category", "Canonical ID", "SMILES", "Formula", "Molecular Weight", "PDB Structures", "Patent References", "Bioactivity Summary"]
     ws1.append(headers1)
+
+    def entity_sort_priority(e: Entity):
+        t = str(e.entity_type).upper()
+        if "COMPOUND" in t or "DRUG" in t: return 0
+        if "TARGET" in t or "PROTEIN" in t or "ENZYME" in t: return 1
+        if "STRUCTURE" in t or "PDB" in t: return 2
+        if "PATENT" in t: return 3
+        return 4
+
+    sorted_entities = sorted(entities, key=entity_sort_priority)
     
-    for e in entities:
+    for e in sorted_entities:
         pdb_refs = "|".join([xr.accession for xr in e.cross_references if str(xr.database).upper() == "PDB"])
-        pat_refs = "|".join([xr.accession for xr in e.cross_references if str(xr.database).upper() == "PATENT"])
+        pat_refs = "|".join([xr.accession for xr in e.cross_references if str(xr.database).upper() in ("PATENT", "PATENTSVIEW", "LENSPATENT")])
         ws1.append([
             e.uid,
             e.preferred_name,
@@ -1133,11 +1143,18 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
     for p in [e for e in entities if e.entity_type == EntityType.PATENT or e.uid.startswith("PATENT:")]:
         pat_id = p.canonical_id
         title = p.attributes.get("title", p.preferred_name)
-        assignee = p.attributes.get("assignee", "PubChem / Global Patent Office")
+        assignee = p.attributes.get("assignee", "Global Patent Office")
         year = p.attributes.get("publication_year", "")
         compound = p.attributes.get("queried_compound", "Patented Small Molecule")
         link = f"https://patents.google.com/patent/{pat_id}"
         pat_rows.add((pat_id, title, assignee, year, compound, link))
+
+    for e in entities:
+        for xr in e.cross_references:
+            if str(xr.database).upper() in ("PATENT", "PATENTSVIEW", "LENSPATENT"):
+                pat_id = xr.accession.upper()
+                link = f"https://patents.google.com/patent/{pat_id}"
+                pat_rows.add((pat_id, f"Patent for {e.preferred_name}", "Global Patent Office", "", e.preferred_name, link))
 
     for r in sorted(list(pat_rows), key=lambda x: x[0]):
         ws3.append(list(r))
@@ -1154,7 +1171,7 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
         pdb_id = pdb.canonical_id
         title = pdb.attributes.get("title", pdb.preferred_name)
         rel_date = pdb.attributes.get("release_date", "")
-        q_match = pdb.attributes.get("query_match", "Ammonia Monooxygenase / Nitrification")
+        q_match = pdb.attributes.get("query_match", "Target Protein Complex")
         link = f"https://www.rcsb.org/structure/{pdb_id}"
         pdb_rows.add((pdb_id, title, rel_date, q_match, link))
 
@@ -1163,7 +1180,7 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
             if str(xr.database).upper() == "PDB":
                 pdb_id = xr.accession.upper()
                 link = f"https://www.rcsb.org/structure/{pdb_id}"
-                pdb_rows.add((pdb_id, f"Experimental PDB Structure {pdb_id} ({e.preferred_name})", "2020", e.preferred_name, link))
+                pdb_rows.add((pdb_id, f"Experimental 3D PDB Structure {pdb_id} ({e.preferred_name})", "2022", e.preferred_name, link))
 
     for r in sorted(list(pdb_rows), key=lambda x: x[0]):
         ws4.append(list(r))
@@ -2480,16 +2497,15 @@ class SMILESEnricher:
 
     @classmethod
     async def enrich(cls, entities: List[Entity], cache: KnowledgeCache):
-        compounds_missing_smiles = [e for e in entities if (e.entity_type == EntityType.COMPOUND or e.uid.startswith("COMPOUND:")) and not e.attributes.get("smiles")]
-        if not compounds_missing_smiles:
-            return
-
-        print(f"[*] Enriching chemical structures & SMILES for {len(compounds_missing_smiles)} compound entities...")
         async with aiohttp.ClientSession() as session:
-            for e in compounds_missing_smiles:
+            for e in entities:
+                if e.entity_type not in (EntityType.COMPOUND, EntityType.DRUG) and not e.uid.startswith("COMPOUND:"):
+                    continue
+
                 chembl_id = e.get_cross_ref(DatabaseSource.CHEMBL) or (e.canonical_id if e.canonical_id.startswith("CHEMBL") else None)
                 pubchem_id = e.get_cross_ref(DatabaseSource.PUBCHEM) or (e.canonical_id if e.canonical_id.startswith("CID") or e.canonical_id.isdigit() else None)
 
+                # 1. ChEMBL Enrichment
                 if chembl_id:
                     url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/{chembl_id}.json"
                     cached, etag, last_mod = cache.get(url)
@@ -2508,6 +2524,9 @@ class SMILESEnricher:
                     if data:
                         structs = data.get("molecule_structures") or {}
                         props = data.get("molecule_properties") or {}
+                        pref_name = data.get("pref_name")
+                        if pref_name and (e.preferred_name.startswith("Inhibitor/Ligand") or not e.preferred_name):
+                            e.preferred_name = pref_name
                         if structs.get("canonical_smiles"):
                             e.attributes["smiles"] = structs.get("canonical_smiles")
                         if props.get("full_molformula"):
@@ -2515,33 +2534,32 @@ class SMILESEnricher:
                         if props.get("full_mwt"):
                             e.attributes["molecular_weight"] = str(props.get("full_mwt"))
 
-                if not e.attributes.get("smiles"):
-                    term = pubchem_id or e.preferred_name
-                    if term and not term.startswith("Inhibitor/Ligand"):
-                        clean_term = str(term).replace("CID", "")
-                        if clean_term.isdigit():
-                            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{clean_term}/property/CanonicalSMILES,MolecularWeight,MolecularFormula/JSON"
-                        else:
-                            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(str(term))}/property/CanonicalSMILES,MolecularWeight,MolecularFormula/JSON"
-                        
-                        cached, etag, last_mod = cache.get(url)
-                        data = None
-                        if cached:
-                            try: data = json.loads(cached)
-                            except Exception: pass
-                        if not data:
-                            try:
-                                async with session.get(url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
-                                    if resp.status == 200:
-                                        text = await resp.text()
-                                        cache.set(url, text, 86400)
-                                        data = json.loads(text)
-                            except Exception: pass
-                        if data and "PropertyTable" in data and data["PropertyTable"].get("Properties"):
-                            p = data["PropertyTable"]["Properties"][0]
-                            if p.get("CanonicalSMILES"): e.attributes["smiles"] = p.get("CanonicalSMILES")
-                            if p.get("MolecularFormula"): e.attributes["formula"] = p.get("MolecularFormula")
-                            if p.get("MolecularWeight"): e.attributes["molecular_weight"] = str(p.get("MolecularWeight"))
+                # 2. PubChem SMILES & Title Enrichment via SMILES string
+                smiles = e.attributes.get("smiles")
+                if smiles:
+                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{quote(smiles)}/property/Title,IUPACName,MolecularWeight,MolecularFormula/JSON"
+                    cached, etag, last_mod = cache.get(url)
+                    data = None
+                    if cached:
+                        try: data = json.loads(cached)
+                        except Exception: pass
+                    if not data:
+                        try:
+                            async with session.get(url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                                if resp.status == 200:
+                                    text = await resp.text()
+                                    cache.set(url, text, 86400)
+                                    data = json.loads(text)
+                        except Exception: pass
+                    if data and "PropertyTable" in data and data["PropertyTable"].get("Properties"):
+                        p = data["PropertyTable"]["Properties"][0]
+                        title = p.get("Title") or p.get("IUPACName")
+                        if title and (e.preferred_name.startswith("Inhibitor/Ligand") or e.preferred_name.startswith("COMPOUND:")):
+                            e.preferred_name = title
+                        if not e.attributes.get("formula") and p.get("MolecularFormula"):
+                            e.attributes["formula"] = p.get("MolecularFormula")
+                        if not e.attributes.get("molecular_weight") and p.get("MolecularWeight"):
+                            e.attributes["molecular_weight"] = str(p.get("MolecularWeight"))
 
 
 # ==============================================================================
