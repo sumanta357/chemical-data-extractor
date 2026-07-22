@@ -1874,11 +1874,18 @@ class UniProtConnector(BaseConnector):
     NAME = "UniProt"
 
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
-        url = f"https://rest.uniprot.org/uniprotkb/search?query={quote(query)}&size=3"
-        data = await self._safe_get(session, url)
         entities, relations = [], []
-        if data and "results" in data:
-            for item in data["results"]:
+        if re.match(r"^[A-Z0-9]{6,10}$", query, re.I):
+            url = f"https://rest.uniprot.org/uniprotkb/{query.upper()}.json"
+            data = await self._safe_get(session, url)
+            results = [data] if data and "primaryAccession" in data else []
+        else:
+            url = f"https://rest.uniprot.org/uniprotkb/search?query={quote(query)}&size=3"
+            data = await self._safe_get(session, url)
+            results = data.get("results", []) if data else []
+
+        if results:
+            for item in results:
                 acc = item.get("primaryAccession")
                 rec_name = item.get("proteinDescription", {}).get("recommendedName", {}).get("fullName", {}).get("value", query)
                 organism = item.get("organism", {}).get("scientificName", "")
@@ -1995,10 +2002,17 @@ class ChEMBLConnector(BaseConnector):
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
         
-        mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q={quote(query)}&limit=5"
-        mol_data = await self._safe_get(session, mol_url)
-        if mol_data and "molecules" in mol_data:
-            for m in mol_data["molecules"]:
+        if re.match(r"^CHEMBL\d+$", query, re.I):
+            mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/{query.upper()}.json"
+            m_data = await self._safe_get(session, mol_url)
+            mol_list = [m_data] if m_data and "molecule_chembl_id" in m_data else []
+        else:
+            mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q={quote(query)}&limit=5"
+            mol_data = await self._safe_get(session, mol_url)
+            mol_list = mol_data.get("molecules", []) if mol_data else []
+
+        if mol_list:
+            for m in mol_list:
                 chembl_id = m.get("molecule_chembl_id")
                 pref_name = m.get("pref_name") or query
                 structs = m.get("molecule_structures") or {}
