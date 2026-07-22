@@ -2341,9 +2341,12 @@ class RecursiveGraphExpander:
         self.max_entities_per_hop = max_entities_per_hop
         self.visited_uids: Set[str] = set()
 
-    async def expand(self, initial_query: str):
+    async def expand(self, initial_query: Union[str, List[str]]):
         async with aiohttp.ClientSession() as session:
-            current_queries = [initial_query]
+            if isinstance(initial_query, list):
+                current_queries = [q for q in initial_query if q]
+            else:
+                current_queries = [initial_query]
             
             for hop in range(self.max_hops):
                 if not current_queries: break
@@ -2525,6 +2528,30 @@ class SMILESEnricher:
 # 16. CLI & AUTOMATED RUNNER
 # ==============================================================================
 
+def clean_query_terms(query_str: str) -> List[str]:
+    if "," not in query_str:
+        return [query_str.strip()]
+    raw_terms = [t.strip() for t in query_str.split(",") if t.strip()]
+    noise_pattern = re.compile(
+        r"\b(inhibitor|inhibitors|inhibiting|agent|agents|compound|compounds|assay|assays|review|reviews|docking|pharmacophore|sar|qsar|structure-activity relationship|dynamics|targeting|disrupting|stabilizing|destabilizing|natural product|synthetic compound|analog|analogs|site|domain|complex|complexes)\b",
+        re.I
+    )
+    cleaned = []
+    for term in raw_terms:
+        cleaned.append(term)
+        core = noise_pattern.sub("", term).strip()
+        core = re.sub(r"[\s\-\_]+", " ", core).strip()
+        if core and len(core) >= 2 and core.lower() not in [c.lower() for c in cleaned]:
+            cleaned.append(core)
+    seen = set()
+    result = []
+    for item in cleaned:
+        if item.lower() not in seen:
+            seen.add(item.lower())
+            result.append(item)
+    return result
+
+
 def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", export_dir: str = "./exports", max_hops: int = 4, answers: Dict[str, Any] = None):
     print("================================================================================")
     print(f"  ENTERPRISE AUTOMATED DISCOVERY ENGINE v3.1: '{query}'")
@@ -2560,19 +2587,13 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
     print(f"\n[1/6] Intelligent Routing & Multi-Hop Expansion (Hops: {max_hops})...")
     expander = RecursiveGraphExpander(connectors, resolver, max_hops=max_hops)
 
-    # Auto-split comma-separated multi-term queries
-    if "," in query:
-        sub_queries = [q.strip() for q in query.split(",") if q.strip()]
-        for q_item in sub_queries:
-            try:
-                asyncio.run(expander.expand(q_item))
-            except Exception as err:
-                logger.debug(f"Sub-query execution error for '{q_item}': {err}")
-    else:
-        try:
-            asyncio.run(expander.expand(query))
-        except Exception as err:
-            logger.debug(f"Search pipeline executed: {err}")
+    # Intelligent Batch Query Expansion
+    target_terms = clean_query_terms(query)
+    print(f"[*] Batch Query Targets ({len(target_terms)} terms): {target_terms[:5]}...")
+    try:
+        asyncio.run(expander.expand(target_terms))
+    except Exception as err:
+        logger.debug(f"Search pipeline executed: {err}")
 
     entities = resolver.get_entities()
     relations = resolver.get_relations()
