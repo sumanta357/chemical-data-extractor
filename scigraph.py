@@ -2701,8 +2701,10 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
     print(f"  * Dominant Category: {trends['dominant_entity_type']}")
     print(f"  * Potential Hypotheses Generated: {len(repurposing)}")
 
-    print("\n[6/6] Generating Multi-Format Export Files & Excel Spreadsheets...")
-    excel_path = out_dir / "Nitrification_Inhibitors_Knowledge_Graph.xlsx"
+    clean_q_filename = re.sub(r'[/\\:*?"<>|]', '_', query).strip()
+    clean_q_filename = re.sub(r'\s+', '_', clean_q_filename)[:50]
+    excel_filename = f"{clean_q_filename}_Knowledge_Graph.xlsx" if clean_q_filename else "Scientific_Knowledge_Graph.xlsx"
+    excel_path = out_dir / excel_filename
     export_to_excel(entities, relations, str(excel_path))
     (out_dir / "neo4j_import.cypher").write_text(export_to_neo4j_cypher(entities, relations), encoding="utf-8")
     export_to_csv(entities, relations, str(out_dir / "nodes.csv"), str(out_dir / "edges.csv"))
