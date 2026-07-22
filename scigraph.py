@@ -2241,7 +2241,7 @@ class QueryAssistant:
             questions.append({
                 "id": "expansion_hops",
                 "question": "How deep should the multi-hop knowledge graph expansion traverse?",
-                "options": ["1-Hop (Direct Targets & Bioactivities)", "2-Hops (Multi-Network Cross-References)", "3-Hops (Deep Systems Biology Graph)"]
+                "options": ["4-Hops (Deep Extensive Systems Biology Graph - Recommended)", "3-Hops (Standard Network Search)", "2-Hops (Direct Cross-References)", "1-Hop (Direct Targets)"]
             })
 
         questions.append({
@@ -2555,13 +2555,30 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
         try: connectors.append(c_cls(cache, translator))
         except Exception: pass
 
+    # Parse answers for max_hops if provided
+    if answers and "expansion_hops" in answers:
+        h_text = str(answers["expansion_hops"])
+        if "4-Hop" in h_text: max_hops = 4
+        elif "3-Hop" in h_text: max_hops = 3
+        elif "2-Hop" in h_text: max_hops = 2
+        elif "1-Hop" in h_text: max_hops = 1
+
     print(f"\n[1/6] Intelligent Routing & Multi-Hop Expansion (Hops: {max_hops})...")
     expander = RecursiveGraphExpander(connectors, resolver, max_hops=max_hops)
 
-    try:
-        asyncio.run(expander.expand(query))
-    except Exception as err:
-        logger.debug(f"Search pipeline executed: {err}")
+    # Auto-split comma-separated multi-term queries
+    if "," in query:
+        sub_queries = [q.strip() for q in query.split(",") if q.strip()]
+        for q_item in sub_queries:
+            try:
+                asyncio.run(expander.expand(q_item))
+            except Exception as err:
+                logger.debug(f"Sub-query execution error for '{q_item}': {err}")
+    else:
+        try:
+            asyncio.run(expander.expand(query))
+        except Exception as err:
+            logger.debug(f"Search pipeline executed: {err}")
 
     entities = resolver.get_entities()
     relations = resolver.get_relations()
