@@ -2529,20 +2529,27 @@ class SMILESEnricher:
 # ==============================================================================
 
 def clean_query_terms(query_str: str) -> List[str]:
-    if "," not in query_str:
-        return [query_str.strip()]
-    raw_terms = [t.strip() for t in query_str.split(",") if t.strip()]
     noise_pattern = re.compile(
         r"\b(inhibitor|inhibitors|inhibiting|agent|agents|compound|compounds|assay|assays|review|reviews|docking|pharmacophore|sar|qsar|structure-activity relationship|dynamics|targeting|disrupting|stabilizing|destabilizing|natural product|synthetic compound|analog|analogs|site|domain|complex|complexes)\b",
         re.I
     )
+    if "," not in query_str:
+        core = noise_pattern.sub("", query_str).strip()
+        core = re.sub(r"[\s\-\_]+", " ", core).strip()
+        terms = []
+        if core and len(core) >= 2: terms.append(core)
+        if query_str.strip().lower() not in [t.lower() for t in terms]: terms.append(query_str.strip())
+        return terms
+    
+    raw_terms = [t.strip() for t in query_str.split(",") if t.strip()]
     cleaned = []
     for term in raw_terms:
-        cleaned.append(term)
         core = noise_pattern.sub("", term).strip()
         core = re.sub(r"[\s\-\_]+", " ", core).strip()
-        if core and len(core) >= 2 and core.lower() not in [c.lower() for c in cleaned]:
+        if core and len(core) >= 2:
             cleaned.append(core)
+        else:
+            cleaned.append(term)
     seen = set()
     result = []
     for item in cleaned:
