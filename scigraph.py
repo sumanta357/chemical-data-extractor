@@ -1430,8 +1430,14 @@ class BaseConnector(abc.ABC):
     async def _safe_get(self, session: aiohttp.ClientSession, url: str) -> Optional[Dict[str, Any]]:
         cached, etag, last_mod = self.cache.get(url)
         if cached:
-            try: return orjson.loads(cached)
-            except Exception: return json.loads(cached)
+            try:
+                parsed = orjson.loads(cached)
+                if parsed and parsed != {} and parsed != []: return parsed
+            except Exception:
+                try:
+                    parsed = json.loads(cached)
+                    if parsed and parsed != {} and parsed != []: return parsed
+                except Exception: pass
 
         headers = {"User-Agent": "SciGraphEnterprise/3.1"}
         if etag: headers["If-None-Match"] = etag
