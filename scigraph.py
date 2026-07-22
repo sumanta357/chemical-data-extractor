@@ -1135,15 +1135,9 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
         title = p.attributes.get("title", p.preferred_name)
         assignee = p.attributes.get("assignee", "PubChem / Global Patent Office")
         year = p.attributes.get("publication_year", "")
-        compound = p.attributes.get("queried_compound", "Nitrification Inhibitor Compound")
+        compound = p.attributes.get("queried_compound", "Patented Small Molecule")
         link = f"https://patents.google.com/patent/{pat_id}"
         pat_rows.add((pat_id, title, assignee, year, compound, link))
-
-    for k, p_list in PatentConnector.PATENT_DATABASE.items():
-        for p in p_list:
-            pat_id = p["patent_id"]
-            link = f"https://patents.google.com/patent/{pat_id}"
-            pat_rows.add((pat_id, p["title"], p["assignee"], p["year"], k, link))
 
     for r in sorted(list(pat_rows), key=lambda x: x[0]):
         ws3.append(list(r))
@@ -1738,7 +1732,7 @@ class PatentConnector(BaseConnector):
         q_upper = query.upper()
 
         for chem_key, patents in self.PATENT_DATABASE.items():
-            if chem_key in q_upper or "AMMONIA" in q_upper or "NITRIFICATION" in q_upper or "AMO" in q_upper:
+            if chem_key == q_upper or ("AMMONIA" in q_upper and "MONOOXYGENASE" in q_upper) or "NITRIFICATION" in q_upper:
                 for p in patents:
                     pat_id = p["patent_id"]
                     pat_ent = Entity(
@@ -2132,7 +2126,7 @@ class BRENDAConnector(BaseConnector):
         entities, relations = [], []
         q_upper = query.upper()
         
-        matched_key = next((k for k in self.BENCHMARK_ENZYMES if k in q_upper or "AMO" in q_upper or "1.14.99.39" in q_upper), None)
+        matched_key = next((k for k in self.BENCHMARK_ENZYMES if k in q_upper or ("AMMONIA" in q_upper and "MONOOXYGENASE" in q_upper) or "1.14.99.39" in q_upper), None)
         if matched_key:
             data = self.BENCHMARK_ENZYMES[matched_key]
             ec = data["ec"]
