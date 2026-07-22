@@ -959,11 +959,14 @@ def export_to_neo4j_cypher(entities: List[Entity], relations: List[Relation]) ->
         labels_str = ":" + ":".join(e.node_labels())
         props = {"uid": e.uid, "preferred_name": e.preferred_name, "canonical_id": e.canonical_id, "entity_type": str(e.entity_type), **e.attributes}
         props_str = json.dumps(props)
-        statements.append(f"MERGE (n{labels_str} {{uid: '{e.uid}'}}) SET n += {props_str};")
+        safe_uid = e.uid.replace("'", "\\'")
+        statements.append(f"MERGE (n{labels_str} {{uid: '{safe_uid}'}}) SET n += {props_str};")
     for r in relations:
         props = {"relation_type": str(r.relation_type), **r.attributes}
         props_str = json.dumps(props)
-        statements.append(f"MATCH (a {{uid: '{r.source_uid}'}}), (b {{uid: '{r.target_uid}'}}) MERGE (a)-[r:{r.relationship_type()}]->(b) SET r += {props_str};")
+        safe_src = r.source_uid.replace("'", "\\'")
+        safe_tgt = r.target_uid.replace("'", "\\'")
+        statements.append(f"MATCH (a {{uid: '{safe_src}'}}), (b {{uid: '{safe_tgt}'}}) MERGE (a)-[r:{r.relationship_type()}]->(b) SET r += {props_str};")
     return "\n".join(statements)
 
 
@@ -1026,8 +1029,9 @@ def export_to_turtle(entities: List[Entity], relations: List[Relation], filepath
     ]
     for e in entities:
         type_str = str(e.entity_type).lower().replace(" ", "_")
+        safe_name = e.preferred_name.replace('\\', '\\\\').replace('"', '\\"')
         lines.append(f"id:{type_str}/{e.canonical_id} a sg:{type_str} ;")
-        lines.append(f'    rdfs:label "{e.preferred_name}" .')
+        lines.append(f'    rdfs:label "{safe_name}" .')
     for r in relations:
         lines.append(f"id:entity/{r.source_uid} sg:{r.relationship_type().lower()} id:entity/{r.target_uid} .")
     Path(filepath).write_text("\n".join(lines), encoding="utf-8")
@@ -1061,6 +1065,13 @@ def export_to_vector_index(entities: List[Entity], relations: List[Relation], me
     Path(triples_filepath).write_text(json.dumps(triples, indent=2), encoding="utf-8")
 
 
+def _sanitize_excel_string(val: Any) -> Any:
+    """Strip ASCII control characters that cause openpyxl IllegalCharacterError."""
+    if isinstance(val, str):
+        return re.sub(r'[\x00-\x08\x0B-\x0C\x0E-\x1F]', '', val)
+    return val
+
+
 def export_to_excel(entities: List[Entity], relations: List[Relation], filepath: str) -> None:
     """Exports scientific knowledge graph entities, compounds, SMILES, PDB structures, patents, and bioactivity relations to a styled multi-tab Excel Workbook (.xlsx)."""
     try:
@@ -1072,6 +1083,9 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
         return
 
     wb = openpyxl.Workbook()
+
+    # Build UID -> preferred_name lookup for reliable name resolution
+    uid_name_map = {e.uid: e.preferred_name for e in entities}
     
     # ---------------------------------------------------------
     # TAB 1: Entities, Compounds, SMILES, PDB IDs & Patents
@@ -1095,7 +1109,7 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
     for e in sorted_entities:
         pdb_refs = "|".join([xr.accession for xr in e.cross_references if str(xr.database).upper() == "PDB"])
         pat_refs = "|".join([xr.accession for xr in e.cross_references if str(xr.database).upper() in ("PATENT", "PATENTSVIEW", "LENSPATENT")])
-        ws1.append([
+        ws1.append([_sanitize_excel_string(v) for v in [
             e.uid,
             e.preferred_name,
             str(e.entity_type),
@@ -1106,7 +1120,7 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
             pdb_refs,
             pat_refs,
             e.attributes.get("bioactivity_summary", "")
-        ])
+        ]])
 
     # ---------------------------------------------------------
     # TAB 2: Bioactivity & Patent Relations
@@ -1116,10 +1130,10 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
     ws2.append(headers2)
 
     for r in relations:
-        s_name = next((e.preferred_name for e in entities if e.uid == r.source_uid), r.source_uid)
-        t_name = next((e.preferred_name for e in entities if e.uid == r.target_uid), r.target_uid)
+        s_name = uid_name_map.get(r.source_uid, r.source_uid)
+        t_name = uid_name_map.get(r.target_uid, r.target_uid)
         conf = r.evidence[0].confidence_score if r.evidence else 1.0
-        ws2.append([
+        ws2.append([_sanitize_excel_string(v) for v in [
             s_name,
             t_name,
             r.relationship_type(),
@@ -1130,7 +1144,7 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
             r.attributes.get("pchembl_value", ""),
             r.attributes.get("mechanism_of_action", r.attributes.get("patent_id", "")),
             r.attributes.get("assay_id", r.evidence[0].source_url if r.evidence else "")
-        ])
+        ]])
 
     # ---------------------------------------------------------
     # TAB 3: Patents & Patented Inhibitor Molecules
@@ -1325,14 +1339,18 @@ class UniversalIDTranslator:
         self._matrix: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
 
     def register_entity(self, entity: Entity):
-        refs = dict(entity.cross_references)
+        # Use list of tuples to avoid key collisions when multiple cross-refs share the same database
+        refs = []
+        for xr in entity.cross_references:
+            db_str = xr.database.value if isinstance(xr.database, DatabaseSource) else str(xr.database)
+            refs.append((db_str.upper(), xr.accession))
         type_str = entity.entity_type.value if isinstance(entity.entity_type, EntityType) else str(entity.entity_type)
-        refs[type_str.upper()] = entity.canonical_id
-        for t1, id1 in refs.items():
-            for t2, id2 in refs.items():
-                if t1 != t2:
-                    self._matrix[t1.upper()][id1].add(id2)
-                    self._matrix[t2.upper()][id2].add(id1)
+        refs.append((type_str.upper(), entity.canonical_id))
+        for i, (t1, id1) in enumerate(refs):
+            for j, (t2, id2) in enumerate(refs):
+                if i != j:
+                    self._matrix[t1][id1].add(id2)
+                    self._matrix[t2][id2].add(id1)
 
     def translate(self, source_type: str, source_id: str) -> List[str]:
         return list(self._matrix[source_type.upper()].get(source_id, set()))
@@ -1373,7 +1391,10 @@ class KnowledgeCache:
             if row:
                 blob, etag, last_mod, ts, ttl = row
                 if time.time() - ts <= ttl:
-                    return zlib.decompress(blob).decode('utf-8'), None, None
+                    try:
+                        return zlib.decompress(blob).decode('utf-8'), None, None
+                    except Exception:
+                        return None, etag, last_mod
                 return None, etag, last_mod
             return None, None, None
 
@@ -1615,17 +1636,6 @@ class STRINGConnector(BaseConnector):
 class PDBeKBConnector(BaseConnector):
     NAME = "PDBe-KB"
 
-    BENCHMARK_PDB_STRUCTURES = {
-        "AMMONIA": [
-            {"pdb_id": "9PXF", "title": "Cryo-EM structure of Ammonia Monooxygenase (AMO) complex", "year": "2024"},
-            {"pdb_id": "6N4N", "title": "Structure of Nitrosomonas europaea Ammonia Monooxygenase", "year": "2019"},
-            {"pdb_id": "6C0B", "title": "Structure of particulate Methane Monooxygenase (pMMO/AMO homolog)", "year": "2018"},
-            {"pdb_id": "7Z36", "title": "Cryo-EM structure of membrane-bound Ammonia Monooxygenase", "year": "2022"},
-            {"pdb_id": "1A00", "title": "Crystal structure of Hydroxylamine Oxidoreductase (HAO)", "year": "1998"},
-            {"pdb_id": "3RFA", "title": "Crystal structure of Nitrosomonas europaea Hydroxylamine Oxidoreductase", "year": "2011"},
-            {"pdb_id": "4EDK", "title": "Crystal structure of particulate Methane/Ammonia Monooxygenase active site", "year": "2012"}
-        ]
-    }
 
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
@@ -1779,7 +1789,7 @@ class PatentConnector(BaseConnector):
                         pat_ent = Entity(
                             uid=f"PATENT:{pid}",
                             entity_type=EntityType.PATENT,
-                            preferred_name=f"Patent {pid} (Patented Nitrification Molecule)",
+                            preferred_name=f"Patent {pid} ({query})",
                             canonical_id=pid,
                             evidence=[Evidence(database=self.NAME, patent_number=pid, source_url=f"https://patents.google.com/patent/{pid}")],
                             attributes={"patent_number": pid, "queried_compound": query}
@@ -2230,14 +2240,19 @@ class BRENDAConnector(BaseConnector):
 # Auto-register fallbacks for remaining sources
 ALL_SOURCES = [e.value for e in DatabaseSource if e != DatabaseSource.OTHER]
 registered_names = set(ConnectorRegistry.get_all().keys())
+
+def _make_dynamic_connector(name: str) -> type:
+    """Factory function to avoid closure-over-loop-variable bug."""
+    class DynamicConnector(BaseConnector):
+        NAME = name
+        async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+            return [], []
+    DynamicConnector.__name__ = f"{re.sub(r'[^a-zA-Z0-9]', '', name)}Connector"
+    return DynamicConnector
+
 for source_name in ALL_SOURCES:
     if source_name not in registered_names:
-        class DynamicConnector(BaseConnector):
-            NAME = source_name
-            async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
-                return [], []
-        DynamicConnector.__name__ = f"{re.sub(r'[^a-zA-Z0-9]', '', source_name)}Connector"
-        ConnectorRegistry.register(DynamicConnector)
+        ConnectorRegistry.register(_make_dynamic_connector(source_name))
 
 
 # ==============================================================================
@@ -2534,21 +2549,22 @@ class SMILESEnricher:
                         if props.get("full_mwt"):
                             e.attributes["molecular_weight"] = str(props.get("full_mwt"))
 
-                # 2. PubChem SMILES & Title Enrichment via SMILES string
+                # 2. PubChem SMILES & Title Enrichment via POST (avoids URL issues with /, \, #)
                 smiles = e.attributes.get("smiles")
                 if smiles:
-                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{quote(smiles)}/property/Title,IUPACName,MolecularWeight,MolecularFormula/JSON"
-                    cached, etag, last_mod = cache.get(url)
+                    post_url = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/property/Title,IUPACName,MolecularWeight,MolecularFormula/JSON"
+                    cache_key = f"PUBCHEM_SMILES_POST:{hashlib.md5(smiles.encode()).hexdigest()}"
+                    cached, etag, last_mod = cache.get(cache_key)
                     data = None
                     if cached:
                         try: data = json.loads(cached)
                         except Exception: pass
                     if not data:
                         try:
-                            async with session.get(url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                            async with session.post(post_url, data={"smiles": smiles}, timeout=aiohttp.ClientTimeout(total=6)) as resp:
                                 if resp.status == 200:
                                     text = await resp.text()
-                                    cache.set(url, text, 86400)
+                                    cache.set(cache_key, text, 86400)
                                     data = json.loads(text)
                         except Exception: pass
                     if data and "PropertyTable" in data and data["PropertyTable"].get("Properties"):
@@ -2701,6 +2717,7 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
     print(f"  * Dominant Category: {trends['dominant_entity_type']}")
     print(f"  * Potential Hypotheses Generated: {len(repurposing)}")
 
+    print("\n[6/6] Generating Multi-Format Export Files & Excel Spreadsheets...")
     clean_q_filename = re.sub(r'[/\\:*?"<>|]', '_', query).strip()
     clean_q_filename = re.sub(r'\s+', '_', clean_q_filename)[:50]
     excel_filename = f"{clean_q_filename}_Knowledge_Graph.xlsx" if clean_q_filename else "Scientific_Knowledge_Graph.xlsx"
