@@ -2535,6 +2535,41 @@ class SMILESEnricher:
 # 16. CLI & AUTOMATED RUNNER
 # ==============================================================================
 
+class BioactivityRankingEngine:
+    """Ranks extracted entities using a multi-factor Scientific Relevance Score (S_rel)."""
+
+    @classmethod
+    def calculate_score(cls, entity: Entity) -> float:
+        score = 0.0
+        # 1. pChEMBL / Potency Score
+        pchembl_str = entity.attributes.get("pchembl_value", "")
+        if pchembl_str:
+            try:
+                pchembl = float(pchembl_str)
+                score += pchembl * 2.0
+            except ValueError: pass
+
+        # 2. Max Clinical Phase Bonus
+        phase_str = str(entity.attributes.get("max_phase", ""))
+        if phase_str == "4": score += 10.0  # FDA Approved Drug
+        elif phase_str == "3": score += 7.5
+        elif phase_str == "2": score += 5.0
+        elif phase_str == "1": score += 2.5
+
+        # 3. PDB Experimental 3D Structure Bonus
+        if entity.entity_type == EntityType.STRUCTURE or any(str(xr.database).upper() == "PDB" for xr in entity.cross_references):
+            score += 5.0
+
+        # 4. Canonical Cross-References & Evidence Provenance Score
+        score += len(entity.cross_references) * 1.5
+        score += len(entity.evidence) * 0.5
+        return score
+
+    @classmethod
+    def rank_entities(cls, entities: List[Entity]) -> List[Entity]:
+        return sorted(entities, key=cls.calculate_score, reverse=True)
+
+
 def clean_query_terms(query_str: str) -> List[str]:
     noise_pattern = re.compile(
         r"\b(inhibitor|inhibitors|inhibiting|agent|agents|compound|compounds|assay|assays|review|reviews|docking|pharmacophore|sar|qsar|structure-activity relationship|dynamics|targeting|disrupting|stabilizing|destabilizing|natural product|synthetic compound|analog|analogs|site|domain|complex|complexes)\b",
@@ -2631,6 +2666,9 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
         asyncio.run(SMILESEnricher.enrich(entities, cache))
     except Exception as err:
         logger.debug(f"SMILES enrichment step error: {err}")
+
+    # Sort entities using Multi-Factor Scientific Relevance Score (S_rel)
+    entities = BioactivityRankingEngine.rank_entities(entities)
 
     repo.save_entities_bulk(entities)
     if relations:
