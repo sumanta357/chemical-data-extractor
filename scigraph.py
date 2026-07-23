@@ -1775,60 +1775,9 @@ class OpenAlexConnector(BaseConnector):
 class PatentConnector(BaseConnector):
     NAME = "Patents"
 
-    PATENT_DATABASE = {
-        "NITRAPYRIN": [
-            {"patent_id": "US3135594A", "title": "Soil Treatment with 2-Chloro-6-(trichloromethyl)pyridine Nitrification Inhibitor", "year": "1964", "assignee": "Dow Chemical Co"},
-            {"patent_id": "US3424754A", "title": "Process for the Preparation of Trichloromethyl Pyridine Compounds", "year": "1969", "assignee": "Dow Chemical Co"}
-        ],
-        "DMPP": [
-            {"patent_id": "US7883568B2", "title": "Use of Pyrazole Derivatives as Nitrification Inhibitors in Inorganic Fertilizers", "year": "2011", "assignee": "BASF SE"},
-            {"patent_id": "WO2011045763A1", "title": "Nitrification Inhibitors Containing 3,4-Dimethylpyrazole Phosphate Formulations", "year": "2011", "assignee": "EuroChem AG"}
-        ],
-        "DCD": [
-            {"patent_id": "EP0386767B1", "title": "Process for Inhibiting Nitrification of Ammonium Nitrogen with Dicyandiamide", "year": "1990", "assignee": "SKW Trostberg AG"},
-            {"patent_id": "US4523940A", "title": "Nitrification Inhibitor Composition Comprising Dicyandiamide", "year": "1985", "assignee": "Agrium Inc"}
-        ],
-        "PRONITRIDINE": [
-            {"patent_id": "US5354726A", "title": "Substituted 1,2,4-Triazole Compounds as Nitrification Inhibitors", "year": "1994", "assignee": "BASF Corp"}
-        ],
-        "SORGOLEONE": [
-            {"patent_id": "WO2020123456A1", "title": "Biological Nitrification Inhibitor Compositions Exuded from Sorghum Roots", "year": "2020", "assignee": "JIRCAS / FAO"}
-        ],
-        "BRACHIALACTONE": [
-            {"patent_id": "WO2015098123A1", "title": "Brachialactone Compounds and Methods for Suppressing Soil Nitrification", "year": "2015", "assignee": "JIRCAS"}
-        ],
-        "TUBULIN": [
-            {"patent_id": "US5496804A", "title": "Taxol Derivatives and Method of Preparation as Antineoplastic Agents", "year": "1996", "assignee": "Florida State Univ / Bristol-Myers Squibb"},
-            {"patent_id": "US4814470A", "title": "Taxane Derivatives, Process for Preparation and Pharmaceutical Compositions", "year": "1989", "assignee": "Rhone-Poulenc Rorer"},
-            {"patent_id": "US3205220A", "title": "Process for the Preparation of Vincristine and Vinblastine", "year": "1965", "assignee": "Eli Lilly and Co"},
-            {"patent_id": "US4996237A", "title": "Combretastatin A-4 Analogues and Tubulin Depolymerization Methods", "year": "1991", "assignee": "Arizona State Univ / Pettit et al"},
-            {"patent_id": "US5561122A", "title": "Water Soluble Prodrugs of Combretastatin A-4", "year": "1996", "assignee": "Arizona Board of Regents"},
-            {"patent_id": "US6433012B1", "title": "Indole Derivatives as Inhibitors of Tubulin Polymerization", "year": "2002", "assignee": "Abbott Laboratories"},
-            {"patent_id": "US6987126B2", "title": "Pyrrole and Triazole Inhibitors of Microtubule Polymerization", "year": "2006", "assignee": "Aventis Pharmaceuticals"},
-            {"patent_id": "US7569592B2", "title": "Pironetin Derivatives and Synthesis of Tubulin Binding Agents", "year": "2009", "assignee": "Novartis AG"},
-            {"patent_id": "US6127377A", "title": "Epothilone Derivatives as Microtubule Stabilizers", "year": "2000", "assignee": "Merck & Co"},
-            {"patent_id": "US6365752B1", "title": "Halichondrin B Analogues (Eribulin Synthesis)", "year": "2002", "assignee": "Eisai R&D Management"}
-        ]
-    }
-
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
         q_upper = query.upper()
-
-        for chem_key, patents in self.PATENT_DATABASE.items():
-            if chem_key in q_upper or ("AMMONIA" in q_upper and "MONOOXYGENASE" in q_upper) or "NITRIFICATION" in q_upper or ("TUBULIN" in q_upper and chem_key == "TUBULIN"):
-                for p in patents:
-                    pat_id = p["patent_id"]
-                    pat_ent = Entity(
-                        uid=f"PATENT:{pat_id}",
-                        entity_type=EntityType.PATENT,
-                        preferred_name=f"Patent {pat_id}: {p['title']}",
-                        canonical_id=pat_id,
-                        evidence=[Evidence(database=self.NAME, patent_number=pat_id, source_url=f"https://patents.google.com/patent/{pat_id}")],
-                        attributes={"title": p["title"], "publication_year": p["year"], "assignee": p["assignee"]}
-                    )
-                    pat_ent.add_cross_ref("PATENT", pat_id)
-                    entities.append(pat_ent)
 
         if not q_upper.startswith("EC:"):
             url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(query)}/xrefs/PatentID/JSON"
@@ -2089,73 +2038,8 @@ class PubChemConnector(BaseConnector):
 class ChEMBLConnector(BaseConnector):
     NAME = "ChEMBL"
 
-    BENCHMARK_TARGET_DRUGS = {
-        "TUBULIN": [
-            {"name": "Colchicine", "chembl": "CHEMBL411", "cid": "CID6167", "smiles": "CC(=O)NC1CCC2=CC(=C(C(=C2C3=CC=C(C(=O)C=C13)OC)OC)OC)OC", "type": "IC50", "val": "10.0", "units": "nM", "mech": "Colchicine Binding Site Inhibitor (FDA Approved)"},
-            {"name": "Paclitaxel (Taxol)", "chembl": "CHEMBL428", "cid": "CID36314", "smiles": "CC1=C2C(C(=O)C3(C(CC4C(C3C(C(C2(C)C)(CC1OC(=O)C(C(C5=CC=CC=C5)NC(=O)C6=CC=CC=C6)O)O)OC(=O)C7=CC=CC=C7)(CO4)OC(=O)C)O)C)OC(=O)C", "type": "Kd", "val": "20.0", "units": "nM", "mech": "Taxane Site Microtubule Stabilizer (FDA Approved)"},
-            {"name": "Docetaxel", "chembl": "CHEMBL92", "cid": "CID148124", "smiles": "CC1=C2C(C(=O)C3(C(CC4C(C3C(C(C2(C)C)(CC1OC(=O)C(C(C5=CC=CC=C5)NC(=O)OC(C)(C)C)O)O)OC(=O)C6=CC=CC=C6)(CO4)OC(=O)C)O)C)O", "type": "Kd", "val": "15.0", "units": "nM", "mech": "Taxane Site Microtubule Stabilizer (FDA Approved)"},
-            {"name": "Vinblastine", "chembl": "CHEMBL54", "cid": "CID6719", "smiles": "CCC1(CC2CC(C3=C(N21)C4=CC=CC=C4N3)(C5=C(C=C6C(=C5)C78C9C1(CC7(C(=O)C1(C(C=C9N8C=C6)AC(=O)O)(O)C(=O)OC)CC)N)OC)OC)O", "type": "IC50", "val": "120.0", "units": "nM", "mech": "Vinca Binding Site Destabilizer (FDA Approved)"},
-            {"name": "Vincristine", "chembl": "CHEMBL406", "cid": "CID5978", "smiles": "CCC1(CC2CC(C3=C(N21)C4=CC=CC=C4N3)(C5=C(C=C6C(=C5)C78C9C1(CC7(C(=O)C1(C(C=C9N8C=C6)AC(=O)O)(O)C(=O)OC)CC)N)OC)OC)O", "type": "IC50", "val": "85.0", "units": "nM", "mech": "Vinca Binding Site Destabilizer (FDA Approved)"},
-            {"name": "Combretastatin A-4", "chembl": "CHEMBL490", "cid": "CID73391", "smiles": "COC1=CC(=CC(=C1O)OC)C=CC2=CC(=C(C=C2)OC)OC", "type": "IC50", "val": "2.5", "units": "nM", "mech": "Colchicine Site Tubulin Depolymerization Inhibitor"},
-            {"name": "Nocodazole", "chembl": "CHEMBL173", "cid": "CID4122", "smiles": "CC1=CC=C(C=C1)C(=O)C2=CC3=C(C=C2)NC(=N3)NC(=O)OC", "type": "IC50", "val": "50.0", "units": "nM", "mech": "Microtubule Polymerization Inhibitor"},
-            {"name": "Podophyllotoxin", "chembl": "CHEMBL178", "cid": "CID3676", "smiles": "COC1=CC(=CC(=C1OC)OC)C2C3C(COC3=O)C(C4=CC5=OCOCC5=C24)O", "type": "IC50", "val": "15.0", "units": "nM", "mech": "Colchicine Site Inhibitor"},
-            {"name": "Epothilone B", "chembl": "CHEMBL1201083", "cid": "CID448013", "smiles": "CC1CC2OC2(C)CCCC(C)C(OC(=O)CC(O)C(C)(C)C(O)C(=O)C1C)C(=CC3=CSC(=N3)C)C", "type": "EC50", "val": "2.1", "units": "nM", "mech": "Microtubule Stabilizing Agent"},
-            {"name": "Ixabepilone", "chembl": "CHEMBL1201742", "cid": "CID6451149", "smiles": "CC1CC2OC2(C)CCCC(C)C(OC(=O)CC(O)C(C)(C)C(O)C(=O)C1C)C(=CC3=CSC(=N3)C)C", "type": "IC50", "val": "4.5", "units": "nM", "mech": "Semi-synthetic Epothilone B Analog (FDA Approved)"},
-            {"name": "Eribulin", "chembl": "CHEMBL1201777", "cid": "CID11594223", "smiles": "CC1C2CC3C(O2)CC4C(O3)CC5(O4)CCC6C(O5)CC7C(O6)CC8(O7)CCC9(O8)CCC1O9", "type": "IC50", "val": "0.7", "units": "nM", "mech": "Halichondrin B Analog Tubulin Inhibitor (FDA Approved)"},
-            {"name": "Maytansine", "chembl": "CHEMBL366922", "cid": "CID5281824", "smiles": "CC1C=CC=C(C(CC2C(=O)C(C(C3=C2C(=C(C=C3)Cl)OC)N(C1=O)C)O)OC(=O)C(C)N(C)C(=O)C)OC", "type": "IC50", "val": "0.4", "units": "nM", "mech": "Maytansine Site Tubulin Inhibitor"},
-            {"name": "Pironetin", "chembl": "CHEMBL264716", "cid": "CID54681657", "smiles": "CCC1C(C=CC(=O)O1)CC(C)C(C)C=CC(C)C(C)O", "type": "IC50", "val": "870.0", "units": "nM", "mech": "Covalent alpha-Tubulin Lys352 Inhibitor"},
-            {"name": "Curacin A", "chembl": "CHEMBL89138", "cid": "CID445839", "smiles": "C=CCC(O)CC/C(C)=C/C=C/CC/C=C\\C1CSC(C)=N1", "type": "IC50", "val": "720.0", "units": "nM", "mech": "Marine Natural Product Colchicine Site Binder"},
-            {"name": "Discodermolide", "chembl": "CHEMBL306233", "cid": "CID443749", "smiles": "CCC(C)C(C)C(C=C)OC(=O)N", "type": "IC50", "val": "14.0", "units": "nM", "mech": "Polyketide Microtubule Stabilizer"},
-            {"name": "Peloruside A", "chembl": "CHEMBL508351", "cid": "CID10072049", "smiles": "CC1C(C(CC(O1)C=CC2C(C(C(=O)O2)O)OC)O)OC", "type": "IC50", "val": "18.0", "units": "nM", "mech": "Non-taxane Site Microtubule Stabilizer"},
-            {"name": "Noscapine", "chembl": "CHEMBL482", "cid": "CID4534", "smiles": "CN1CCC2=CC3=C(C=C2C1C4C5=C(C=CC(=C5C(=O)O4)OC)OCO3", "type": "IC50", "val": "45.0", "units": "uM", "mech": "Opium Alkaloid Microtubule Dynamics Modulator"}
-        ]
-    }
-
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
-        q_upper = query.upper()
-
-        # Check Benchmark Target Inhibitors
-        for target_key, drugs in self.BENCHMARK_TARGET_DRUGS.items():
-            if target_key in q_upper or "TUBULIN" in q_upper or "MICROTUBULE" in q_upper:
-                target_ent = Entity(
-                    uid=f"TARGET:CHEMBL:{target_key}",
-                    entity_type=EntityType.TARGET,
-                    preferred_name="Tubulin Alpha/Beta Heterodimer Complex",
-                    canonical_id=f"TARGET:{target_key}",
-                    evidence=[Evidence(database=self.NAME, source_url="https://www.ebi.ac.uk/chembl/")]
-                )
-                entities.append(target_ent)
-
-                for drg in drugs:
-                    drg_ent = Entity(
-                        uid=f"COMPOUND:{drg['chembl']}",
-                        entity_type=EntityType.DRUG if "FDA" in drg["mech"] else EntityType.COMPOUND,
-                        preferred_name=drg["name"],
-                        canonical_id=drg["chembl"],
-                        evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/chembl/compound_report_card/{drg['chembl']}/")],
-                        attributes={
-                            "smiles": drg["smiles"],
-                            "bioactivity_summary": f"{drg['type']}={drg['val']} {drg['units']} ({drg['mech']})"
-                        }
-                    )
-                    drg_ent.add_cross_ref(DatabaseSource.CHEMBL, drg["chembl"])
-                    drg_ent.add_cross_ref(DatabaseSource.PUBCHEM, drg["cid"].replace("CID", ""))
-                    entities.append(drg_ent)
-
-                    rel = Relation(
-                        source_uid=drg_ent.uid,
-                        target_uid=target_ent.uid,
-                        relation_type=RelationType.INHIBITS if "Stabilizer" not in drg["mech"] else RelationType.BINDS,
-                        evidence=[Evidence(database=self.NAME, confidence_score=1.0)],
-                        attributes={
-                            "activity_type": drg["type"],
-                            "activity_value": drg["val"],
-                            "units": drg["units"],
-                            "mechanism_of_action": drg["mech"]
-                        }
-                    )
-                    relations.append(rel)
         
         if re.match(r"^CHEMBL\d+$", query, re.I):
             mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/{query.upper()}.json"
@@ -2256,105 +2140,27 @@ class ChEMBLConnector(BaseConnector):
 class BRENDAConnector(BaseConnector):
     NAME = "BRENDA"
 
-    BENCHMARK_ENZYMES = {
-        "AMMONIA": {
-            "ec": "1.14.99.39",
-            "name": "Ammonia Monooxygenase (AMO)",
-            "inhibitors": [
-                {"name": "Nitrapyrin (2-Chloro-6-(trichloromethyl)pyridine)", "cid": "CID24740", "smiles": "C1=CC(=C(N=C1)C(Cl)(Cl)Cl)Cl", "type": "IC50", "val": "0.1", "units": "uM", "mech": "Irreversible Nitrification Inhibitor"},
-                {"name": "Allylthiourea (ATU)", "cid": "CID10477", "smiles": "C=CCNC(=S)N", "type": "IC50", "val": "1.5", "units": "uM", "mech": "Metal Chelating AMO Inhibitor"},
-                {"name": "Dicyandiamide (DCD)", "cid": "CID6844", "smiles": "C(#N)N=C(N)N", "type": "IC50", "val": "12.0", "units": "uM", "mech": "Substrate Analogue Inhibitor"},
-                {"name": "Acetylene", "cid": "CID6326", "smiles": "C#C", "type": "Ki", "val": "0.5", "units": "uM", "mech": "Mechanism-Based Suicidal Inhibitor"},
-                {"name": "3,4-Dimethylpyrazole phosphate (DMPP)", "cid": "CID220509", "smiles": "CC1=CC(=NN1)C.OP(=O)(O)O", "type": "IC50", "val": "0.8", "units": "uM", "mech": "Commercial Agricultural Inhibitor"},
-                {"name": "Pronitridine (1H-1,2,4-Triazole derivative)", "cid": "CID9154", "smiles": "C1=NC=NN1", "type": "IC50", "val": "2.1", "units": "uM", "mech": "Triazole Synthetic Nitrification Inhibitor"},
-                {"name": "4-Amino-1,2,4-triazole (ATC)", "cid": "CID11467", "smiles": "C1=NC(=NN1)N", "type": "IC50", "val": "5.0", "units": "uM", "mech": "Synthetic Triazole Inhibitor"},
-                {"name": "Thiourea", "cid": "CID2723601", "smiles": "C(=S)(N)N", "type": "IC50", "val": "18.5", "units": "uM", "mech": "Sulfur-based Copper Chelating Inhibitor"},
-                {"name": "2-Sulfanilamidothiazole (ST)", "cid": "CID5338", "smiles": "C1=CSC(=N1)NS(=O)(=O)C2=CC=C(C=C2)N", "type": "IC50", "val": "3.4", "units": "uM", "mech": "Sulfa-based Nitrification Inhibitor"},
-                {"name": "2-Amino-4-chloro-6-methylpyrimidine (AM)", "cid": "CID70146", "smiles": "CC1=CC(=NC(=N1)N)Cl", "type": "IC50", "val": "4.2", "units": "uM", "mech": "Pyrimidine Derivative Inhibitor"},
-                {"name": "Phenylacetylene", "cid": "CID11459", "smiles": "C#CC1=CC=CC=C1", "type": "Ki", "val": "0.8", "units": "uM", "mech": "Alkyne Irreversible Suicide AMO Inhibitor"},
-                {"name": "1-Heptyne", "cid": "CID12591", "smiles": "CCCCCC#C", "type": "Ki", "val": "1.2", "units": "uM", "mech": "Alkyne-based Suicide Inhibitor"},
-                {"name": "Azadirachtin (Neem extract)", "cid": "CID5281303", "smiles": "CC12C3C(C(=O)C(O3)(C(=O)O1)C)C4C5(C(C=CO5)O4)OC(=O)C2", "type": "IC50", "val": "10.0", "units": "uM", "mech": "Botanical / Plant-Derived Synthetic Inhibitor"},
-                {"name": "Karanjin (Pongamia pinnata extract)", "cid": "CID114679", "smiles": "COC1=C2C(=CC=C1)OC=C2C(=O)C3=CC=CC=C3", "type": "IC50", "val": "8.5", "units": "uM", "mech": "Furanocumarin Botanical Inhibitor"},
-                {"name": "PTIO", "cid": "CID119247", "smiles": "CC1(C(N(C(=N1)[O-])C2=CC=CC=C2)(C)C)[O-]", "type": "IC50", "val": "6.0", "units": "uM", "mech": "Nitric Oxide Radical Scavenger Inhibitor"},
-                {"name": "Brachialactone", "cid": "CID101968846", "smiles": "CC1C2CC(=O)OC2C1(C)C=C", "type": "IC50", "val": "2.5", "units": "uM", "mech": "Biological Nitrification Inhibitor (BNI - Brachiaria)"},
-                {"name": "Sorgoleone", "cid": "CID120536", "smiles": "CCCCCC=CCC=CCC=CCC1=C(C(=O)C=C(C1=O)O)OC", "type": "IC50", "val": "1.0", "units": "uM", "mech": "Biological Nitrification Inhibitor (BNI - Sorghum)"},
-                {"name": "Sakuranetin", "cid": "CID73571", "smiles": "COC1=CC(=C2C(=C1)C(=O)CC(O2)C3=CC=C(C=C3)O)O", "type": "IC50", "val": "5.5", "units": "uM", "mech": "Flavonoid BNI (Rice exudate)"},
-                {"name": "1,9-Decanediol", "cid": "CID71360", "smiles": "C(CCCCCO)CCCCO", "type": "IC50", "val": "15.0", "units": "uM", "mech": "Fatty Alcohol BNI (Rice root exudate)"},
-                {"name": "Linolenic acid", "cid": "CID5280934", "smiles": "CCC=CCC=CCC=CCCCCCCCC(=O)O", "type": "IC50", "val": "20.0", "units": "uM", "mech": "Free Fatty Acid BNI"},
-                {"name": "Linoleic acid", "cid": "CID5280450", "smiles": "CCCCCC=CCC=CCCCCCCCC(=O)O", "type": "IC50", "val": "25.0", "units": "uM", "mech": "Free Fatty Acid BNI"},
-                {"name": "MHPP (Methyl 3-(4-hydroxyphenyl)propionate)", "cid": "CID73479", "smiles": "COC(=O)CCC1=CC=C(C=C1)O", "type": "IC50", "val": "3.8", "units": "uM", "mech": "Phenylpropanoid BNI"},
-                {"name": "Syringic acid", "cid": "CID10742", "smiles": "COC1=CC(=CC(=C1O)OC)C(=O)O", "type": "IC50", "val": "14.2", "units": "uM", "mech": "Phenolic Acid BNI"},
-                {"name": "Limonene", "cid": "CID22311", "smiles": "CC1=CCC(CC1)C(=C)C", "type": "IC50", "val": "30.0", "units": "uM", "mech": "Monoterpene BNI"},
-                {"name": "Alpha-pinene", "cid": "CID6654", "smiles": "CC1=CCC2CC1C2(C)C", "type": "IC50", "val": "35.0", "units": "uM", "mech": "Monoterpene BNI"}
-            ],
-            "substrates": ["Ammonia (NH3)", "Hydroxylamine", "Oxygen (O2)"]
-        }
-    }
-
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
-        q_upper = query.upper()
-        
-        matched_key = next((k for k in self.BENCHMARK_ENZYMES if k in q_upper or ("AMMONIA" in q_upper and "MONOOXYGENASE" in q_upper) or "1.14.99.39" in q_upper), None)
-        if matched_key:
-            data = self.BENCHMARK_ENZYMES[matched_key]
-            ec = data["ec"]
-            enzyme_ent = Entity(
-                uid=f"ENZYME:EC:{ec}",
-                entity_type=EntityType.ENZYME,
-                preferred_name=data["name"],
-                canonical_id=f"EC:{ec}",
-                evidence=[Evidence(database=self.NAME, source_url=f"https://www.brenda-enzymes.org/enzyme.php?ec={ec}")]
-            )
-            enzyme_ent.add_cross_ref(DatabaseSource.BRENDA, ec)
-            entities.append(enzyme_ent)
+        q_clean = query.strip()
 
-            for inh in data["inhibitors"]:
-                inh_ent = Entity(
-                    uid=f"COMPOUND:{inh['cid']}",
-                    entity_type=EntityType.COMPOUND,
-                    preferred_name=inh["name"],
-                    canonical_id=inh["cid"],
-                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.brenda-enzymes.org/enzyme.php?ec={ec}")],
-                    attributes={
-                        "smiles": inh["smiles"],
-                        "bioactivity_summary": f"{inh['type']}={inh['val']} {inh['units']} ({inh['mech']})"
-                    }
-                )
-                inh_ent.add_cross_ref(DatabaseSource.PUBCHEM, inh["cid"].replace("CID", ""))
-                entities.append(inh_ent)
-
-                rel = Relation(
-                    source_uid=inh_ent.uid,
-                    target_uid=enzyme_ent.uid,
-                    relation_type=RelationType.INHIBITS,
-                    evidence=[Evidence(database=self.NAME, confidence_score=0.98)],
-                    attributes={
-                        "activity_type": inh["type"],
-                        "activity_value": inh["val"],
-                        "units": inh["units"],
-                        "mechanism_of_action": inh["mech"]
-                    }
-                )
-                relations.append(rel)
-
-            for sub_name in data["substrates"]:
-                sub_ent = Entity(
-                    uid=f"COMPOUND:SUBSTRATE:{sub_name.split()[0].upper()}",
-                    entity_type=EntityType.COMPOUND,
-                    preferred_name=sub_name,
-                    canonical_id=sub_name.split()[0].upper(),
-                    evidence=[Evidence(database=self.NAME)]
-                )
-                entities.append(sub_ent)
-
-                rel = Relation(
-                    source_uid=sub_ent.uid,
-                    target_uid=enzyme_ent.uid,
-                    relation_type=RelationType.SUBSTRATE_OF,
-                    evidence=[Evidence(database=self.NAME, confidence_score=1.0)]
-                )
-                relations.append(rel)
+        # Query QuickGO / EBI EC services dynamically for enzyme terms
+        url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/find?query={quote(q_clean)}"
+        data = await self._safe_get(session, url)
+        if data and "results" in data:
+            for item in data["results"][:3]:
+                go_id = item.get("id")
+                name = item.get("name", query)
+                if "enzyme" in name.lower() or "catalytic" in name.lower() or "transferase" in name.lower() or "hydrolase" in name.lower() or "oxidoreductase" in name.lower() or "oxygenase" in name.lower():
+                    enzyme_ent = Entity(
+                        uid=f"ENZYME:GO:{go_id}",
+                        entity_type=EntityType.ENZYME,
+                        preferred_name=name,
+                        canonical_id=go_id,
+                        evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/QuickGO/term/{go_id}")]
+                    )
+                    enzyme_ent.add_cross_ref(DatabaseSource.BRENDA, go_id)
+                    entities.append(enzyme_ent)
 
         return entities, relations
 
@@ -2446,21 +2252,8 @@ class SearchLibraryBuilder:
         out_dir.mkdir(exist_ok=True)
         user_answers = user_answers or {}
 
-        # Query Expansion & Synonym Generation (Synthetic & Biological Nitrification Inhibitors)
-        synonyms = [query, f"{query} Inhibitors", f"{query} Substrates", f"{query} Mechanism"]
-        q_upper = query.upper()
-        if any(term in q_upper for term in ["AMMONIA", "AMO", "NITRIFICATION"]):
-            synonyms.extend([
-                "EC 1.14.99.39",
-                # Synthetic Nitrification Inhibitors (SNIs)
-                "Nitrapyrin", "Allylthiourea", "Dicyandiamide", "Acetylene", "DMPP",
-                "Pronitridine", "4-Amino-1,2,4-triazole", "Thiourea", "2-Sulfanilamidothiazole",
-                "2-Amino-4-chloro-6-methylpyrimidine", "Phenylacetylene", "1-Heptyne",
-                "Azadirachtin", "Karanjin", "PTIO",
-                # Biological Nitrification Inhibitors (BNIs)
-                "Brachialactone", "Sorgoleone", "Sakuranetin", "1,9-Decanediol",
-                "Linolenic acid", "Linoleic acid", "MHPP", "Syringic acid", "Limonene", "Alpha-pinene"
-            ])
+        # Query Expansion & Synonym Generation (Generic for any target, drug, or enzyme)
+        synonyms = [query, f"{query} Inhibitors", f"{query} Substrates", f"{query} Mechanism", f"{query} Binding"]
 
         library = {
             "library_name": f"Search Library: {query}",
