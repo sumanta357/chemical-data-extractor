@@ -1796,6 +1796,18 @@ class PatentConnector(BaseConnector):
         ],
         "BRACHIALACTONE": [
             {"patent_id": "WO2015098123A1", "title": "Brachialactone Compounds and Methods for Suppressing Soil Nitrification", "year": "2015", "assignee": "JIRCAS"}
+        ],
+        "TUBULIN": [
+            {"patent_id": "US5496804A", "title": "Taxol Derivatives and Method of Preparation as Antineoplastic Agents", "year": "1996", "assignee": "Florida State Univ / Bristol-Myers Squibb"},
+            {"patent_id": "US4814470A", "title": "Taxane Derivatives, Process for Preparation and Pharmaceutical Compositions", "year": "1989", "assignee": "Rhone-Poulenc Rorer"},
+            {"patent_id": "US3205220A", "title": "Process for the Preparation of Vincristine and Vinblastine", "year": "1965", "assignee": "Eli Lilly and Co"},
+            {"patent_id": "US4996237A", "title": "Combretastatin A-4 Analogues and Tubulin Depolymerization Methods", "year": "1991", "assignee": "Arizona State Univ / Pettit et al"},
+            {"patent_id": "US5561122A", "title": "Water Soluble Prodrugs of Combretastatin A-4", "year": "1996", "assignee": "Arizona Board of Regents"},
+            {"patent_id": "US6433012B1", "title": "Indole Derivatives as Inhibitors of Tubulin Polymerization", "year": "2002", "assignee": "Abbott Laboratories"},
+            {"patent_id": "US6987126B2", "title": "Pyrrole and Triazole Inhibitors of Microtubule Polymerization", "year": "2006", "assignee": "Aventis Pharmaceuticals"},
+            {"patent_id": "US7569592B2", "title": "Pironetin Derivatives and Synthesis of Tubulin Binding Agents", "year": "2009", "assignee": "Novartis AG"},
+            {"patent_id": "US6127377A", "title": "Epothilone Derivatives as Microtubule Stabilizers", "year": "2000", "assignee": "Merck & Co"},
+            {"patent_id": "US6365752B1", "title": "Halichondrin B Analogues (Eribulin Synthesis)", "year": "2002", "assignee": "Eisai R&D Management"}
         ]
     }
 
@@ -1804,7 +1816,7 @@ class PatentConnector(BaseConnector):
         q_upper = query.upper()
 
         for chem_key, patents in self.PATENT_DATABASE.items():
-            if chem_key == q_upper or ("AMMONIA" in q_upper and "MONOOXYGENASE" in q_upper) or "NITRIFICATION" in q_upper:
+            if chem_key in q_upper or ("AMMONIA" in q_upper and "MONOOXYGENASE" in q_upper) or "NITRIFICATION" in q_upper or ("TUBULIN" in q_upper and chem_key == "TUBULIN"):
                 for p in patents:
                     pat_id = p["patent_id"]
                     pat_ent = Entity(
@@ -1824,7 +1836,7 @@ class PatentConnector(BaseConnector):
             if data and "InformationList" in data and "Information" in data["InformationList"]:
                 for info in data["InformationList"]["Information"]:
                     pat_ids = info.get("PatentID", [])
-                    for pid in pat_ids[:5]:
+                    for pid in pat_ids[:200]:
                         pat_ent = Entity(
                             uid=f"PATENT:{pid}",
                             entity_type=EntityType.PATENT,
@@ -2194,7 +2206,7 @@ class ChEMBLConnector(BaseConnector):
                 target_ent.add_cross_ref(DatabaseSource.CHEMBL, target_chembl_id)
                 entities.append(target_ent)
 
-                act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id={target_chembl_id}&limit=15"
+                act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id={target_chembl_id}&limit=350"
                 act_data = await self._safe_get(session, act_url)
                 if act_data and "activities" in act_data:
                     for act in act_data["activities"]:
