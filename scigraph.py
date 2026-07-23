@@ -1231,12 +1231,19 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
     # Formatting and Styling across all 5 Excel tabs
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    link_font = Font(name="Calibri", size=11, color="0000FF", underline="single")
     
     for ws in [ws1, ws2, ws3, ws4, ws5]:
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
+        for row in ws.iter_rows(min_row=2):
+            for cell in row:
+                val_str = str(cell.value or '')
+                if val_str.startswith('http://') or val_str.startswith('https://'):
+                    cell.hyperlink = val_str
+                    cell.font = link_font
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = get_column_letter(col[0].column)
@@ -1535,6 +1542,36 @@ class BaseConnector(abc.ABC):
                         continue
             except Exception as e:
                 logger.debug(f"[{self.NAME}] Request Error: {e}")
+        return None
+
+    async def _safe_post(self, session: aiohttp.ClientSession, url: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        cache_key = f"POST:{url}:{hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()}"
+        cached, etag, last_mod = self.cache.get(cache_key)
+        if cached:
+            try:
+                parsed = orjson.loads(cached)
+                if parsed and parsed != {} and parsed != []: return parsed
+            except Exception:
+                try:
+                    parsed = json.loads(cached)
+                    if parsed and parsed != {} and parsed != []: return parsed
+                except Exception: pass
+
+        headers = {"User-Agent": "SciGraphEnterprise/3.1"}
+        for attempt in range(2):
+            await self.rate_limiter.acquire()
+            try:
+                async with session.post(url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                    if resp.status == 200:
+                        res_text = await resp.text()
+                        self.cache.set(cache_key, res_text, 86400)
+                        try: return orjson.loads(res_text)
+                        except Exception: return json.loads(res_text)
+                    if resp.status in (429, 503):
+                        await asyncio.sleep(1.0)
+                        continue
+            except Exception as e:
+                logger.debug(f"[{self.NAME}] POST Request Error: {e}")
         return None
 
     @abc.abstractmethod
