@@ -1199,11 +1199,40 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
     for r in sorted(list(pdb_rows), key=lambda x: x[0]):
         ws4.append(list(r))
 
-    # Formatting and Styling across all 4 Excel tabs
+    # ---------------------------------------------------------
+    # TAB 5: Literature, Research Publications & Web Links
+    # ---------------------------------------------------------
+    ws5 = wb.create_sheet(title="Literature & Web Links")
+    headers5 = ["Publication Title", "Journal / Source", "Publication Year", "PMID / PMCID / DOI", "Citations", "Clickable Literature / Web Link"]
+    ws5.append(headers5)
+
+    lit_rows = set()
+    for pub in [e for e in entities if e.entity_type == EntityType.PUBLICATION or e.uid.startswith("PUBLICATION:")]:
+        title = pub.preferred_name
+        journal = pub.attributes.get("journal", "Scientific Journal")
+        year = pub.attributes.get("publication_year", "")
+        doi_pmid = pub.canonical_id
+        citations = pub.attributes.get("citations", "0")
+        link = pub.evidence[0].source_url if (pub.evidence and pub.evidence[0].source_url) else f"https://doi.org/{pub.canonical_id}" if "10." in pub.canonical_id else f"https://pubmed.ncbi.nlm.nih.gov/{pub.canonical_id}"
+        lit_rows.add((title, journal, year, doi_pmid, citations, link))
+
+    for e in entities:
+        for ev in e.evidence:
+            if ev.source_url and ("doi.org" in ev.source_url or "pubmed" in ev.source_url or "europepmc" in ev.source_url or "openalex" in ev.source_url):
+                title = ev.title or e.preferred_name
+                journal = ev.journal or str(ev.database)
+                year = str(ev.publication_year or "")
+                ref_id = ev.doi or ev.pmid or e.canonical_id
+                lit_rows.add((title, journal, year, ref_id, "N/A", ev.source_url))
+
+    for r in sorted(list(lit_rows), key=lambda x: str(x[2]), reverse=True):
+        ws5.append([_sanitize_excel_string(v) for v in r])
+
+    # Formatting and Styling across all 5 Excel tabs
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
     
-    for ws in [ws1, ws2, ws3, ws4]:
+    for ws in [ws1, ws2, ws3, ws4, ws5]:
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = header_font
@@ -1873,23 +1902,28 @@ class BindingDBConnector(BaseConnector):
     NAME = "BindingDB"
 
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
-        url = f"https://www.bindingdb.org/axis2/services/BDBService/getLigandsByUniprot?uniprot={quote(query)}"
-        data = await self._safe_get(session, url)
         entities, relations = [], []
+        if re.match(r"^[A-Z0-9]{6,10}$", query, re.I):
+            url = f"https://www.bindingdb.org/axis2/services/BDBService/getLigandsByUniprot?uniprot={query.upper()}"
+        else:
+            url = f"https://www.bindingdb.org/axis2/services/BDBService/getLigandsByCompoundName?compound={quote(query)}"
+        
+        data = await self._safe_get(session, url)
         if data and isinstance(data, list):
-            for item in data[:5]:
-                lig_id = str(item.get("monomerid", query))
+            for item in data[:10]:
+                lig_id = str(item.get("monomerid", item.get("compound_id", query)))
+                lig_name = item.get("monomer_name", item.get("compound_name", f"BindingDB Compound {lig_id}"))
                 smiles = item.get("smiles", "")
-                affinity = str(item.get("ki", item.get("ic50", "")))
-                aff_type = "Ki" if item.get("ki") else "IC50"
+                affinity = str(item.get("ki", item.get("ic50", item.get("kd", ""))))
+                aff_type = "Ki" if item.get("ki") else "IC50" if item.get("ic50") else "Kd"
 
                 lig_ent = Entity(
                     uid=f"COMPOUND:BINDINGDB:{lig_id}",
                     entity_type=EntityType.COMPOUND,
-                    preferred_name=f"BindingDB Compound {lig_id}",
+                    preferred_name=lig_name,
                     canonical_id=lig_id,
                     evidence=[Evidence(database=self.NAME, source_url=url)],
-                    attributes={"smiles": smiles, "bioactivity_summary": f"{aff_type}={affinity}nM"}
+                    attributes={"smiles": smiles, "bioactivity_summary": f"{aff_type}={affinity}nM (BindingDB)"}
                 )
                 lig_ent.add_cross_ref(DatabaseSource.BINDINGDB, lig_id)
                 entities.append(lig_ent)
@@ -1897,7 +1931,7 @@ class BindingDBConnector(BaseConnector):
                 target_ent = Entity(
                     uid=f"TARGET:UNIPROT:{query.upper()}",
                     entity_type=EntityType.TARGET,
-                    preferred_name=f"BindingDB Target {query.upper()}",
+                    preferred_name=query.title(),
                     canonical_id=query.upper()
                 )
                 entities.append(target_ent)
@@ -1905,8 +1939,9 @@ class BindingDBConnector(BaseConnector):
                 rel = Relation(
                     source_uid=lig_ent.uid,
                     target_uid=target_ent.uid,
-                    relation_type=RelationType.INHIBITS if aff_type in ["Ki", "IC50"] else RelationType.BINDS,
-                    attributes={"activity_type": aff_type, "activity_value": affinity, "units": "nM", "source": "BindingDB"}
+                    relation_type=RelationType.INHIBITS if aff_type in ["Ki", "IC50", "Kd"] else RelationType.BINDS,
+                    evidence=[Evidence(database=self.NAME, source_url=url, confidence_score=0.95)],
+                    attributes={"activity_type": aff_type, "activity_value": affinity, "units": "nM", "source": "BindingDB Experimental Assay"}
                 )
                 relations.append(rel)
         return entities, relations
