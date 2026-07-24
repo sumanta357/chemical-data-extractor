@@ -1557,11 +1557,11 @@ class BaseConnector(abc.ABC):
                     if parsed and parsed != {} and parsed != []: return parsed
                 except Exception: pass
 
-        headers = {"User-Agent": "SciGraphEnterprise/3.1"}
+        headers = {"User-Agent": "SciGraphEnterprise/3.1", "Content-Type": "application/json"}
         for attempt in range(2):
             await self.rate_limiter.acquire()
             try:
-                async with session.post(url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                async with session.post(url, json=data, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
                     if resp.status == 200:
                         res_text = await resp.text()
                         self.cache.set(cache_key, res_text, 86400)
@@ -1669,11 +1669,15 @@ class QueryRouter:
     """Intelligent Query Router selecting target databases based on query pattern."""
 
     PATTERNS = [
-        (re.compile(r"^CHEMBL\d+$", re.I), ["ChEMBL", "PubChem", "BindingDB", "Guide to Pharmacology"]),
-        (re.compile(r"^(?:CID)?:?\d+$", re.I), ["PubChem", "ChEMBL", "BindingDB"]),
+        (re.compile(r"^CHEMBL\d+$", re.I), ["ChEMBL", "PubChem", "BindingDB", "Guide to Pharmacology", "PDBe-KB"]),
+        (re.compile(r"^(?:CID)?:?\d+$", re.I), ["PubChem", "ChEMBL", "BindingDB", "PDBe-KB"]),
         (re.compile(r"^[A-Z0-9]{6,10}$", re.I), ["UniProt", "ChEMBL", "BindingDB", "STRING", "PDBe-KB", "AlphaFoldDB"]),
         (re.compile(r"^GO:\d{7}$", re.I), ["GeneOntology"]),
         (re.compile(r"^DB\d{5}$", re.I), ["DrugBank", "PubChem", "ChEMBL"]),
+        (re.compile(r"^CHEBI:\d+$", re.I), ["ChEBI", "PubChem", "ChEMBL"]),
+        (re.compile(r"^C\d{5}$", re.I), ["KEGG", "PubChem", "ChEBI", "ChEMBL"]),
+        (re.compile(r"^R\d{5}$", re.I), ["KEGG", "Rhea", "Reactome"]),
+        (re.compile(r"^R-[A-Z]{3}-\d+(-\d+)?$"), ["Reactome", "UniProt"]),
         (re.compile(r"^10\.\d{4,9}/[-._;()/:A-Za-z0-9]+$", re.I), ["CrossRef", "EuropePMC", "OpenAlex"]),
         (re.compile(r"^(?:PMID:?)?\d{7,9}$", re.I), ["PubMed", "EuropePMC", "OpenAlex"]),
         (re.compile(r"^EC:\d+\.\d+\.\d+\.\d+$", re.I), ["BRENDA", "ChEMBL", "Rhea", "KEGG", "BindingDB"]),
@@ -1688,8 +1692,8 @@ class QueryRouter:
         for pattern, connector_names in cls.PATTERNS:
             if pattern.match(q_clean):
                 return connector_names
-        # Default: broad multi-database fanout (23 active database connectors)
-        return ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "AlphaFoldDB", "DrugBank", "KEGG", "Reactome", "EPA CompTox", "ChEBI", "ZINC20", "LensPatent", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy", "PubMed"]
+        # Default: broad multi-database fanout (18 active database connectors)
+        return ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy", "PubMed"]
 
 
 # ==============================================================================
@@ -1835,8 +1839,19 @@ class PDBeKBConnector(BaseConnector):
 
         # 2. General Query Search via RCSB PDB Search API (Top 20 results)
         else:
-            rcsb_url = f"https://search.rcsb.org/rcsbsearch/v2/query?json=%7B%22query%22%3A%7B%22type%22%3A%22terminal%22%2C%22service%22%3A%22text%22%2C%22parameters%22%3A%7B%22value%22%3A%22{quote(query)}%22%7D%7D%2C%22return_type%22%3A%22entry%22%2C%22request_options%22%3A%7B%22paginate%22%3A%7B%22start%22%3A0%2C%22rows%22%3A20%7D%7D%7D"
-            data = await self._safe_get(session, rcsb_url)
+            rcsb_url = "https://search.rcsb.org/rcsbsearch/v2/query"
+            rcsb_payload = {
+                "query": {
+                    "type": "terminal",
+                    "service": "full_text",
+                    "parameters": {"value": query}
+                },
+                "return_type": "entry",
+                "request_options": {
+                    "paginate": {"start": 0, "rows": 20}
+                }
+            }
+            data = await self._safe_post(session, rcsb_url, rcsb_payload)
             if data and "result_set" in data:
                 for hit in data["result_set"]:
                     pdb_id = hit.get("identifier", "").upper()
@@ -1851,6 +1866,15 @@ class PDBeKBConnector(BaseConnector):
                         )
                         pdb_ent.add_cross_ref("PDB", pdb_id)
                         entities.append(pdb_ent)
+                        # Build HAS_STRUCTURE relation linking protein query to PDB structure
+                        query_uid = f"PROTEIN:PDBQUERY:{hashlib.md5(query.encode()).hexdigest()[:8]}"
+                        has_struct_rel = Relation(
+                            source_uid=query_uid,
+                            target_uid=pdb_ent.uid,
+                            relation_type=RelationType.HAS_STRUCTURE,
+                            attributes={"pdb_id": pdb_id, "query": query, "score": str(hit.get("score", 1.0))}
+                        )
+                        relations.append(has_struct_rel)
 
         return entities, relations
 
@@ -2247,27 +2271,59 @@ class ChEMBLConnector(BaseConnector):
 
 
 @ConnectorRegistry.register
+@ConnectorRegistry.register
 class BRENDAConnector(BaseConnector):
+    """Improved BRENDA connector using EBI QuickGO + UniProt enzyme portal.
+    Note: BRENDA's native SOAP API requires free registration at https://www.brenda-enzymes.org/register.php
+    This connector uses EBI's enzyme portal and QuickGO as public alternatives."""
     NAME = "BRENDA"
 
     async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
         q_clean = query.strip()
+        if not q_clean:
+            return entities, relations
 
-        # Query QuickGO / EBI EC services dynamically for enzyme terms
+        # Strategy 1: Direct EC number lookup via QuickGO
+        ec_match = re.match(r"^EC:(\d+\.\d+\.\d+\.\d+)$", q_clean, re.I)
+        if ec_match:
+            ec_number = ec_match.group(1)
+            url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/find?query={quote(ec_number)}"
+            data = await self._safe_get(session, url)
+            if data and "results" in data:
+                for item in data["results"][:3]:
+                    go_id = item.get("id")
+                    name = item.get("name", ec_number)
+                    enzyme_ent = Entity(
+                        uid=f"ENZYME:{ec_number}",
+                        entity_type=EntityType.ENZYME,
+                        preferred_name=name,
+                        canonical_id=ec_number,
+                        evidence=[Evidence(database=self.NAME, source_url=f"https://www.brenda-enzymes.org/enzyme.php?ecno={ec_number}")]
+                    )
+                    enzyme_ent.add_cross_ref(DatabaseSource.BRENDA, ec_number)
+                    entities.append(enzyme_ent)
+            return entities, relations
+
+        # Strategy 2: Keyword search via QuickGO with enzyme filtering
         url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/find?query={quote(q_clean)}"
         data = await self._safe_get(session, url)
         if data and "results" in data:
-            for item in data["results"][:3]:
+            for item in data["results"][:5]:
                 go_id = item.get("id")
                 name = item.get("name", query)
-                if "enzyme" in name.lower() or "catalytic" in name.lower() or "transferase" in name.lower() or "hydrolase" in name.lower() or "oxidoreductase" in name.lower() or "oxygenase" in name.lower():
+                aspect = item.get("aspect", "")
+                enzyme_keywords = ["enzyme", "catalytic", "transferase", "hydrolase", "oxidoreductase",
+                                  "oxygenase", "lyase", "isomerase", "ligase", "synthetase", "synthase",
+                                  "dehydrogenase", "kinase", "phosphatase", "protease", "peptidase"]
+                if any(kw in name.lower() for kw in enzyme_keywords):
                     enzyme_ent = Entity(
                         uid=f"ENZYME:GO:{go_id}",
                         entity_type=EntityType.ENZYME,
                         preferred_name=name,
                         canonical_id=go_id,
-                        evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/QuickGO/term/{go_id}")]
+                        evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/QuickGO/term/{go_id}")],
+                        attributes={"aspect": aspect}
                     )
                     enzyme_ent.add_cross_ref(DatabaseSource.BRENDA, go_id)
                     entities.append(enzyme_ent)
@@ -2275,9 +2331,237 @@ class BRENDAConnector(BaseConnector):
         return entities, relations
 
 
+@ConnectorRegistry.register
+class KEGGConnector(BaseConnector):
+    """KEGG REST API connector for compounds, pathways, and reactions.
+    API: https://rest.kegg.jp/ (no key required)"""
+    NAME = "KEGG"
+
+    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+        entities, relations = [], []
+        q_clean = query.strip()
+        if not q_clean:
+            return entities, relations
+
+        base = "https://rest.kegg.jp"
+        is_kegg_compound = bool(re.match(r"^C\d{5}$", q_clean, re.I))
+        is_kegg_reaction = bool(re.match(r"^R\d{5}$", q_clean, re.I))
+        is_pathway = bool(re.match(r"^(map|hsa|eco|mmu)\d{5}$", q_clean, re.I))
+
+        if is_kegg_compound or is_kegg_reaction:
+            url = f"{base}/get/{q_clean}/json"
+            data = await self._safe_get(session, url)
+            if data:
+                name = str(data.get("name", q_clean)).split(";")[0].strip()
+                formula = data.get("formula", "")
+                ent = Entity(
+                    uid=f"COMPOUND:KEGG:{q_clean}" if is_kegg_compound else f"REACTION:KEGG:{q_clean}",
+                    entity_type=EntityType.COMPOUND if is_kegg_compound else EntityType.REACTION,
+                    preferred_name=name,
+                    canonical_id=q_clean,
+                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.kegg.jp/entry/{q_clean}")],
+                    attributes={"formula": formula}
+                )
+                ent.add_cross_ref(DatabaseSource.KEGG, q_clean)
+                entities.append(ent)
+        elif is_pathway:
+            url = f"{base}/find/pathway/{q_clean}/"
+            txt = await self._raw_get(session, url)
+            if txt:
+                for line in txt.strip().split("\n")[:3]:
+                    parts = line.split("\t")
+                    if len(parts) >= 2:
+                        ent = Entity(
+                            uid=f"PATHWAY:KEGG:{parts[0].strip()}",
+                            entity_type=EntityType.PATHWAY,
+                            preferred_name=parts[1].strip(),
+                            canonical_id=parts[0].strip(),
+                            evidence=[Evidence(database=self.NAME, source_url=f"https://www.kegg.jp/entry/{parts[0].strip()}")]
+                        )
+                        ent.add_cross_ref(DatabaseSource.KEGG, parts[0].strip())
+                        entities.append(ent)
+        else:
+            # Keyword compound search
+            txt = await self._raw_get(session, f"{base}/find/compound/{quote(q_clean)}/")
+            if txt:
+                for line in txt.strip().split("\n")[:5]:
+                    parts = line.split("	")
+                    if len(parts) >= 2:
+                        cpd_id = parts[0].strip()
+                        if ":" in cpd_id:
+                            cpd_id = cpd_id.split(":")[1]
+                        if re.match(r"^C\d{5}$", cpd_id):
+                            ent = Entity(
+                                uid=f"COMPOUND:KEGG:{cpd_id}",
+                                entity_type=EntityType.COMPOUND,
+                                preferred_name=parts[1].strip(),
+                                canonical_id=cpd_id,
+                                evidence=[Evidence(database=self.NAME, source_url=f"https://www.kegg.jp/entry/{cpd_id}")]
+                            )
+                            ent.add_cross_ref(DatabaseSource.KEGG, cpd_id)
+                            entities.append(ent)
+        return entities, relations
+
+    async def _raw_get(self, session, url):
+        cached, etag, last_mod = self.cache.get(url)
+        if cached:
+            return cached
+        headers = {"User-Agent": "SciGraphEnterprise/3.1"}
+        for attempt in range(2):
+            await self.rate_limiter.acquire()
+            try:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        txt = await resp.text()
+                        self.cache.set(url, txt, 86400)
+                        return txt
+                    if resp.status in (429, 503):
+                        await asyncio.sleep(1.0)
+                        continue
+            except Exception as e:
+                logger.debug(f"[{self.NAME}] KEGG Request Error: {e}")
+        return None
+
+
+@ConnectorRegistry.register
+class ChEBIConnector(BaseConnector):
+    """ChEBI 2.0 REST API connector for chemical ontology.
+    API: https://www.ebi.ac.uk/chebi/backend/api/ (no key required)"""
+    NAME = "ChEBI"
+
+    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+        entities, relations = [], []
+        q_clean = query.strip()
+        if not q_clean:
+            return entities, relations
+
+        is_chebi_id = bool(re.match(r"^CHEBI:\d+$", q_clean, re.I))
+
+        if is_chebi_id:
+            url = f"https://www.ebi.ac.uk/chebi/backend/api/public/compound/{q_clean.upper()}/"
+            data = await self._safe_get(session, url)
+            if data:
+                name = data.get("chebiAsciiName", data.get("chebiName", q_clean))
+                formula = data.get("chemicalFormula", "")
+                mass = str(data.get("exactMass", "")) if data.get("exactMass") else ""
+                ent = Entity(
+                    uid=f"COMPOUND:CHEBI:{q_clean.upper()}",
+                    entity_type=EntityType.COMPOUND,
+                    preferred_name=name,
+                    canonical_id=q_clean.upper(),
+                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId={q_clean.upper()}")],
+                    attributes={"formula": formula, "mass": mass}
+                )
+                ent.add_cross_ref(DatabaseSource.CHEBI, q_clean.upper())
+                entities.append(ent)
+        else:
+            payload = {"query": q_clean, "maxResults": 5, "stars": "ALL"}
+            data = await self._safe_post(session, "https://www.ebi.ac.uk/chebi/backend/api/public/advanced_search/", payload)
+            if data and "list" in data:
+                for item in data["list"][:5]:
+                    chebi_id = item.get("chebiId", "")
+                    name = item.get("chebiAsciiName", item.get("chebiName", q_clean))
+                    formula = item.get("chemicalFormula", "")
+                    if chebi_id:
+                        ent = Entity(
+                            uid=f"COMPOUND:CHEBI:{chebi_id}",
+                            entity_type=EntityType.COMPOUND,
+                            preferred_name=name,
+                            canonical_id=chebi_id,
+                            evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId={chebi_id}")],
+                            attributes={"formula": formula}
+                        )
+                        ent.add_cross_ref(DatabaseSource.CHEBI, chebi_id)
+                        entities.append(ent)
+        return entities, relations
+
+
+@ConnectorRegistry.register
+class ReactomeConnector(BaseConnector):
+    """Reactome Content Service for pathways, reactions, and participants.
+    API: https://reactome.org/ContentService/ (no key required)"""
+    NAME = "Reactome"
+
+    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+        entities, relations = [], []
+        q_clean = query.strip()
+        if not q_clean:
+            return entities, relations
+
+        is_reactome_id = bool(re.match(r"^R-[A-Z]{3}-\d+(-\d+)?$", q_clean))
+        base = "https://reactome.org/ContentService/data"
+
+        if is_reactome_id:
+            data = await self._safe_get(session, f"{base}/query/{q_clean}")
+            if data:
+                name = data.get("displayName", q_clean)
+                schema = data.get("schemaClass", "")
+                etype = EntityType.REACTION if "Reaction" in str(schema) else EntityType.PATHWAY
+                ent = Entity(
+                    uid=f"REACTOME:{q_clean}",
+                    entity_type=etype,
+                    preferred_name=name,
+                    canonical_id=q_clean,
+                    evidence=[Evidence(database=self.NAME, source_url=f"https://reactome.org/content/detail/{q_clean}")],
+                    attributes={"schema_class": schema}
+                )
+                ent.add_cross_ref(DatabaseSource.REACTOME, q_clean)
+                entities.append(ent)
+                # Fetch participants
+                parts = await self._safe_get(session, f"{base}/event/{q_clean}/participatingPhysicalEntities")
+                if parts:
+                    for p in parts[:5]:
+                        p_name = p.get("displayName", "")
+                        p_id = p.get("stId", p.get("dbId", ""))
+                        if p_name and p_id:
+                            pe = Entity(
+                                uid=f"PROTEIN:REACTOME:{p_id}",
+                                entity_type=EntityType.PROTEIN,
+                                preferred_name=p_name,
+                                canonical_id=str(p_id),
+                                evidence=[Evidence(database=self.NAME, source_url=f"https://reactome.org/content/detail/{p_id}")]
+                            )
+                            entities.append(pe)
+        else:
+            data = await self._safe_get(session, f"{base}/pathways/low/entity/{quote(q_clean)}?species=ALL")
+            if data and isinstance(data, list):
+                for item in data[:5]:
+                    st_id = item.get("stId", "")
+                    name = item.get("displayName", q_clean)
+                    if st_id:
+                        ent = Entity(
+                            uid=f"PATHWAY:REACTOME:{st_id}",
+                            entity_type=EntityType.PATHWAY,
+                            preferred_name=name,
+                            canonical_id=st_id,
+                            evidence=[Evidence(database=self.NAME, source_url=f"https://reactome.org/content/detail/{st_id}")]
+                        )
+                        ent.add_cross_ref(DatabaseSource.REACTOME, st_id)
+                        entities.append(ent)
+            # Also try direct query
+            data2 = await self._safe_get(session, f"{base}/query/{quote(q_clean)}")
+            if data2 and isinstance(data2, dict):
+                st_id = data2.get("stId", "")
+                if st_id and ":" not in st_id and not any(e.uid.endswith(st_id) for e in entities):
+                    name = data2.get("displayName", q_clean)
+                    schema = data2.get("schemaClass", "")
+                    etype = EntityType.REACTION if "Reaction" in str(schema) else EntityType.PATHWAY
+                    ent2 = Entity(
+                        uid=f"REACTOME:{st_id}",
+                        entity_type=etype,
+                        preferred_name=name,
+                        canonical_id=st_id,
+                        evidence=[Evidence(database=self.NAME, source_url=f"https://reactome.org/content/detail/{st_id}")]
+                    )
+                    ent2.add_cross_ref(DatabaseSource.REACTOME, st_id)
+                    entities.append(ent2)
+        return entities, relations
+
+
 # Auto-register fallbacks for remaining sources
 ALL_SOURCES = [e.value for e in DatabaseSource if e != DatabaseSource.OTHER]
 registered_names = set(ConnectorRegistry.get_all().keys())
+
 
 def _make_dynamic_connector(name: str) -> type:
     """Factory function to avoid closure-over-loop-variable bug."""
@@ -2291,7 +2575,6 @@ def _make_dynamic_connector(name: str) -> type:
 for source_name in ALL_SOURCES:
     if source_name not in registered_names:
         ConnectorRegistry.register(_make_dynamic_connector(source_name))
-
 
 # ==============================================================================
 # 12. INTERACTIVE QUERY ASSISTANT & SEARCH LIBRARY BUILDER
@@ -2445,9 +2728,18 @@ class RecursiveGraphExpander:
                                 if e.uid not in self.visited_uids:
                                     self.visited_uids.add(e.uid)
                                     self.resolver.resolve(e)
-                                    if e.entity_type in (EntityType.COMPOUND, EntityType.DRUG, EntityType.TARGET, EntityType.ENZYME, EntityType.STRUCTURE):
+                                    if e.entity_type in (EntityType.COMPOUND, EntityType.DRUG, EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME, EntityType.STRUCTURE):
                                         for xr in e.cross_references:
                                             next_queries.add(xr.accession)
+                                        # For protein/target/enzyme entities, also add the preferred name and canonical_id
+                                        # so PDBe-KB can search RCSB PDB by human-readable protein/gene name
+                                        if e.entity_type in (EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME):
+                                            name = e.preferred_name.strip()
+                                            if name and len(name) > 1 and not re.match(r"^CHEMBL\d+$", name, re.I):
+                                                next_queries.add(name)
+                                            cid = e.canonical_id.strip()
+                                            if cid and len(cid) > 1 and cid != name and not re.match(r"^CHEMBL\d+$", cid, re.I):
+                                                next_queries.add(cid)
                             for r in rels:
                                 self.resolver.add_relation(r)
 
