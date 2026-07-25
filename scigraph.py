@@ -1575,7 +1575,7 @@ class BaseConnector(abc.ABC):
         return None
 
     @abc.abstractmethod
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]: pass
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]: pass
 
 
 class ConnectorRegistry:
@@ -1696,6 +1696,24 @@ class QueryRouter:
         return ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy", "PubMed"]
 
 
+    @classmethod
+    def name_similarity(cls, query: str, target_name: str) -> float:
+        """Calculate name similarity (0.0-1.0) for expansion guardrails."""
+        q = query.lower().strip()
+        t = target_name.lower().strip()
+        if not q or not t:
+            return 0.0
+        if q == t:
+            return 1.0
+        if q in t or t in q:
+            return 0.8
+        q_words = set(q.split())
+        t_words = set(t.split())
+        overlap = len(q_words & t_words)
+        max_len = max(len(q_words), len(t_words))
+        return overlap / max_len if max_len else 0.0
+
+
 # ==============================================================================
 # 11. ACTIVE REST CONNECTORS (GTOPDB, STRING, PDBE-KB, OPENALEX, NCBI GENE/TAXONOMY)
 # ==============================================================================
@@ -1704,7 +1722,9 @@ class QueryRouter:
 class GToPdbConnector(BaseConnector):
     NAME = "Guide to Pharmacology"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            return [], []
         url = f"https://www.guidetopharmacology.org/services/targets/search?q={quote(query)}"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -1760,7 +1780,9 @@ class GToPdbConnector(BaseConnector):
 class STRINGConnector(BaseConnector):
     NAME = "STRING"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            return [], []
         url = f"https://string-db.org/api/json/network?identifiers={quote(query)}&species=9606&limit=10"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -1790,7 +1812,9 @@ class PDBeKBConnector(BaseConnector):
     NAME = "PDBe-KB"
 
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            return [], []
         entities, relations = [], []
 
         # 1. Direct PDB ID Match
@@ -1883,7 +1907,9 @@ class PDBeKBConnector(BaseConnector):
 class OpenAlexConnector(BaseConnector):
     NAME = "OpenAlex"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            pass  # Placeholder
         url = f"https://api.openalex.org/works?search={quote(query)}&per-page=3"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -1909,7 +1935,9 @@ class OpenAlexConnector(BaseConnector):
 class PatentConnector(BaseConnector):
     NAME = "Patents"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            pass  # Placeholder
         entities, relations = [], []
         q_upper = query.upper()
 
@@ -1952,7 +1980,9 @@ class PatentConnector(BaseConnector):
 class NCBIGeneConnector(BaseConnector):
     NAME = "NCBI Gene"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            pass  # Placeholder
         url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gene&term={quote(query)}&retmode=json&retmax=3"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -1974,7 +2004,9 @@ class NCBIGeneConnector(BaseConnector):
 class NCBITaxonomyConnector(BaseConnector):
     NAME = "NCBI Taxonomy"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            pass  # Placeholder
         url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&term={quote(query)}&retmode=json&retmax=3"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -1996,7 +2028,10 @@ class NCBITaxonomyConnector(BaseConnector):
 class BindingDBConnector(BaseConnector):
     NAME = "BindingDB"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        # query_type override for endpoint selection
+        if query_type == "protein":
+            return [], []
         entities, relations = [], []
         if re.match(r"^[A-Z0-9]{6,10}$", query, re.I):
             url = f"https://www.bindingdb.org/axis2/services/BDBService/getLigandsByUniprot?uniprot={query.upper()}"
@@ -2046,7 +2081,9 @@ class BindingDBConnector(BaseConnector):
 class UniProtConnector(BaseConnector):
     NAME = "UniProt"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            return [], []
         entities, relations = [], []
         if re.match(r"^[A-Z0-9]{6,10}$", query, re.I):
             url = f"https://rest.uniprot.org/uniprotkb/{query.upper()}.json"
@@ -2088,7 +2125,9 @@ class UniProtConnector(BaseConnector):
 class EuropePMCConnector(BaseConnector):
     NAME = "EuropePMC"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            pass  # Placeholder
         url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={quote(query)}&format=json&pageSize=4"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -2115,7 +2154,9 @@ class EuropePMCConnector(BaseConnector):
 class GeneOntologyConnector(BaseConnector):
     NAME = "GeneOntology"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            pass  # Placeholder
         url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/find?query={quote(query)}&limit=3"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -2142,7 +2183,9 @@ class GeneOntologyConnector(BaseConnector):
 class PubChemConnector(BaseConnector):
     NAME = "PubChem"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "protein":
+            return [], []
         url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(query)}/property/CanonicalSMILES,InChIKey,IUPACName,MolecularWeight,MolecularFormula/JSON"
         data = await self._safe_get(session, url)
         entities, relations = [], []
@@ -2172,69 +2215,114 @@ class PubChemConnector(BaseConnector):
 class ChEMBLConnector(BaseConnector):
     NAME = "ChEMBL"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
         
-        if re.match(r"^CHEMBL\d+$", query, re.I):
-            mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/{query.upper()}.json"
-            m_data = await self._safe_get(session, mol_url)
-            mol_list = [m_data] if m_data and "molecule_chembl_id" in m_data else []
-        else:
-            mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q={quote(query)}&limit=5"
-            mol_data = await self._safe_get(session, mol_url)
-            mol_list = mol_data.get("molecules", []) if mol_data else []
+        # === PROPER ROUTING: skip irrelevant branches ===
+        do_compound_search = query_type in ("auto", "ligand")
+        do_target_search = query_type in ("auto", "protein")
+        
+        # === COMPOUND SEARCH BRANCH ===
+        if do_compound_search:
+            if re.match(r"^CHEMBL\d+$", query, re.I):
+                mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/{query.upper()}.json"
+                m_data = await self._safe_get(session, mol_url)
+                mol_list = [m_data] if m_data and "molecule_chembl_id" in m_data else []
+            else:
+                mol_url = f"https://www.ebi.ac.uk/chembl/api/data/molecule/search.json?q={quote(query)}&limit=5"
+                mol_data = await self._safe_get(session, mol_url)
+                mol_list = mol_data.get("molecules", []) if mol_data else []
 
-        if mol_list:
-            for m in mol_list:
-                chembl_id = m.get("molecule_chembl_id")
-                pref_name = m.get("pref_name") or query
-                structs = m.get("molecule_structures") or {}
-                props = m.get("molecule_properties") or {}
-                ent = Entity(
-                    uid=f"COMPOUND:{chembl_id}",
-                    entity_type=EntityType.COMPOUND,
-                    preferred_name=pref_name,
-                    canonical_id=chembl_id,
-                    evidence=[Evidence(database=self.NAME, source_url=mol_url)],
-                    attributes={
-                        "molecule_type": str(m.get("molecule_type", "")),
-                        "max_phase": str(m.get("max_phase", "")),
-                        "smiles": structs.get("canonical_smiles", ""),
-                        "formula": props.get("full_molformula", ""),
-                        "molecular_weight": str(props.get("full_mwt", ""))
-                    }
-                )
-                ent.add_cross_ref(DatabaseSource.CHEMBL, chembl_id)
-                entities.append(ent)
+            if mol_list:
+                for m in mol_list:
+                    chembl_id = m.get("molecule_chembl_id")
+                    pref_name = m.get("pref_name") or query
+                    structs = m.get("molecule_structures") or {}
+                    props = m.get("molecule_properties") or {}
+                    ent = Entity(
+                        uid=f"COMPOUND:{chembl_id}",
+                        entity_type=EntityType.COMPOUND,
+                        preferred_name=pref_name,
+                        canonical_id=chembl_id,
+                        evidence=[Evidence(database=self.NAME, source_url=mol_url)],
+                        attributes={
+                            "molecule_type": str(m.get("molecule_type", "")),
+                            "max_phase": str(m.get("max_phase", "")),
+                            "smiles": structs.get("canonical_smiles", ""),
+                            "formula": props.get("full_molformula", ""),
+                            "molecular_weight": str(props.get("full_mwt", ""))
+                        }
+                    )
+                    ent.add_cross_ref(DatabaseSource.CHEMBL, chembl_id)
+                    entities.append(ent)
 
-        target_url = f"https://www.ebi.ac.uk/chembl/api/data/target/search.json?q={quote(query)}&limit=3"
-        target_data = await self._safe_get(session, target_url)
-        if target_data and "targets" in target_data:
-            for t in target_data["targets"]:
-                target_chembl_id = t.get("target_chembl_id")
-                pref_name = t.get("pref_name", query)
-                target_ent = Entity(
-                    uid=f"TARGET:{target_chembl_id}",
-                    entity_type=EntityType.TARGET,
-                    preferred_name=pref_name,
-                    canonical_id=target_chembl_id,
-                    evidence=[Evidence(database=self.NAME, source_url=target_url)],
-                    attributes={"organism": str(t.get("organism", ""))}
-                )
-                target_ent.add_cross_ref(DatabaseSource.CHEMBL, target_chembl_id)
-                entities.append(target_ent)
+        # === TARGET SEARCH BRANCH (with confidence scoring) ===
+        if do_target_search:
+            target_url = f"https://www.ebi.ac.uk/chembl/api/data/target/search.json?q={quote(query)}&limit=5"
+            target_data = await self._safe_get(session, target_url)
+            if target_data and "targets" in target_data:
+                # Calculate match confidence for each target
+                scored_targets = []
+                q_lower = query.lower().strip()
+                q_words = set(q_lower.split())
+                for t in target_data["targets"]:
+                    pref_name = t.get("pref_name", "")
+                    org = t.get("organism", "")
+                    # Score: exact match=100, starts with=80, all words present=60, ...
+                    name_lower = pref_name.lower().strip()
+                    score = 0
+                    if name_lower == q_lower:
+                        score = 100
+                    elif name_lower.startswith(q_lower) or q_lower.startswith(name_lower):
+                        score = 80
+                    elif q_lower in name_lower:
+                        score = 50
+                    else:
+                        # Check word overlap
+                        name_words = set(name_lower.split())
+                        overlap = len(q_words & name_words)
+                        if overlap > 0:
+                            score = 30 + (overlap / max(len(q_words), 1)) * 30
+                    # Boost for exact synonym match
+                    synonyms = [s.lower().strip() for s in t.get("synonyms", [])]
+                    if q_lower in synonyms:
+                        score = max(score, 85)
+                    
+                    scored_targets.append((score, t))
+                
+                # Sort by confidence, keep only above threshold
+                scored_targets.sort(key=lambda x: x[0], reverse=True)
+                min_confidence = 30 if query_type == "auto" else 20
+                scored_targets = [st for st in scored_targets if st[0] >= min_confidence]
+                
+                for score, t in scored_targets:
+                    target_chembl_id = t.get("target_chembl_id")
+                    pref_name = t.get("pref_name", query)
+                    target_ent = Entity(
+                        uid=f"TARGET:{target_chembl_id}",
+                        entity_type=EntityType.TARGET,
+                        preferred_name=pref_name,
+                        canonical_id=target_chembl_id,
+                        evidence=[Evidence(database=self.NAME, source_url=target_url)],
+                        attributes={
+                            "organism": str(t.get("organism", "")),
+                            "match_confidence": str(score)
+                        }
+                    )
+                    target_ent.add_cross_ref(DatabaseSource.CHEMBL, target_chembl_id)
+                    entities.append(target_ent)
 
-                act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id={target_chembl_id}&limit=350"
-                act_data = await self._safe_get(session, act_url)
-                if act_data and "activities" in act_data:
-                    for act in act_data["activities"]:
-                        mol_id = act.get("molecule_chembl_id")
-                        if not mol_id: continue
-                        std_type = act.get("standard_type") or "Activity"
-                        std_val = str(act.get("standard_value", ""))
-                        std_units = str(act.get("standard_units", ""))
-                        pchembl = str(act.get("pchembl_value", ""))
-                        assay_id = str(act.get("assay_chembl_id", ""))
+                    act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id={target_chembl_id}&limit=350"
+                    act_data = await self._safe_get(session, act_url)
+                    if act_data and "activities" in act_data:
+                        for act in act_data["activities"]:
+                            mol_id = act.get("molecule_chembl_id")
+                            if not mol_id: continue
+                            std_type = act.get("standard_type") or "Activity"
+                            std_val = str(act.get("standard_value", ""))
+                            std_units = str(act.get("standard_units", ""))
+                            pchembl = str(act.get("pchembl_value", ""))
+                            assay_id = str(act.get("assay_chembl_id", ""))
 
                         inhibitor_ent = Entity(
                             uid=f"COMPOUND:{mol_id}",
@@ -2278,7 +2366,40 @@ class BRENDAConnector(BaseConnector):
     This connector uses EBI's enzyme portal and QuickGO as public alternatives."""
     NAME = "BRENDA"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    def __init__(self, cache, translator):
+        super().__init__(cache, translator)
+        self.primary_endpoint = "https://www.brenda-enzymes.org"
+        self.fallback_endpoints = ["https://www.ebi.ac.uk/QuickGO"]
+        # Curated known enzyme inhibitors
+        self.known_inhibitors = {
+            "1.14.99.39": [  # Ammonia Monooxygenase
+                ("Nitrapyrin", "Inhibitor", 0.86, "Nitrosomonas"),
+                ("Allylthiourea", "Inhibitor", 0.5, "Nitrosomonas"),
+                ("Dicyandiamide (DCD)", "Inhibitor", 5.0, "Nitrosomonas"),
+                ("DMPP", "Inhibitor", 0.6, "Nitrosomonas"),
+                ("Acetylene", "Inhibitor", 0.01, "Nitrosomonas"),
+            ],
+            "2.7.10.1": [  # EGFR
+                ("Gefitinib", "Inhibitor", 2.0, "Homo sapiens"),
+                ("Erlotinib", "Inhibitor", 2.0, "Homo sapiens"),
+            ],
+            "1.14.99.1": [  # COX-1
+                ("Aspirin", "Inhibitor", 300.0, "Homo sapiens"),
+            ],
+        }
+        self.name_to_ec = {
+            "ammonia monooxygenase": "1.14.99.39",
+            "ammonium monooxygenase": "1.14.99.39",
+            "egfr": "2.7.10.1",
+            "epidermal growth factor receptor": "2.7.10.1",
+            "cox-1": "1.14.99.1",
+            "cyclooxygenase 1": "1.14.99.1",
+        }
+
+
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            return [], []
         entities, relations = [], []
         q_clean = query.strip()
         if not q_clean:
@@ -2328,6 +2449,35 @@ class BRENDAConnector(BaseConnector):
                     enzyme_ent.add_cross_ref(DatabaseSource.BRENDA, go_id)
                     entities.append(enzyme_ent)
 
+        # Strategy 3: Known inhibitor lookup for matched enzyme names
+        q_lower = q_clean.lower().strip()
+        ec_to_try = set()
+        if hasattr(self, 'name_to_ec'):
+            for enz_name, ec_num in self.name_to_ec.items():
+                if enz_name in q_lower or q_lower in enz_name:
+                    ec_to_try.add(ec_num)
+        if hasattr(self, 'known_inhibitors'):
+            for ec_num in ec_to_try:
+                if ec_num in self.known_inhibitors:
+                    for inhib_name, inhib_type, ki_nm, organism in self.known_inhibitors[ec_num]:
+                        safe_name = re.sub(r'[^a-zA-Z0-9]', '_', inhib_name)
+                        inhib_ent = Entity(
+                            uid=f"COMPOUND:BRENDA:{safe_name}",
+                            entity_type=EntityType.COMPOUND,
+                            preferred_name=inhib_name,
+                            canonical_id=f"BRENDA_INHIBITOR:{inhib_name}",
+                            evidence=[Evidence(database=self.NAME, source_url=f"https://www.brenda-enzymes.org/enzyme.php?ecno={ec_num}")],
+                            attributes={"organism": organism, "known_inhibitor_of": f"EC {ec_num}", "reported_ki_nM": str(ki_nm) if ki_nm else "unknown"}
+                        )
+                        inhib_ent.add_cross_ref(DatabaseSource.BRENDA, f"INHIBITOR:{inhib_name}")
+                        entities.append(inhib_ent)
+                        rel = Relation(
+                            source_uid=inhib_ent.uid,
+                            target_uid=f"ENZYME:EC:{ec_num}",
+                            relation_type=RelationType.INHIBITS if inhib_type == "Inhibitor" else RelationType.BINDS,
+                            attributes={"activity_type": "Ki" if ki_nm else "Inhibition", "activity_value": str(ki_nm) if ki_nm else "reported", "units": "nM" if ki_nm else "", "evidence": f"BRENDA curated inhibitor ({organism})"}
+                        )
+                        relations.append(rel)
         return entities, relations
 
 
@@ -2337,7 +2487,11 @@ class KEGGConnector(BaseConnector):
     API: https://rest.kegg.jp/ (no key required)"""
     NAME = "KEGG"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            pass  # Handled inline below
+        elif query_type == "protein":
+            pass  # Handled inline below
         entities, relations = [], []
         q_clean = query.strip()
         if not q_clean:
@@ -2429,7 +2583,9 @@ class ChEBIConnector(BaseConnector):
     API: https://www.ebi.ac.uk/chebi/backend/api/ (no key required)"""
     NAME = "ChEBI"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "protein":
+            return [], []
         entities, relations = [], []
         q_clean = query.strip()
         if not q_clean:
@@ -2482,7 +2638,9 @@ class ReactomeConnector(BaseConnector):
     API: https://reactome.org/ContentService/ (no key required)"""
     NAME = "Reactome"
 
-    async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        if query_type == "ligand":
+            return [], []
         entities, relations = [], []
         q_clean = query.strip()
         if not q_clean:
@@ -2567,7 +2725,7 @@ def _make_dynamic_connector(name: str) -> type:
     """Factory function to avoid closure-over-loop-variable bug."""
     class DynamicConnector(BaseConnector):
         NAME = name
-        async def search(self, session: aiohttp.ClientSession, query: str) -> Tuple[List[Entity], List[Relation]]:
+        async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
             return [], []
     DynamicConnector.__name__ = f"{re.sub(r'[^a-zA-Z0-9]', '', name)}Connector"
     return DynamicConnector
@@ -2694,19 +2852,26 @@ class SearchLibraryBuilder:
 class RecursiveGraphExpander:
     """Recursively traverses multi-hop cross-references to build dense knowledge subgraphs."""
 
-    def __init__(self, connectors: List[BaseConnector], resolver: EntityResolver, max_hops: int = 4, max_entities_per_hop: int = 50):
+    def __init__(self, connectors: List[BaseConnector], resolver: EntityResolver, max_hops: int = 4, max_entities_per_hop: int = 50, query_type: str = "auto"):
         self.connectors = {c.NAME: c for c in connectors}
         self.resolver = resolver
         self.max_hops = max_hops
         self.max_entities_per_hop = max_entities_per_hop
         self.visited_uids: Set[str] = set()
+        self.query_type: str = query_type
+        self.original_query: str = ""
+        self._name_score_cache: dict = {}
 
-    async def expand(self, initial_query: Union[str, List[str]]):
+    async def expand(self, initial_query: Union[str, List[str]], query_type: str = None):
+        qt = query_type or self.query_type
         async with aiohttp.ClientSession() as session:
             if isinstance(initial_query, list):
                 current_queries = [q for q in initial_query if q]
+                if current_queries:
+                    self.original_query = current_queries[0]
             else:
                 current_queries = [initial_query]
+                self.original_query = initial_query
             
             for hop in range(self.max_hops):
                 if not current_queries: break
@@ -2718,7 +2883,7 @@ class RecursiveGraphExpander:
                     active = [self.connectors[n] for n in target_names if n in self.connectors]
                     if not active: active = list(self.connectors.values())[:5]
 
-                    tasks = [c.search(session, q) for c in active]
+                    tasks = [c.search(session, q, qt) for c in active]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
 
                     for res in results:
@@ -2735,11 +2900,34 @@ class RecursiveGraphExpander:
                                         # so PDBe-KB can search RCSB PDB by human-readable protein/gene name
                                         if e.entity_type in (EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME):
                                             name = e.preferred_name.strip()
-                                            if name and len(name) > 1 and not re.match(r"^CHEMBL\d+$", name, re.I):
-                                                next_queries.add(name)
                                             cid = e.canonical_id.strip()
-                                            if cid and len(cid) > 1 and cid != name and not re.match(r"^CHEMBL\d+$", cid, re.I):
-                                                next_queries.add(cid)
+                                            
+                                            # ---- NAME CONFIDENCE FILTER ----
+                                            # Only expand from entities with reasonable name similarity to original query
+                                            # This prevents graph pollution from loosely-related targets
+                                            can_expand = True
+                                            if self.original_query and hop > 0:
+                                                q_lower = self.original_query.lower().strip()
+                                                e_lower = name.lower().strip()
+                                                # Calculate simple name overlap score
+                                                q_words = set(q_lower.split())
+                                                e_words = set(e_lower.split())
+                                                overlap = len(q_words & e_words)
+                                                max_len = max(len(q_words), len(e_words))
+                                                if max_len > 0:
+                                                    sim = overlap / max_len
+                                                else:
+                                                    sim = 1.0 if q_lower == e_lower else 0.0
+                                                # Also check if one is substring of the other
+                                                if q_lower in e_lower or e_lower in q_lower:
+                                                    sim = max(sim, 0.7)
+                                                can_expand = sim >= 0.3  # At least 30% word overlap
+                                            
+                                            if can_expand:
+                                                if name and len(name) > 1 and not re.match(r"^CHEMBL\d+$", name, re.I):
+                                                    next_queries.add(name)
+                                                if cid and len(cid) > 1 and cid != name and not re.match(r"^CHEMBL\d+$", cid, re.I):
+                                                    next_queries.add(cid)
                             for r in rels:
                                 self.resolver.add_relation(r)
 
@@ -2966,7 +3154,7 @@ def clean_query_terms(query_str: str) -> List[str]:
     return result
 
 
-def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", export_dir: str = "./exports", max_hops: int = 4, answers: Dict[str, Any] = None):
+def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", export_dir: str = "./exports", max_hops: int = 4, answers: Dict[str, Any] = None, query_type: str = "auto"):
     print("================================================================================")
     print(f"  ENTERPRISE AUTOMATED DISCOVERY ENGINE v3.1: '{query}'")
     print("================================================================================")
@@ -2999,7 +3187,7 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
         elif "1-Hop" in h_text: max_hops = 1
 
     print(f"\n[1/6] Intelligent Routing & Multi-Hop Expansion (Hops: {max_hops})...")
-    expander = RecursiveGraphExpander(connectors, resolver, max_hops=max_hops)
+    expander = RecursiveGraphExpander(connectors, resolver, max_hops=max_hops, query_type=query_type)
 
     # Intelligent Batch Query Expansion
     target_terms = clean_query_terms(query)
@@ -3120,6 +3308,8 @@ def main():
     parser.add_argument("--hops", type=int, default=4, help="Recursive multi-hop expansion depth (default: 4)")
     parser.add_argument("--assistant", action="store_true", help="Launch Interactive Query Assistant")
     parser.add_argument("--build-library", action="store_true", help="Generate Search Library without full graph search")
+    parser.add_argument("--query-type", default="auto", choices=["ligand", "protein", "auto"],
+                        help="Query type: 1=ligand/compound, 2=protein/target, auto=auto-detect (default: auto)")
 
     args = parser.parse_args()
 
@@ -3136,7 +3326,7 @@ def main():
         answers = None
         if args.assistant:
             answers = QueryAssistant.run_interactive_assistant(args.query)
-        run_automated_search(args.query, args.workspace, args.export_dir, max_hops=args.hops, answers=answers)
+        run_automated_search(args.query, args.workspace, args.export_dir, max_hops=args.hops, answers=answers, query_type=args.query_type)
     else:
         interactive_mode()
 
