@@ -1,43 +1,45 @@
-# Chemical Data Extractor & Enterprise Scientific Knowledge Graph Platform (v3.1)
+# Chemical Data Extractor & Enterprise Scientific Knowledge Graph Platform
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Excel Export](https://img.shields.io/badge/Export-Styled%20Excel%20%28.xlsx%29-green.svg)](#styled-multi-tab-excel-workbook)
-[![Databases Covered](https://img.shields.io/badge/Databases-23%20Connectors-orange.svg)](#-23-integrated-database-connectors)
+[![Excel Export](https://img.shields.io/badge/Export-Styled%20Excel%20%28.xlsx%29-green.svg)](#-enrichment-pipeline)
+[![Databases Covered](https://img.shields.io/badge/Databases-23%20Connectors-orange.svg)](#-integrated-database-connectors)
 
-An enterprise-grade, multi-hop automated scientific discovery engine designed to extract, resolve, align, and construct comprehensive knowledge graphs for chemical compounds, bioactivities, enzyme kinetics, patent claims, 3D PDB crystal structures, and biological pathways.
+An enterprise-grade, multi-hop automated scientific discovery engine that extracts, resolves, aligns, and constructs comprehensive knowledge graphs for chemical compounds, bioactivities, enzyme kinetics, 3D PDB structures, and biological pathways. Queries **protein targets** (e.g., "EGFR", "Ammonia Monooxygenase") or **ligands/compounds** (e.g., "Aspirin", "Nitrapyrin") across 23+ live database APIs.
 
 ---
 
 ## 🌟 Key Features
 
-* **Intelligent Multi-Hop Graph Expansion**: Performs recursive $N$-hop discovery (default `--hops 4`) across global chemical, biological, and patent networks.
-* **23 Active Live Database APIs**: Queries PubChem, ChEMBL, BindingDB, BRENDA, UniProt, RCSB PDB, AlphaFold DB, DrugBank, KEGG, Reactome, EPA CompTox, ChEBI, ZINC20, Lens Patent Engine, Google Patents, and scientific literature repositories in parallel.
-* **Styled Multi-Tab Excel Export (.xlsx)**: Generates production-ready spreadsheets complete with formatted headers, auto-adjusted column widths, SMILES structures, $IC_{50}/K_i$ bioactivities, and clickable web links.
-* **Universal & Query-Agnostic**: Works dynamically for any query (e.g. `Ammonia Monooxygenase`, `Aspirin`, `EGFR`, `COX-2`, `P23219`, `COVID-19 Main Protease`, `Dopamine Receptor`).
-* **Multi-Format Export Suite**: Exports to Excel (`.xlsx`), CSV (`nodes.csv`, `edges.csv`), GraphML (`graph.graphml`), Neo4j Cypher (`neo4j_import.cypher`), RDF/Turtle (`graph.ttl`), Parquet, and AI Vector RAG Metadata (`vector_index_metadata.json`).
-* **Fault-Tolerant Infrastructure**: Built-in DuckDB in-memory fallback and Excel file-lock protection.
+- **Query-Type Selection**: Specify `--query-type protein` (find inhibitors/binders for a target) or `--query-type ligand` (find proteins that bind a compound) — or let `auto` detect it.
+- **Multi-Hop Graph Expansion**: Recursive N-hop discovery (default `--hops 4`) across global chemical, biological, and patent networks.
+- **23 Active Live Database APIs**: Queries PubChem, ChEMBL, BindingDB, BRENDA, UniProt, RCSB PDB, AlphaFold DB, DrugBank, KEGG, Reactome, EPA CompTox, ChEBI, ZINC20, Lens Patent Engine, Google Patents, and scientific literature in parallel.
+- **Rich Excel Export**: 6-sheet styled workbook with SMILES, embedded 2D structure images, Ki/IC₅₀ bioactivities, publication abstracts, and PDB structure mappings.
+- **Multi-Format Export Suite**: Excel (`.xlsx`), CSV (`nodes.csv`, `edges.csv`), GraphML (`graph.graphml`), Neo4j Cypher (`neo4j_import.cypher`), RDF/Turtle (`graph.ttl`), Parquet, and AI Vector RAG Metadata.
+- **Data Enrichment Pipeline**: Post-query script fetches SMILES, molecular properties, and publication abstracts via PubChem and CrossRef APIs.
+- **Knowledge Graph Visualization**: Generate publication-quality network graphs with NetworkX + Matplotlib.
+- **Fault-Tolerant**: DuckDB in-memory fallback, retry logic, and caching.
 
 ---
 
-## 📊 23 Integrated Database Connectors
+## 📊 Integrated Database Connectors
 
 | Category | Database / API Resource | Extracted Data Fields |
 | :--- | :--- | :--- |
-| **Chemical & Bioactivity** | **PubChem PUG REST** | Canonical SMILES, CIDs, IUPAC Names, Formulas, Molecular Weights ($MW$) |
-| | **ChEMBL DB (EMBL-EBI)** | Bioactivity values ($IC_{50}, K_i, K_d$), pChEMBL scores, Assay IDs, Mechanisms |
-| | **BindingDB** | Quantitative target binding affinities ($K_i, K_d, IC_{50}, EC_{50}$) |
-| | **Guide to Pharmacology** | Ligand-target interactions, affinity parameters, selectivity |
+| **Chemical & Bioactivity** | **PubChem PUG REST** | Canonical SMILES, CIDs, IUPAC Names, Formulas, Molecular Weight |
+| | **ChEMBL (EMBL-EBI)** | Bioactivity (IC₅₀, Kᵢ, Kd), pChEMBL scores, Assay IDs, Mechanisms |
+| | **BindingDB** | Quantitative target binding affinities (Kᵢ, Kd, IC₅₀, EC₅₀) |
+| | **Guide to Pharmacology (IUPHAR)** | Ligand-target interactions, affinity parameters, selectivity |
 | | **ChEBI** | Chemical Entities of Biological Interest ontology terms |
 | | **ZINC20** | 3D virtual screening candidates & molecular docking structures |
-| **Enzyme & Pathways** | **BRENDA Enzyme DB** | EC Numbers (**EC 1.14.99.39**), substrate profiles, turnover kinetics |
-| | **KEGG** | KEGG Compound IDs (`C00001`), metabolic pathways, reaction maps |
+| **Enzyme & Pathways** | **BRENDA Enzyme DB** | EC Numbers, known inhibitors with Ki values, substrate profiles |
+| | **KEGG** | KEGG Compound IDs, metabolic pathways, reaction maps |
 | | **Reactome** | Human biological pathways, reaction steps, event diagrams |
-| | **Gene Ontology (QuickGO)** | Biological Process (`GO:0009061`) & Molecular Function terms |
-| **3D Structures** | **RCSB Protein Data Bank (PDB)** | Experimental 3D X-ray & Cryo-EM PDB IDs (`9PXF`, `6N4N`, `6C0B`, `7Z36`) |
+| | **Gene Ontology (QuickGO)** | Biological Process & Molecular Function terms |
+| **3D Structures** | **RCSB Protein Data Bank (PDB)** | Experimental 3D X-ray & Cryo-EM PDB IDs |
 | | **PDBe-KB (EMBL-EBI)** | Co-crystallized 3D ligand binding pockets & UniProt mappings |
 | | **AlphaFold DB** | AI-predicted 3D protein structure models & pLDDT confidence scores |
-| **Patents & IP** | **Google Patents Register** | International Patent IDs (`US`, `WO`, `EP`, `AU`, `AR`), Assignees, Titles |
+| **Patents & IP** | **Google Patents Register** | International Patent IDs, Assignees, Titles |
 | | **PubChem Patent XRefs** | Live chemical-to-patent cross-reference lookup |
 | | **Lens.org Patent Platform** | Open global patents & biological sequence patent citations |
 | **Proteins & Genes** | **UniProtKB** | Primary Accession IDs, catalytic functions, organism taxonomy |
@@ -50,57 +52,164 @@ An enterprise-grade, multi-hop automated scientific discovery engine designed to
 
 ---
 
-## 📁 Multi-Tab Excel Output Structure
-
-The master workbook (`exports/Nitrification_Inhibitors_Knowledge_Graph.xlsx`) includes 4 dedicated sheets:
-
-1. **Tab 1: `Entities & Compounds`**
-   * Compound Names, Entity Categories, Canonical IDs
-   * **SMILES Strings**
-   * **Molecular Formulas** & **Molecular Weights ($MW$)**
-   * Bioactivity Summaries ($IC_{50}, K_i$)
-2. **Tab 2: `Relationships & Patents`**
-   * Source Entity $\rightarrow$ Target Entity
-   * Relationship Types (`INHIBITS`, `PATENTED_IN`, `BINDS`, `SUBSTRATE_OF`)
-   * Bioactivity Values & Units ($\mu\text{M}, \text{nM}$)
-   * Confidence Scores & Source Web URLs
-3. **Tab 3: `Patents & Patented Molecules`**
-   * Global Patent Numbers (`US3135594A`, `US7883568B2`, `EP0386767B1`, `US5354726A`, `WO2020123456A1`, `WO2015098123A1`)
-   * Patent Titles, Corporate Assignees (Dow Chemical, BASF, SKW Trostberg, JIRCAS/FAO)
-   * Publication Years & **Clickable Google Patent Links**
-4. **Tab 4: `PDB 3D Structures`**
-   * PDB Structure Entry IDs (`9PXF`, `6N4N`, `6C0B`, `7Z36`)
-   * Structure Titles, Release Dates, and **Direct RCSB PDB Links**
-
----
-
 ## 🚀 Quick Start
 
 ### 1. Installation
+
 ```bash
 git clone https://github.com/sumanta357/chemical-data-extractor.git
 cd chemical-data-extractor
-pip install aiohttp pydantic networkx openpyxl duckdb pyarrow
+pip install aiohttp pydantic networkx openpyxl duckdb pyarrow matplotlib
 ```
 
-### 2. Run Single Target Extraction (Default 4-Hop Search)
+### 2. Run a Protein Query (Find Inhibitors for a Target)
+
 ```bash
-python scigraph.py "Ammonia Monooxygenase"
+# Search for compounds that inhibit Ammonia Monooxygenase (1 hop = focused)
+python3 scigraph.py "Ammonia Monooxygenase" --query-type protein --hops 1
+
+# Deeper 2-hop expansion (also searches via ChEMBL target linkages)
+python3 scigraph.py "Ammonia Monooxygenase" --query-type protein --hops 2
 ```
 
-### 3. Run Custom Multi-Hop Expansion Depth
+### 3. Run a Ligand Query (Find Targets for a Compound)
+
 ```bash
-python scigraph.py "EGFR" --hops 4
+python3 scigraph.py "Aspirin" --query-type ligand --hops 1
 ```
 
-### 4. Run Interactive Query Assistant
+### 4. Data Enrichment (Add SMILES, 2D Structures, Publication Metadata)
+
+After a query completes, enrich the exports into a beautiful multi-sheet Excel workbook:
+
 ```bash
-python scigraph.py "Ammonia Monooxygenase" --assistant
+python3 enrich_exports.py
 ```
 
-### 5. Run Batch Search from Query File
+**Output:** `exports/enriched_data.xlsx` with 6 sheets.
+
+### 5. Knowledge Graph Visualization
+
+Generate a network graph PNG from the export data:
+
 ```bash
-python scigraph.py --batch exports/library_queries.txt --hops 4
+python3 visualize_graph.py
+```
+
+**Output:** `exports/ammonia_monooxygenase_graph.png`
+
+### 6. Run Tests
+
+```bash
+python3 test_connectors_new.py
+```
+
+---
+
+## 📁 Excel Output Structure (6 Sheets)
+
+The enriched workbook (`exports/enriched_data.xlsx`) contains:
+
+| Sheet | Contents |
+| :--- | :--- |
+| **Summary** | Pipeline statistics and sheet overview |
+| **Compounds** | Name, SMILES, Molecular Formula, MW, InChI Key, IUPAC Name, PubChem CID, **embedded 2D structure images** |
+| **Inhibitor Activities** | Compound → Target mappings with Ki/IC₅₀ values, pChEMBL scores, mechanism of action, assay IDs |
+| **Publications** | DOIs, titles, authors, journals, years, **abstracts**, citation counts, URLs |
+| **PDB Structures** | PDB ID → Protein target mappings with method, resolution |
+| **All Relations** | Complete edge table with all relationship types |
+
+---
+
+## 🧪 Examples by Use Case
+
+### Find Known Inhibitors for an Enzyme
+
+```bash
+# BRENDA curated inhibitors + ChEMBL bioactivity data
+python3 scigraph.py "Ammonia Monooxygenase" --query-type protein --hops 2
+```
+
+### Find All Proteins That Bind a Drug
+
+```bash
+python3 scigraph.py "Aspirin" --query-type ligand --hops 2
+```
+
+### Batch Search from File
+
+```bash
+python3 scigraph.py --batch exports/library_queries.txt --hops 2
+```
+
+---
+
+## 📁 Export Formats
+
+| Format | File | Description |
+| :--- | :--- | :--- |
+| **Excel** | `exports/enriched_data.xlsx` | Formatted 6-sheet workbook with SMILES & images |
+| **CSV** | `exports/nodes.csv` | Node/entity table |
+| **CSV** | `exports/edges.csv` | Edge/relationship table |
+| **GraphML** | `exports/graph.graphml` | Standard graph exchange format |
+| **Neo4j Cypher** | `exports/neo4j_import.cypher` | Import script for Neo4j graph database |
+| **RDF/Turtle** | `exports/graph.ttl` | Semantic web format |
+| **Parquet** | `exports/nodes.parquet` / `edges.parquet` | Columnar storage for large graphs |
+| **PNG** | `exports/ammonia_monooxygenase_graph.png` | Knowledge graph visualization |
+
+---
+
+## 🔧 CLI Reference
+
+### `scigraph.py` — Knowledge Graph Extraction
+
+```
+usage: scigraph.py [-h] [--batch BATCH] [--workspace WORKSPACE]
+                   [--export-dir EXPORT_DIR] [--hops HOPS] [--assistant]
+                   [--build-library]
+                   [--query-type {ligand,protein,auto}]
+                   [query]
+
+positional arguments:
+  query                 Query: compound name, protein name, gene symbol, or
+                        UniProt ID (e.g. "Ammonia Monooxygenase", "Aspirin")
+
+options:
+  -h, --help            Show help and exit
+  --batch BATCH         Path to batch input queries file
+  --workspace WORKSPACE Working directory for cache/data
+  --export-dir EXPORT_DIR Output directory
+  --hops HOPS           Multi-hop expansion depth (default: 4)
+  --assistant           Launch interactive query assistant
+  --build-library       Build search library without full graph search
+  --query-type {ligand,protein,auto}
+                        Query type: ligand/compound, protein/target, or
+                        auto-detect (default: auto)
+```
+
+### `enrich_exports.py` — Data Enrichment Pipeline
+
+Takes no arguments — reads from `exports/nodes.csv` and `exports/edges.csv`, outputs `exports/enriched_data.xlsx`.
+
+```bash
+python3 enrich_exports.py
+```
+
+### `visualize_graph.py` — Knowledge Graph Visualization
+
+Takes no arguments — reads from `exports/nodes.csv` and `exports/edges.csv`, outputs `exports/ammonia_monooxygenase_graph.png`.
+
+```bash
+python3 visualize_graph.py
+```
+
+---
+
+## 🧪 Tests
+
+```bash
+# Connector unit tests (KEGG, ChEBI, Reactome, PDBe-KB)
+python3 test_connectors_new.py
 ```
 
 ---
