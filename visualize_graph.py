@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Visualize the Ammonia Monooxygenase inhibitor graph from exports CSV data.
+Visualize a knowledge graph from exports CSV data.
 Produces a publication-quality figure showing compounds, targets, and their interactions.
+Generates a dynamic output filename based on the query from search_library.json.
 """
 import csv
+import json
 import os
 import re
 from collections import defaultdict
@@ -16,6 +18,22 @@ import networkx as nx
 import numpy as np
 
 EXPORT_DIR = 'exports'
+
+# ── Detect query name from search_library.json or fall back to 'graph' ──
+QUERY_NAME = "graph"
+search_lib_path = os.path.join(EXPORT_DIR, 'search_library.json')
+try:
+    with open(search_lib_path) as f:
+        lib = json.load(f)
+    base_query = lib.get('base_query', '').strip()
+    if base_query:
+        safe_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', base_query).strip('_')
+        safe_name = re.sub(r'_+', '_', safe_name)[:40]
+        if safe_name:
+            QUERY_NAME = safe_name
+    print(f"📝 Detected query: {base_query or 'unknown'} → {QUERY_NAME}")
+except (FileNotFoundError, json.JSONDecodeError, KeyError):
+    print(f"⚠️  Could not read {search_lib_path}, using fallback name: {QUERY_NAME}")
 
 # ── Read nodes ──────────────────────────────────────────────
 nodes = {}
@@ -157,7 +175,7 @@ label_nodes = {}
 for uid, data in nodes.items():
     deg = G.degree(uid)
     name = data.get('name', '')
-    if deg >= 2 or 'Ammonia' in name or 'Monooxygenase' in name:
+    if deg >= 2:
         # Shorten long names
         short = name[:28] + '...' if len(name) > 30 else name
         label_nodes[uid] = short
@@ -190,8 +208,9 @@ inhib_count = sum(1 for e in edges if e['type'] == 'INHIBITS')
 bind_count = sum(1 for e in edges if e['type'] == 'BINDS')
 struct_count = sum(1 for e in edges if e['type'] == 'HAS_STRUCTURE')
 
+query_title = QUERY_NAME.replace('_', ' ').title()
 ax.set_title(
-    f'Ammonia Monooxygenase — Knowledge Graph\n'
+    f'{query_title} — Knowledge Graph\n'
     f'{len(nodes)} entities · {len(edges)} relations '
     f'({inhib_count} INHIBITS · {bind_count} BINDS · {struct_count} Structures)',
     fontsize=18, fontweight='bold', pad=20, color='#222'
@@ -200,7 +219,7 @@ ax.axis('off')
 plt.tight_layout()
 
 # ── Save ────────────────────────────────────────────────────────
-outpath = os.path.join(EXPORT_DIR, 'ammonia_monooxygenase_graph.png')
+outpath = os.path.join(EXPORT_DIR, f'{QUERY_NAME}_graph.png')
 plt.savefig(outpath, dpi=200, bbox_inches='tight', facecolor=fig.get_facecolor())
 print(f"\n✅ Graph saved to: {outpath}")
 print(f"   File size: {os.path.getsize(outpath) / 1024:.1f} KB")
