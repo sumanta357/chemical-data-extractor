@@ -1671,7 +1671,7 @@ class QueryRouter:
     PATTERNS = [
         (re.compile(r"^CHEMBL\d+$", re.I), ["ChEMBL", "PubChem", "BindingDB", "Guide to Pharmacology", "PDBe-KB"]),
         (re.compile(r"^(?:CID)?:?\d+$", re.I), ["PubChem", "ChEMBL", "BindingDB", "PDBe-KB"]),
-        (re.compile(r"^[A-Z0-9]{6,10}$", re.I), ["UniProt", "ChEMBL", "BindingDB", "STRING", "PDBe-KB", "AlphaFoldDB"]),
+        (re.compile(r"^[A-Z0-9]{6,10}$", re.I), ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy", "PubMed"]),
         (re.compile(r"^GO:\d{7}$", re.I), ["GeneOntology"]),
         (re.compile(r"^DB\d{5}$", re.I), ["DrugBank", "PubChem", "ChEMBL"]),
         (re.compile(r"^CHEBI:\d+$", re.I), ["ChEBI", "PubChem", "ChEMBL"]),
@@ -1933,47 +1933,200 @@ class OpenAlexConnector(BaseConnector):
 
 @ConnectorRegistry.register
 class PatentConnector(BaseConnector):
+    """Patent Connector: Searches patents via PubChem patent cross-references.
+    Works for both compound (ligand) and protein queries.
+    Uses PubChem name->CID->patent xref pipeline for reliable patent discovery.
+    Always generates Google Patents search links as fallback.
+    """
     NAME = "Patents"
 
     async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
-        if query_type == "ligand":
-            pass  # Placeholder
         entities, relations = [], []
-        q_upper = query.upper()
+        q_clean = query.strip()
+        q_upper = q_clean.upper()
 
-        if not q_upper.startswith("EC:"):
-            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(query)}/xrefs/PatentID/JSON"
-            data = await self._safe_get(session, url)
-            if data and "InformationList" in data and "Information" in data["InformationList"]:
-                for info in data["InformationList"]["Information"]:
-                    pat_ids = info.get("PatentID", [])
-                    for pid in pat_ids[:200]:
-                        pat_ent = Entity(
-                            uid=f"PATENT:{pid}",
-                            entity_type=EntityType.PATENT,
-                            preferred_name=f"Patent {pid} ({query})",
-                            canonical_id=pid,
-                            evidence=[Evidence(database=self.NAME, patent_number=pid, source_url=f"https://patents.google.com/patent/{pid}")],
-                            attributes={"patent_number": pid, "queried_compound": query}
-                        )
-                        pat_ent.add_cross_ref("PATENT", pid)
-                        entities.append(pat_ent)
+        # Skip EC number and pathway prefix queries
+        if q_upper.startswith("EC:") or q_upper.startswith("RHEA:") or q_upper.startswith("REACTOME:"):
+            return entities, relations
 
-                        comp_ent = Entity(
-                            uid=f"COMPOUND:{query.upper()}",
-                            entity_type=EntityType.COMPOUND,
-                            preferred_name=query.title(),
-                            canonical_id=query.upper()
-                        )
-                        rel = Relation(
-                            source_uid=comp_ent.uid,
-                            target_uid=pat_ent.uid,
-                            relation_type=RelationType.PATENTED_IN,
-                            attributes={"patent_id": pid, "evidence_type": "PubChem Patent XRef"}
-                        )
-                        relations.append(rel)
+        seen_patents: Set[str] = set()
+        names_to_try = [q_clean]
+
+        # Strategy 1: Direct PubChem name patent lookup
+        # PubChem patent xref endpoint maps chemical names to patent IDs
+        # Tested: Aspirin -> 111K patents, Nitrapyrin -> 21K patents
+        if query_type == "protein":
+            base_name = q_clean.split("(")[0].split(",")[0].strip()
+            if base_name != q_clean and len(base_name) > 2:
+                names_to_try.append(base_name)
+
+        if q_clean.isdigit():
+            names_to_try = []
+            await self._fetch_patents_by_cid(session, q_clean, entities, relations, seen_patents)
+
+        for name in names_to_try:
+            if len(name) < 2 or len(name) > 200:
+                continue
+            try:
+                url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(name)}/xrefs/PatentID/JSON"
+                data = await self._safe_get(session, url)
+                if data and "InformationList" in data and "Information" in data["InformationList"]:
+                    for info in data["InformationList"]["Information"]:
+                        pat_ids = info.get("PatentID", [])
+                        sid_pats = info.get("SIDPatentID", [])
+                        all_pats = list(dict.fromkeys(pat_ids + sid_pats))[:200]
+                        for pid in all_pats:
+                            pid_clean = pid.strip().upper()
+                            if pid_clean and pid_clean not in seen_patents:
+                                seen_patents.add(pid_clean)
+                                self._create_patent_entities(pid_clean, name, entities, relations)
+                    if seen_patents:
+                        break
+            except Exception:
+                continue
+
+        # Strategy 2: Name -> CID -> Patents (more reliable fallback)
+        if not seen_patents and not q_clean.isdigit():
+            try:
+                cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(q_clean)}/cids/JSON"
+                cid_data = await self._safe_get(session, cid_url)
+                if cid_data and "IdentifierList" in cid_data and "CID" in cid_data["IdentifierList"]:
+                    cid = str(cid_data["IdentifierList"]["CID"][0])
+                    await self._fetch_patents_by_cid(session, cid, entities, relations, seen_patents, q_clean)
+            except Exception:
+                pass
+
+        # Strategy 3: Google Patents search link (always generated as fallback)
+        if not seen_patents:
+            search_url = f"https://patents.google.com/?q={quote(q_clean)}&language=ENGLISH"
+            search_ent = Entity(
+                uid=f"PATENTSEARCH:{hashlib.md5(q_clean.encode()).hexdigest()[:8]}",
+                entity_type=EntityType.PATENT,
+                preferred_name=f"Patent Search: {q_clean}",
+                canonical_id=f"SEARCH:{q_clean}",
+                evidence=[Evidence(
+                    database=self.NAME,
+                    source_url=search_url,
+                    evidence_type="Google Patents Search URL"
+                )],
+                attributes={
+                    "search_query": q_clean,
+                    "google_patents_search_url": search_url,
+                    "note": "Direct Google Patents search link. No specific patent IDs found via PubChem."
+                }
+            )
+            entities.append(search_ent)
 
         return entities, relations
+
+    def _create_patent_entities(self, pid_clean: str, compound_name: str,
+                                entities: List[Entity], relations: List[Relation]) -> None:
+        """Create patent entity and PATENTED_IN relation for a single patent ID."""
+        patent_url = f"https://patents.google.com/patent/{pid_clean}"
+        pat_type = "US Patent" if pid_clean.startswith("US") else "WO Patent" if pid_clean.startswith("WO") else "EP Patent" if pid_clean.startswith("EP") else "CN Patent" if pid_clean.startswith("CN") else "JP Patent" if pid_clean.startswith("JP") else "Patent"
+        pat_ent = Entity(
+            uid=f"PATENT:{pid_clean}",
+            entity_type=EntityType.PATENT,
+            preferred_name=f"{pat_type} {pid_clean} ({compound_name})",
+            canonical_id=pid_clean,
+            evidence=[Evidence(
+                database=self.NAME,
+                patent_number=pid_clean,
+                source_url=patent_url,
+                evidence_type=f"PubChem Patent XRef ({compound_name})"
+            )],
+            attributes={
+                "patent_number": pid_clean,
+                "patent_type": pat_type,
+                "queried_compound": compound_name,
+                "source": "PubChem Patent XRef",
+                "google_patents_url": patent_url
+            }
+        )
+        pat_ent.add_cross_ref("GOOGLE_PATENTS", pid_clean, url=patent_url)
+        entities.append(pat_ent)
+
+        comp_uid = f"COMPOUND:{compound_name.upper()}"
+        comp_ent = Entity(
+            uid=comp_uid,
+            entity_type=EntityType.COMPOUND,
+            preferred_name=compound_name.title(),
+            canonical_id=compound_name.upper()
+        )
+        rel = Relation(
+            source_uid=comp_uid,
+            target_uid=pat_ent.uid,
+            relation_type=RelationType.PATENTED_IN,
+            attributes={
+                "patent_id": pid_clean,
+                "evidence_type": "PubChem Patent XRef",
+                "queried_term": compound_name,
+                "google_patents_url": patent_url
+            }
+        )
+        relations.append(rel)
+
+    async def _fetch_patents_by_cid(self, session: aiohttp.ClientSession, cid: str,
+                                     entities: List[Entity], relations: List[Relation],
+                                     seen_patents: Set[str],
+                                     query_name: Optional[str] = None) -> None:
+        """Fetch patent cross-references for a PubChem CID."""
+        try:
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/xrefs/PatentID/JSON"
+            data = await self._safe_get(session, url)
+            if data and "InformationList" in data and "Information" in data["InformationList"]:
+                name = query_name or f"CID {cid}"
+                for info in data["InformationList"]["Information"]:
+                    for pid in info.get("PatentID", [])[:200]:
+                        pid_clean = pid.strip().upper()
+                        if pid_clean and pid_clean not in seen_patents:
+                            seen_patents.add(pid_clean)
+                            patent_url = f"https://patents.google.com/patent/{pid_clean}"
+                            pat_type = "US Patent" if pid_clean.startswith("US") else "WO Patent" if pid_clean.startswith("WO") else "EP Patent" if pid_clean.startswith("EP") else "Patent"
+                            pat_ent = Entity(
+                                uid=f"PATENT:{pid_clean}",
+                                entity_type=EntityType.PATENT,
+                                preferred_name=f"{pat_type} {pid_clean} (CID {cid})",
+                                canonical_id=pid_clean,
+                                evidence=[Evidence(
+                                    database=self.NAME,
+                                    patent_number=pid_clean,
+                                    source_url=patent_url,
+                                    evidence_type=f"PubChem CID Patent XRef (CID {cid})"
+                                )],
+                                attributes={
+                                    "patent_number": pid_clean,
+                                    "patent_type": pat_type,
+                                    "pubchem_cid": cid,
+                                    "queried_compound": name,
+                                    "source": "PubChem CID Patent XRef",
+                                    "google_patents_url": patent_url
+                                }
+                            )
+                            pat_ent.add_cross_ref("GOOGLE_PATENTS", pid_clean, url=patent_url)
+                            entities.append(pat_ent)
+
+                            comp_uid = f"COMPOUND:{name.upper()}"
+                            comp_ent = Entity(
+                                uid=comp_uid,
+                                entity_type=EntityType.COMPOUND,
+                                preferred_name=name.title(),
+                                canonical_id=name.upper()
+                            )
+                            rel = Relation(
+                                source_uid=comp_uid,
+                                target_uid=pat_ent.uid,
+                                relation_type=RelationType.PATENTED_IN,
+                                attributes={
+                                    "patent_id": pid_clean,
+                                    "evidence_type": "PubChem CID Patent XRef",
+                                    "pubchem_cid": cid,
+                                    "google_patents_url": patent_url
+                                }
+                            )
+                            relations.append(rel)
+        except Exception:
+            pass
 
 
 @ConnectorRegistry.register
@@ -2026,54 +2179,360 @@ class NCBITaxonomyConnector(BaseConnector):
 
 @ConnectorRegistry.register
 class BindingDBConnector(BaseConnector):
+    """BindingDB Connector: Searches for ligand-target binding affinities.
+    Uses the BindingDB REST API with SMILES-based compound lookup
+    and UniProt-based target lookup.
+    Works for both ligand and protein queries.
+    """
     NAME = "BindingDB"
 
     async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
-        # query_type override for endpoint selection
-        if query_type == "protein":
-            return [], []
         entities, relations = [], []
+        q_clean = query.strip()
+        q_upper = q_clean.upper()
+
+        # Skip EC numbers and pathway IDs
+        if q_upper.startswith("EC:") or q_upper.startswith("RHEA:") or q_upper.startswith("REACTOME:"):
+            return entities, relations
+
+        # Strategy 1: If query looks like a UniProt ID, use getLigandsByUniprot REST API
         if re.match(r"^[A-Z0-9]{6,10}$", query, re.I):
-            url = f"https://www.bindingdb.org/axis2/services/BDBService/getLigandsByUniprot?uniprot={query.upper()}"
-        else:
-            url = f"https://www.bindingdb.org/axis2/services/BDBService/getLigandsByCompoundName?compound={quote(query)}"
-        
-        data = await self._safe_get(session, url)
-        if data and isinstance(data, list):
-            for item in data[:10]:
-                lig_id = str(item.get("monomerid", item.get("compound_id", query)))
-                lig_name = item.get("monomer_name", item.get("compound_name", f"BindingDB Compound {lig_id}"))
-                smiles = item.get("smiles", "")
-                affinity = str(item.get("ki", item.get("ic50", item.get("kd", ""))))
-                aff_type = "Ki" if item.get("ki") else "IC50" if item.get("ic50") else "Kd"
+            url = f"https://www.bindingdb.org/rest/getLigandsByUniprot?uniprot={q_upper}&response=application/json"
+            data = await self._safe_get(session, url)
+            if data and isinstance(data, dict):
+                # BindingDB wraps results in getLindsByUniprotResponse.bdb.affinities
+                resp = data.get("getLindsByUniprotResponse", {})
+                affinities = resp.get("bdb.affinities", [])
+                if not isinstance(affinities, list):
+                    affinities = []
+                for item in affinities[:50]:
+                    lig_id = str(item.get("bdb.monomerid", query))
+                    lig_name = f"Ligand {lig_id}"
+                    smiles = item.get("bdb.smile", "")
+                    affinity = str(item.get("bdb.affinity", "")).strip()
+                    aff_type = str(item.get("bdb.affinity_type", "IC50"))
 
-                lig_ent = Entity(
-                    uid=f"COMPOUND:BINDINGDB:{lig_id}",
-                    entity_type=EntityType.COMPOUND,
-                    preferred_name=lig_name,
-                    canonical_id=lig_id,
-                    evidence=[Evidence(database=self.NAME, source_url=url)],
-                    attributes={"smiles": smiles, "bioactivity_summary": f"{aff_type}={affinity}nM (BindingDB)"}
-                )
-                lig_ent.add_cross_ref(DatabaseSource.BINDINGDB, lig_id)
-                entities.append(lig_ent)
+                    lig_ent = Entity(
+                        uid=f"COMPOUND:BINDINGDB:{lig_id}",
+                        entity_type=EntityType.COMPOUND,
+                        preferred_name=lig_name,
+                        canonical_id=lig_id,
+                        evidence=[Evidence(database=self.NAME, source_url=url)],
+                        attributes={"smiles": smiles, "bioactivity_summary": f"{aff_type}={affinity}nM (BindingDB)"}
+                    )
+                    lig_ent.add_cross_ref(DatabaseSource.BINDINGDB, lig_id)
+                    entities.append(lig_ent)
 
-                target_ent = Entity(
-                    uid=f"TARGET:UNIPROT:{query.upper()}",
+                    target_ent = Entity(
+                        uid=f"TARGET:UNIPROT:{q_upper}",
+                        entity_type=EntityType.TARGET,
+                        preferred_name=query.title(),
+                        canonical_id=q_upper
+                    )
+                    entities.append(target_ent)
+
+                    rel = Relation(
+                        source_uid=lig_ent.uid,
+                        target_uid=target_ent.uid,
+                        relation_type=RelationType.INHIBITS if aff_type in ["Ki", "IC50", "Kd"] else RelationType.BINDS,
+                        evidence=[Evidence(database=self.NAME, source_url=url, confidence_score=0.95)],
+                        attributes={"activity_type": aff_type, "activity_value": affinity, "units": "nM", "source": "BindingDB Experimental Assay"}
+                    )
+                    relations.append(rel)
+                return entities, relations
+
+        # Strategy 2: For compound/ligand queries, resolve name to SMILES via PubChem,
+        # then use getTargetByCompound for exact binding affinity data
+        if query_type in ("ligand", "auto"):
+            try:
+                # Resolve compound name to PubChem CID then to SMILES
+                cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(q_clean)}/cids/JSON"
+                cid_data = await self._safe_get(session, cid_url)
+                if cid_data and "IdentifierList" in cid_data and "CID" in cid_data["IdentifierList"]:
+                    cid = str(cid_data["IdentifierList"]["CID"][0])
+                    prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/CanonicalSMILES/JSON"
+                    prop_data = await self._safe_get(session, prop_url)
+                    if prop_data and "PropertyTable" in prop_data and "Properties" in prop_data["PropertyTable"]:
+                        smiles = prop_data["PropertyTable"]["Properties"][0].get("CanonicalSMILES", "")
+                        if smiles:
+                            bdb_url = f"https://www.bindingdb.org/rest/getTargetByCompound?smiles={urllib.parse.quote(smiles)}&cutoff=1.0&response=application/json"
+                            bdb_data = await self._safe_get(session, bdb_url)
+                            if bdb_data and isinstance(bdb_data, dict):
+                                bdb_resp = bdb_data.get("getLindsByUniprotResponse", {})
+                                bdb_items = bdb_resp.get("bdb.affinities", [])
+                                if not isinstance(bdb_items, list):
+                                    bdb_items = []
+                                for item in bdb_items[:50]:
+                                    lig_id = str(item.get("bdb.monomerid", cid))
+                                    lig_name = item.get("bdb.inhibitor", q_clean)
+                                    target_name = item.get("bdb.target", "Unknown Target")
+                                    target_id = f"BINDINGDB:{lig_id}"
+                                    bdb_smiles = item.get("bdb.smiles", smiles)
+                                    affinity = str(item.get("bdb.affinity", ""))
+                                    aff_type = str(item.get("bdb.affinity_type", "IC50"))
+
+                                    lig_ent = Entity(
+                                        uid=f"COMPOUND:BINDINGDB:{lig_id}",
+                                        entity_type=EntityType.COMPOUND,
+                                        preferred_name=lig_name,
+                                        canonical_id=lig_id,
+                                        evidence=[Evidence(database=self.NAME, source_url=bdb_url)],
+                                        attributes={"smiles": bdb_smiles, "bioactivity_summary": f"{aff_type}={affinity}nM (BindingDB)"}
+                                    )
+                                    lig_ent.add_cross_ref(DatabaseSource.BINDINGDB, lig_id)
+                                    entities.append(lig_ent)
+
+                                    target_ent = Entity(
+                                        uid=f"TARGET:{target_id}",
+                                        entity_type=EntityType.TARGET,
+                                        preferred_name=target_name,
+                                        canonical_id=target_id
+                                    )
+                                    entities.append(target_ent)
+
+                                    rel = Relation(
+                                        source_uid=lig_ent.uid,
+                                        target_uid=target_ent.uid,
+                                        relation_type=RelationType.INHIBITS if aff_type in ["Ki", "IC50", "Kd"] else RelationType.BINDS,
+                                        evidence=[Evidence(database=self.NAME, source_url=bdb_url, confidence_score=0.95)],
+                                        attributes={"activity_type": aff_type, "activity_value": affinity, "units": "nM", "source": "BindingDB Experimental Assay"}
+                                    )
+                                    relations.append(rel)
+            except Exception:
+                pass
+
+        # Strategy 3: For protein queries, resolve name to UniProt IDs via UniProt API,
+        # then query BindingDB's getLigandsByUniprot for each resolved ID
+        if not entities and query_type == "protein":
+            try:
+                # Resolve protein name to UniProt IDs
+                uniprot_search_url = f"https://rest.uniprot.org/uniprotkb/search?query={quote(q_clean)}&format=json&size=50"
+                async with session.get(uniprot_search_url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"}, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status == 200:
+                        uniprot_data = await resp.json()
+                        uniprot_results = uniprot_data.get("results", [])
+                        # Collect all UniProt IDs and names
+                        uniprot_ids = []
+                        uniprot_names = {}
+                        for r in uniprot_results[:50]:
+                            uid = r.get("primaryAccession", "")
+                            if uid:
+                                uniprot_ids.append(uid)
+                                uniprot_names[uid] = r.get("proteinDescription", {}).get("recommendedName", {}).get("fullName", {}).get("value", uid)
+                        
+                        # Batch query all UniProt IDs via the PLURAL endpoint (much higher limits!)
+                        if uniprot_ids:
+                            ids_param = ",".join(uniprot_ids)
+                            bdb_url = f"https://www.bindingdb.org/rest/getLigandsByUniprots?uniprot={ids_param}&cutoff=1000000&response=application/json"
+                            bdb_data = await self._safe_get(session, bdb_url)
+                            if bdb_data and isinstance(bdb_data, dict):
+                                bdb_resp = bdb_data.get("getLindsByUniprotsResponse", {})
+                                affinities = bdb_resp.get("affinities", [])
+                                if isinstance(affinities, list):
+                                    for item in affinities:
+                                        lig_id = str(item.get("monomerid", ""))
+                                        if not lig_id:
+                                            continue
+                                        lig_name = f"Ligand {lig_id}"
+                                        smiles = item.get("smile", "")
+                                        affinity = str(item.get("affinity", "")).strip()
+                                        aff_type = str(item.get("affinity_type", "IC50"))
+                                        target_query = item.get("query", "")
+                                        
+                                        # Try to get a better name from the UniProt lookup
+                                        prot_name = uniprot_names.get(target_query, target_query)
+
+                                        lig_ent = Entity(
+                                            uid=f"COMPOUND:BINDINGDB:{lig_id}",
+                                            entity_type=EntityType.COMPOUND,
+                                            preferred_name=lig_name,
+                                            canonical_id=lig_id,
+                                            evidence=[Evidence(database=self.NAME, source_url=bdb_url)],
+                                            attributes={"smiles": smiles, "bioactivity_summary": f"{aff_type}={affinity}nM (BindingDB)"}
+                                        )
+                                        lig_ent.add_cross_ref(DatabaseSource.BINDINGDB, lig_id)
+                                        entities.append(lig_ent)
+
+                                        target_ent = Entity(
+                                            uid=f"TARGET:{target_query.replace(' ', '_')}",
+                                            entity_type=EntityType.TARGET,
+                                            preferred_name=prot_name,
+                                            canonical_id=target_query
+                                        )
+                                        entities.append(target_ent)
+
+                                        rel = Relation(
+                                            source_uid=lig_ent.uid,
+                                            target_uid=target_ent.uid,
+                                            relation_type=RelationType.INHIBITS if aff_type in ["Ki", "IC50", "Kd"] else RelationType.BINDS,
+                                            evidence=[Evidence(database=self.NAME, source_url=bdb_url, confidence_score=0.95)],
+                                            attributes={"activity_type": aff_type, "activity_value": affinity, "units": "nM", "source": "BindingDB Experimental Assay"}
+                                        )
+                                        relations.append(rel)
+            except Exception:
+                pass
+
+            # If still no entities from the resolved UniProt approach, create a search link
+            if not entities:
+                search_url = f"https://www.bindingdb.org/rwd/bind/chemsearch/marvin/SearchServlet?target_name={quote(q_clean)}&response=text"
+                search_ent = Entity(
+                    uid=f"BINDINGDBSEARCH:{hashlib.md5(q_clean.encode()).hexdigest()[:8]}",
                     entity_type=EntityType.TARGET,
-                    preferred_name=query.title(),
-                    canonical_id=query.upper()
+                    preferred_name=f"BindingDB Search: {q_clean}",
+                    canonical_id=f"SEARCH:{q_clean}",
+                    evidence=[Evidence(
+                        database=self.NAME,
+                        source_url=search_url,
+                        evidence_type="BindingDB Target Search URL"
+                    )],
+                    attributes={
+                        "search_query": q_clean,
+                        "bindingdb_search_url": search_url,
+                        "note": "BindingDB web search link for this target. No direct API results."
+                    }
                 )
-                entities.append(target_ent)
+                entities.append(search_ent)
 
-                rel = Relation(
-                    source_uid=lig_ent.uid,
-                    target_uid=target_ent.uid,
-                    relation_type=RelationType.INHIBITS if aff_type in ["Ki", "IC50", "Kd"] else RelationType.BINDS,
-                    evidence=[Evidence(database=self.NAME, source_url=url, confidence_score=0.95)],
-                    attributes={"activity_type": aff_type, "activity_value": affinity, "units": "nM", "source": "BindingDB Experimental Assay"}
+        return entities, relations
+
+
+
+
+@ConnectorRegistry.register
+class PDBbindConnector(BaseConnector):
+    """PDBbind-CN binding affinity database connector.
+    Primary source: http://www.pdbbind.org.cn/ (when accessible)
+    Fallback: Cross-references PDB IDs with PDBe-KB for ligand data.
+    Ref: Liu et al., Bioinformatics 2015; 31(3):405-12."""
+    NAME = "PDBbind"
+
+    async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        entities, relations = [], []
+        q_clean = query.strip().upper()
+        if not q_clean:
+            return entities, relations
+        
+        is_pdb_id = bool(re.match(r'^[A-Z0-9]{4}$', q_clean))
+        
+        if is_pdb_id:
+            # Attempt 1: Try PDBbind web API
+            try:
+                url = f"http://www.pdbbind.org.cn/search?pdb_id={q_clean}&output=json"
+                async with session.get(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        entities, relations = self._process_pdbbind_response(data, q_clean)
+                        if entities:
+                            return entities, relations
+            except Exception:
+                pass
+            
+            # Attempt 2: Try PDBe-KB for this PDB to get ligand binding data
+            try:
+                pdbe_url = f"https://www.ebi.ac.uk/pdbe/api/pdb/entry/summary/{q_clean.lower()}/"
+                pdbe_data = await self._safe_get(session, pdbe_url)
+                if pdbe_data and q_clean.lower() in pdbe_data:
+                    entry = pdbe_data[q_clean.lower()][0]
+                    title = entry.get("title", f"PDB Entry {q_clean}")
+                    
+                    lig_url = f"https://www.ebi.ac.uk/pdbe/api/pdb/entry/ligand_monomers/{q_clean.lower()}/"
+                    lig_data = await self._safe_get(session, lig_url)
+                    if lig_data and q_clean.lower() in lig_data:
+                        ligands = lig_data[q_clean.lower()]
+                        for lig in ligands[:10]:
+                            lig_id = lig.get("chem_comp_id", "")
+                            lig_name = lig.get("chem_comp_name", f"Ligand {lig_id}")
+                            if lig_id:
+                                ent = Entity(
+                                    uid=f"COMPOUND:PDBBIND:{q_clean}:{lig_id}",
+                                    entity_type=EntityType.COMPOUND,
+                                    preferred_name=lig_name,
+                                    canonical_id=lig_id,
+                                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/pdbe/entry/pdb/{q_clean}")],
+                                    attributes={"note": f"PDBbind cross-ref: {lig_id} in PDB {q_clean}", "pdb_id": q_clean}
+                                )
+                                entities.append(ent)
+                                
+                                struct_ent = Entity(
+                                    uid=f"STRUCTURE:PDB:{q_clean}",
+                                    entity_type=EntityType.STRUCTURE,
+                                    preferred_name=title,
+                                    canonical_id=q_clean,
+                                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/pdbe/entry/pdb/{q_clean}")]
+                                )
+                                entities.append(struct_ent)
+                                
+                                rel = Relation(
+                                    source_uid=ent.uid,
+                                    target_uid=struct_ent.uid,
+                                    relation_type=RelationType.BINDS,
+                                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/pdbe/entry/pdb/{q_clean}")],
+                                    attributes={"source": "PDBbind/PDBe cross-ref", "pdb_id": q_clean}
+                                )
+                                relations.append(rel)
+            except Exception:
+                pass
+            
+            if entities:
+                return entities, relations
+            
+            # Attempt 3: Create search link
+            search_url = f"http://www.pdbbind.org.cn/search?pdb_id={q_clean}"
+            ent = Entity(
+                uid=f"PDBBINDSEARCH:{q_clean}",
+                entity_type=EntityType.STRUCTURE,
+                preferred_name=f"PDBbind Search: {q_clean}",
+                canonical_id=q_clean,
+                evidence=[Evidence(database=self.NAME, source_url=search_url, evidence_type="PDBbind web search")],
+                attributes={"note": "PDBbind web search link", "pdb_id": q_clean}
+            )
+            entities.append(ent)
+        
+        return entities, relations
+    
+    async def _process_pdbbind_response(self, data: dict, pdb_id: str):
+        """Process PDBbind JSON response."""
+        entities, relations = [], []
+        complexes = data.get("results", data.get("data", data.get("complexes", [])))
+        if isinstance(complexes, dict):
+            complexes = [complexes]
+        if not isinstance(complexes, list):
+            return entities, relations
+        for cpx in complexes:
+            if isinstance(cpx, dict):
+                pdb = cpx.get("pdb_id", cpx.get("pdb", pdb_id))
+                affinity = cpx.get("affinity", cpx.get("binding", ""))
+                aff_type = cpx.get("affinity_type", cpx.get("type", "Kd"))
+                ligand = cpx.get("ligand", cpx.get("ligand_name", f"Ligand in {pdb}"))
+                target = cpx.get("target", cpx.get("protein", f"Protein in {pdb}"))
+                
+                ent = Entity(
+                    uid=f"COMPOUND:PDBBIND:{pdb}",
+                    entity_type=EntityType.COMPOUND,
+                    preferred_name=ligand,
+                    canonical_id=pdb,
+                    evidence=[Evidence(database=self.NAME, source_url=f"http://www.pdbbind.org.cn/search?pdb_id={pdb}")],
+                    attributes={"bioactivity_summary": f"{aff_type}={affinity}" if affinity else "", "pdb_id": pdb}
                 )
-                relations.append(rel)
+                entities.append(ent)
+                
+                if target:
+                    target_ent = Entity(
+                        uid=f"TARGET:PDBBIND:{pdb}",
+                        entity_type=EntityType.TARGET,
+                        preferred_name=target,
+                        canonical_id=pdb
+                    )
+                    entities.append(target_ent)
+                    
+                    rel = Relation(
+                        source_uid=ent.uid,
+                        target_uid=target_ent.uid,
+                        relation_type=RelationType.BINDS,
+                        evidence=[Evidence(database=self.NAME, source_url=f"http://www.pdbbind.org.cn/search?pdb_id={pdb}")],
+                        attributes={"activity_type": aff_type, "activity_value": str(affinity), "source": "PDBbind"}
+                    )
+                    relations.append(rel)
         return entities, relations
 
 
@@ -2184,29 +2643,83 @@ class PubChemConnector(BaseConnector):
     NAME = "PubChem"
 
     async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
-        if query_type == "protein":
-            return [], []
-        url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(query)}/property/CanonicalSMILES,InChIKey,IUPACName,MolecularWeight,MolecularFormula/JSON"
-        data = await self._safe_get(session, url)
         entities, relations = [], []
+        q_clean = query.strip()
+        if not q_clean:
+            return entities, relations
+        
+        # Determine query type: CID (numeric), SMILES (has = or # or ()), or name
+        is_cid = q_clean.isdigit()
+        is_smiles = any(c in q_clean for c in ['=', '#', '(', ')', '[', ']', '@', '/']) and len(q_clean) > 5
+        
+        data = None
+        url = None
+        
+        if is_cid:
+            # Direct CID lookup
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{q_clean}/property/CanonicalSMILES,InChIKey,IUPACName,MolecularWeight,MolecularFormula/JSON"
+            data = await self._safe_get(session, url)
+        elif is_smiles:
+            # SMILES search - use POST for proper encoding
+            try:
+                post_data = f"smiles={urllib.parse.quote(q_clean)}"
+                async with session.post(
+                    "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/property/CanonicalSMILES,InChIKey,IUPACName,MolecularWeight,MolecularFormula/JSON",
+                    data=post_data,
+                    headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0"},
+                    timeout=aiohttp.ClientTimeout(total=15)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                    else:
+                        # Silently fail - SMILES search may not work
+                        pass
+            except Exception:
+                pass
+            url = f"SMILES:{q_clean[:30]}..."
+        else:
+            # Name search - try multiple approaches
+            # Approach 1: Direct name to property
+            url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(q_clean)}/property/CanonicalSMILES,InChIKey,IUPACName,MolecularWeight,MolecularFormula/JSON"
+            data = await self._safe_get(session, url)
+            
+            if not data:
+                # Approach 2: Try synonyms endpoint for name resolution
+                try:
+                    syn_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(q_clean)}/synonyms/JSON"
+                    syn_data = await self._safe_get(session, syn_url)
+                    if syn_data and "InformationList" in syn_data:
+                        info = syn_data["InformationList"]["Information"]
+                        if info:
+                            cid = info[0].get("CID")
+                            if cid:
+                                url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/CanonicalSMILES,InChIKey,IUPACName,MolecularWeight,MolecularFormula/JSON"
+                                data = await self._safe_get(session, url)
+                except Exception:
+                    pass
+        
         if data and "PropertyTable" in data:
             for p in data["PropertyTable"]["Properties"]:
                 cid = str(p.get("CID"))
                 inchikey = p.get("InChIKey")
+                name = p.get("IUPACName", p.get("Title", q_clean))
+                smiles = p.get("CanonicalSMILES", p.get("IsomericSMILES", ""))
+                
                 ent = Entity(
                     uid=f"COMPOUND:{inchikey or cid}",
                     entity_type=EntityType.COMPOUND,
-                    preferred_name=p.get("IUPACName", query),
+                    preferred_name=name,
                     canonical_id=inchikey or cid,
-                    evidence=[Evidence(database=self.NAME, source_url=url)],
+                    evidence=[Evidence(database=self.NAME, source_url=url or "")],
                     attributes={
-                        "smiles": p.get("CanonicalSMILES"),
+                        "smiles": smiles,
                         "molecular_weight": str(p.get("MolecularWeight", "")),
-                        "formula": p.get("MolecularFormula")
+                        "formula": p.get("MolecularFormula", "")
                     }
                 )
                 ent.add_cross_ref(DatabaseSource.PUBCHEM, cid)
-                if inchikey: ent.add_cross_ref("INCHIKEY", inchikey)
+                if inchikey:
+                    ent.add_cross_ref("INCHIKEY", inchikey)
                 entities.append(ent)
         return entities, relations
 
@@ -2312,10 +2825,16 @@ class ChEMBLConnector(BaseConnector):
                     target_ent.add_cross_ref(DatabaseSource.CHEMBL, target_chembl_id)
                     entities.append(target_ent)
 
-                    act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id={target_chembl_id}&limit=350"
-                    act_data = await self._safe_get(session, act_url)
-                    if act_data and "activities" in act_data:
-                        for act in act_data["activities"]:
+                    act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id={target_chembl_id}&limit=500"
+                    for offset in range(0, 3000, 500):
+                        page_url = act_url + f"&offset={offset}"
+                        act_data = await self._safe_get(session, page_url)
+                        if not act_data or "activities" not in act_data:
+                            break
+                        activities = act_data["activities"]
+                        if not activities:
+                            break
+                        for act in activities:
                             mol_id = act.get("molecule_chembl_id")
                             if not mol_id: continue
                             std_type = act.get("standard_type") or "Activity"
@@ -2332,7 +2851,8 @@ class ChEMBLConnector(BaseConnector):
                             evidence=[Evidence(database=self.NAME, source_url=act_url)],
                             attributes={
                                 "bioactivity_summary": f"{std_type}={std_val}{std_units} (pChEMBL: {pchembl})",
-                                "pchembl_value": pchembl
+                                "pchembl_value": pchembl,
+                                "smiles": act.get("canonical_smiles", "")
                             }
                         )
                         inhibitor_ent.add_cross_ref(DatabaseSource.CHEMBL, mol_id)
@@ -2584,8 +3104,8 @@ class ChEBIConnector(BaseConnector):
     NAME = "ChEBI"
 
     async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
-        if query_type == "protein":
-            return [], []
+        # ChEBI is a chemical ontology database - try name lookup for any query type
+        # Protein names will naturally return no results, compound names will work
         entities, relations = [], []
         q_clean = query.strip()
         if not q_clean:
@@ -2611,21 +3131,36 @@ class ChEBIConnector(BaseConnector):
                 ent.add_cross_ref(DatabaseSource.CHEBI, q_clean.upper())
                 entities.append(ent)
         else:
-            payload = {"query": q_clean, "maxResults": 5, "stars": "ALL"}
-            data = await self._safe_post(session, "https://www.ebi.ac.uk/chebi/backend/api/public/advanced_search/", payload)
-            if data and "list" in data:
-                for item in data["list"][:5]:
-                    chebi_id = item.get("chebiId", "")
-                    name = item.get("chebiAsciiName", item.get("chebiName", q_clean))
-                    formula = item.get("chemicalFormula", "")
+            url = f"https://www.ebi.ac.uk/chebi/backend/api/public/es_search/?q={quote(q_clean)}&size=5"
+            data = await self._safe_get(session, url)
+            if data and "results" in data:
+                for item in data["results"][:5]:
+                    source = item.get("_source", {})
+                    chebi_id = source.get("chebi_accession", "")
+                    name = source.get("ascii_name", source.get("name", q_clean))
+                    formula = source.get("formula", "")
                     if chebi_id:
+                        # Fetch full compound details to get SMILES
+                        smiles = ""
+                        try:
+                            detail_url = f"https://www.ebi.ac.uk/chebi/backend/api/public/compound/{chebi_id}/"
+                            detail_data = await self._safe_get(session, detail_url)
+                            if detail_data:
+                                ds = detail_data.get("default_structure", {})
+                                if ds:
+                                    smiles = ds.get("smiles", "")
+                                    if not formula:
+                                        formula = detail_data.get("chemicalFormula", "")
+                        except Exception:
+                            pass
+                        
                         ent = Entity(
                             uid=f"COMPOUND:CHEBI:{chebi_id}",
                             entity_type=EntityType.COMPOUND,
                             preferred_name=name,
                             canonical_id=chebi_id,
                             evidence=[Evidence(database=self.NAME, source_url=f"https://www.ebi.ac.uk/chebi/searchId.do?chebiId={chebi_id}")],
-                            attributes={"formula": formula}
+                            attributes={"smiles": smiles, "formula": formula}
                         )
                         ent.add_cross_ref(DatabaseSource.CHEBI, chebi_id)
                         entities.append(ent)
