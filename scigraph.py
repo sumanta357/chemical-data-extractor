@@ -135,6 +135,71 @@ if not logger.handlers:
 
 
 # ==============================================================================
+# 2A. PROGRESS TRACKER — Live Time Estimates & Visual Progress Bar
+# ==============================================================================
+
+class ProgressTracker:
+    """Lightweight CLI progress tracker with live timing, ETA, and animated progress bar.
+
+    Provides formatted status updates at checkpoints so users can see
+    how long each step takes and estimate remaining runtime.
+    """
+
+    def __init__(self, total_steps: int = 6, label: str = "Pipeline"):
+        self.total_steps = total_steps
+        self.label = label
+        self._start_time = time.time()
+        self._step_times: Dict[str, float] = {}
+        self._current_step = 0
+
+    def tick(self, step_name: str) -> float:
+        """Mark a step as complete. Returns elapsed time for this step."""
+        now = time.time()
+        self._current_step += 1
+        elapsed = now - self._start_time
+        self._step_times[step_name] = elapsed
+        return elapsed
+
+    def step_start(self, step_num: int, total_steps: int, description: str) -> None:
+        """Print a clear step header with overall progress percentage."""
+        pct = int(step_num / total_steps * 100)
+        bar_len = 20
+        filled = int(bar_len * step_num / total_steps)
+        bar = "█" * filled + "░" * (bar_len - filled)
+        elapsed = time.time() - self._start_time
+        print(f"\n  [{bar}] {pct}%  ⏱ {elapsed:.0f}s elapsed")
+        print(f"  ── Step {step_num}/{total_steps}: {description}")
+
+    def step_done(self, summary: str = "") -> None:
+        """Mark the current step as complete with timing info."""
+        now = time.time()
+        elapsed = now - self._start_time
+        step_time = now - (list(self._step_times.values())[-1] if self._step_times else self._start_time)
+        remaining_steps = self.total_steps - self._current_step
+        avg_per_step = elapsed / max(self._current_step, 1)
+        eta = avg_per_step * remaining_steps if remaining_steps > 0 else 0
+        extra = f" | {summary}" if summary else ""
+        print(f"  ✔ Done in {step_time:.1f}s  (elapsed: {elapsed:.0f}s | ETA remaining: ~{eta:.0f}s){extra}")
+
+    def summary(self) -> str:
+        """Return final summary string."""
+        total = time.time() - self._start_time
+        hours = int(total) // 3600
+        minutes = int(total) // 60
+        seconds = int(total) % 60
+        if hours > 0:
+            return f"⏱ Total: {hours}h {minutes}m {seconds}s"
+        return f"⏱ Total: {minutes}m {seconds}s"
+
+    @staticmethod
+    def format_connector_status(name: str, status: str, elapsed: float) -> str:
+        """Format a single connector status line."""
+        icons = {"🟡": "checking", "✅": "done", "❌": "failed", "⏭": "skipped"}
+        icon = next((k for k, v in icons.items() if v == status), "🟡")
+        return f"    {icon} {name:<25s} {status:<10s} ({elapsed:.1f}s)"
+
+
+# ==============================================================================
 # 2. CONTROLLED ENUMS & VALIDATION HELPERS
 # ==============================================================================
 
@@ -3387,7 +3452,7 @@ class SearchLibraryBuilder:
 class RecursiveGraphExpander:
     """Recursively traverses multi-hop cross-references to build dense knowledge subgraphs."""
 
-    def __init__(self, connectors: List[BaseConnector], resolver: EntityResolver, max_hops: int = 4, max_entities_per_hop: int = 50, query_type: str = "auto"):
+    def __init__(self, connectors: List[BaseConnector], resolver: EntityResolver, max_hops: int = 4, max_entities_per_hop: int = 10, query_type: str = "auto"):
         self.connectors = {c.NAME: c for c in connectors}
         self.resolver = resolver
         self.max_hops = max_hops
@@ -3408,18 +3473,48 @@ class RecursiveGraphExpander:
                 current_queries = [initial_query]
                 self.original_query = initial_query
             
+            hop_start = time.time()
             for hop in range(self.max_hops):
                 if not current_queries: break
+                hop_elapsed = time.time() - hop_start
+                n_connectors = len(self.connectors)
+                n_queries = len(current_queries)
+                print(f"\n  ╔══ Hop {hop+1}/{self.max_hops} ═══════════════════════════════════════╗")
+                print(f"  ║  Queries: {n_queries}  |  Active Connectors: {n_connectors}  |  ⏱ {hop_elapsed:.0f}s elapsed  ║")
+                print(f"  ╚═════════════════════════════════════════════════════════════╝")
                 logger.info(f"[GraphExpander] Executing Hop {hop+1}/{self.max_hops} for queries: {current_queries[:5]}")
                 
                 next_queries = set()
-                for q in current_queries:
+                for qidx, q in enumerate(current_queries):
+                    q_start = time.time()
                     target_names = QueryRouter.route(q)
                     active = [self.connectors[n] for n in target_names if n in self.connectors]
-                    if not active: active = list(self.connectors.values())[:5]
+                    if not active: active = list(self.connectors.values())[:3]
+                    print(f"    Searching '{q}' via {len(active)} connectors... ", end="", flush=True)
 
-                    tasks = [c.search(session, q, qt) for c in active]
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    async def _search_with_connector_timeout(c, sess, q, qt, timeout=25):
+                        try:
+                            return await asyncio.wait_for(c.search(sess, q, qt), timeout=timeout)
+                        except asyncio.TimeoutError:
+                            return [], []
+                        except Exception:
+                            return [], []
+                    tasks = [_search_with_connector_timeout(c, session, q, qt) for c in active]
+                    try:
+                        results = await asyncio.wait_for(
+                            asyncio.gather(*tasks, return_exceptions=True), timeout=60
+                        )
+                    except asyncio.TimeoutError:
+                        logger.warning(f"[GraphExpander] Hop {hop+1} timed out globally for '{q}'")
+                        print(f"⏱ {time.time()-q_start:.1f}s ⚠️ timed out")
+                        continue
+                    
+                    q_elapsed = time.time() - q_start
+                    # Count succeeded/results
+                    n_ents = sum(len(r[0]) for r in results if isinstance(r, tuple)) if isinstance(results, list) else 0
+                    n_rels = sum(len(r[1]) for r in results if isinstance(r, tuple)) if isinstance(results, list) else 0
+                    print(f"⏱ {q_elapsed:.1f}s (found {n_ents} entities, {n_rels} relations)")
+
 
                     for res in results:
                         if isinstance(res, tuple):
@@ -3721,7 +3816,8 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
         elif "2-Hop" in h_text: max_hops = 2
         elif "1-Hop" in h_text: max_hops = 1
 
-    print(f"\n[1/6] Intelligent Routing & Multi-Hop Expansion (Hops: {max_hops})...")
+    progress = ProgressTracker(total_steps=6, label="Scientific Knowledge Graph Pipeline")
+    progress.step_start(1, 6, f"Intelligent Routing & Multi-Hop Expansion (Hops: {max_hops})")
     expander = RecursiveGraphExpander(connectors, resolver, max_hops=max_hops, query_type=query_type)
 
     # Intelligent Batch Query Expansion
@@ -3763,11 +3859,14 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
         repo.save_relations_bulk(relations)
     repo.record_search(query, len(entities), len(relations))
 
-    print(f"\n[2/6] Entity Resolution & Deduplication Complete.")
+    progress.tick("Expansion")
+    progress.step_done(f"{len(entities)} entities, {len(relations)} relations")
+    
+    progress.step_start(2, 6, "Entity Resolution & Deduplication")
     print(f"  * Unique Entities Found: {len(entities)}")
     print(f"  * Relationships Extracted: {len(relations)}")
-
-    print("\n[3/6] ENTITIES & CONNECTIONS SUMMARY:")
+    
+    print(f"\n[3/6] ENTITIES & CONNECTIONS SUMMARY:")
     print("--------------------------------------------------------------------------------")
     for idx, e in enumerate(entities[:10], 1):
         xr_str = f" | Refs: {[(str(xr.database), xr.accession) for xr in e.cross_references]}" if e.cross_references else ""
@@ -3784,19 +3883,23 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
             mech_str = f" [{r.attributes.get('mechanism_of_action', '')}]" if r.attributes.get('mechanism_of_action') else ""
             print(f"  * {src_ent} --[{r.relation_type}]--> {tgt_ent}{act_str}{mech_str}")
 
-    print("\n[4/6] Running Graph Analytics Engine...")
+    progress.step_start(4, 6, "Running Graph Analytics Engine")
     analytics = GraphAnalyticsEngine(entities, relations)
     stats = analytics.summary_statistics()
     print(f"  * Network Density  : {stats['density']:.4f}")
     print(f"  * Connected Components Count : {stats['number_connected_components']}")
+    progress.tick("Analytics")
+    progress.step_done()
 
-    print("\n[5/6] AI / NLP Knowledge Discovery Engine Insights...")
+    progress.step_start(5, 6, "AI / NLP Knowledge Discovery Engine Insights")
     trends = AIKnowledgeEngine.cluster_research_trends(entities, relations)
     repurposing = AIKnowledgeEngine.predict_drug_repurposing_and_missing_links(entities, relations)
     print(f"  * Dominant Category: {trends['dominant_entity_type']}")
     print(f"  * Potential Hypotheses Generated: {len(repurposing)}")
 
-    print("\n[6/6] Generating Multi-Format Export Files & Excel Spreadsheets...")
+    progress.step_start(6, 6, "Generating Multi-Format Export Files & Excel Spreadsheets")
+    print(f"  * Formats: Excel (.xlsx) | CSV | Cypher | GraphML | RDF JSON-LD | Turtle | Parquet")
+    export_start = time.time()
     first_term = query.split(',')[0].strip()
     clean_q_filename = re.sub(r'[^a-zA-Z0-9_\-]', '_', first_term).strip('_')
     clean_q_filename = re.sub(r'_+', '_', clean_q_filename)[:40]
@@ -3812,10 +3915,14 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
     export_to_vector_index(entities, relations, str(out_dir / "vector_index_metadata.json"), str(out_dir / "triples.json"))
 
     ValidationFramework.validate_exports(str(out_dir.absolute()), query, entities, relations)
+    export_elapsed = time.time() - export_start
+    progress.tick("Exports")
+    progress.step_done(f"{export_elapsed:.1f}s for file generation")
     print(f"\n[OK] Pipeline finished successfully! Exports saved to '{out_dir.absolute()}':")
     print(f"  * Master Excel Workbook : {excel_path}")
     print(f"  * CSV Spreadsheets      : {out_dir / 'nodes.csv'} & {out_dir / 'edges.csv'}")
     print(f"  * Search Library        : {out_dir / 'search_library.json'}")
+    print(f"  * {progress.summary()}")
     print("================================================================================\n")
 
 
@@ -3840,7 +3947,7 @@ def main():
     parser.add_argument("--batch", default=None, help="Path to batch input queries file (CSV, TXT)")
     parser.add_argument("--workspace", default="./scigraph_data", help="Data directory")
     parser.add_argument("--export-dir", default="./exports", help="Export directory")
-    parser.add_argument("--hops", type=int, default=4, help="Recursive multi-hop expansion depth (default: 4)")
+    parser.add_argument("--hops", type=int, default=1, help="Recursive multi-hop expansion depth (default: 1, use --hops 2 for broader)")
     parser.add_argument("--assistant", action="store_true", help="Launch Interactive Query Assistant")
     parser.add_argument("--build-library", action="store_true", help="Generate Search Library without full graph search")
     parser.add_argument("--query-type", default="auto", choices=["ligand", "protein", "auto"],
