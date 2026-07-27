@@ -1,7 +1,21 @@
+# Generated data directories
+exports/
+exports_*/
+test_*/
+aspirin_hops4/
 scigraph_data/
+
+# Python cache
 __pycache__/
 .pytest_cache/
-exports_BKP/
 *.pyc
 *.duckdb
 *.sqlite
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
