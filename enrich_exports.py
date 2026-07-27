@@ -4,12 +4,18 @@ Enrichment Pipeline: API-powered data enrichment for chemical-data-extractor exp
 
 Fetches SMILES, 2D structure images, molecular properties, and publication details,
 then writes everything to a beautifully formatted multi-sheet Excel workbook.
+
+Usage:
+    python3 enrich_exports.py                           # Uses ./exports/
+    python3 enrich_exports.py --export-dir ./my_output   # Custom directory
 """
+import argparse
 import csv
 import io
 import json
 import os
 import re
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -20,12 +26,23 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# ── Configuration ──────────────────────────────────────────────────────────
+# ── Configuration (overridable via --export-dir) ───────────────────────────
 EXPORT_DIR = "exports"
-NODES_FILE = os.path.join(EXPORT_DIR, "nodes.csv")
-EDGES_FILE = os.path.join(EXPORT_DIR, "edges.csv")
-OUTPUT_XLSX = os.path.join(EXPORT_DIR, "enriched_data.xlsx")
-IMG_DIR = os.path.join(EXPORT_DIR, "structure_images")
+NODES_FILE: str = ""
+EDGES_FILE: str = ""
+OUTPUT_XLSX: str = ""
+IMG_DIR: str = ""
+
+
+def set_export_dir(path: str):
+    """Configure all paths to point at the given export directory."""
+    global EXPORT_DIR, NODES_FILE, EDGES_FILE, OUTPUT_XLSX, IMG_DIR
+    EXPORT_DIR = path
+    NODES_FILE = os.path.join(path, "nodes.csv")
+    EDGES_FILE = os.path.join(path, "edges.csv")
+    OUTPUT_XLSX = os.path.join(path, "enriched_data.xlsx")
+    IMG_DIR = os.path.join(path, "structure_images")
+    os.makedirs(IMG_DIR, exist_ok=True)
 
 # PubChem API
 PUBCHEM_BASE = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
@@ -37,8 +54,6 @@ CROSSREF_BASE = "https://api.crossref.org/works"
 # Cache
 PUBCHEM_CACHE = {}
 PUBCHEM_IMG_CACHE = set()
-
-os.makedirs(IMG_DIR, exist_ok=True)
 
 # ── Styling helpers ─────────────────────────────────────────────────────────
 HEADER_FONT = Font(name="Calibri", bold=True, color="FFFFFF", size=11)
@@ -787,7 +802,17 @@ def write_summary_sheet(wb, compound_count, compound_enriched, inhibitor_count,
 
 # ── Main Pipeline ───────────────────────────────────────────────────────────
 
-def main():
+def run_enrichment(export_dir: str = "exports") -> None:
+    """Run the full enrichment pipeline on a given export directory.
+    
+    Args:
+        export_dir: Path to the directory containing nodes.csv and edges.csv
+    """
+    set_export_dir(export_dir)
+    return _run_pipeline()
+
+
+def _run_pipeline():
     start_time = time.time()
     print("=" * 60)
     print("  CHEMICAL DATA EXTRACTOR — ENRICHMENT PIPELINE")
@@ -853,6 +878,15 @@ def main():
     print(f"{'─' * 60}")
 
     return compound_nodes, pub_nodes
+
+
+def main():
+    """CLI entry point."""
+    parser = argparse.ArgumentParser(description="Enrich chemical data exports with SMILES, properties, and publication metadata.")
+    parser.add_argument("--export-dir", default="exports",
+                        help="Directory containing nodes.csv and edges.csv (default: ./exports)")
+    args = parser.parse_args()
+    return run_enrichment(args.export_dir)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Freebuff Scientific Knowledge Graph Platform - Web API
-FastAPI backend that wraps scigraph.py CLI for deployment.
+FastAPI backend that wraps scigraph.py CLI for deployment, then enriches results.
 
 Run: uvicorn app:app --host 0.0.0.0 --port $PORT
 """
@@ -23,6 +23,10 @@ from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+# Enrichment pipeline import
+sys.path.insert(0, str(Path(__file__).parent))
+from enrich_exports import run_enrichment
 
 # ── App Setup ──────────────────────────────────────────────────────────────────
 
@@ -113,11 +117,56 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
         await process.wait()
 
         if process.returncode == 0:
+            # --- Run enrichment pipeline ---
+            state["progress"] = "🧪 Enriching compounds with PubChem & CrossRef..."
+            state["log"].append("")
+            state["log"].append("═" * 60)
+            state["log"].append("  Starting Enrichment Pipeline (PubChem SMILES / CrossRef metadata)")
+            state["log"].append("═" * 60)
+            enrichment_start = time.time()
+            try:
+                # Run enrichment as subprocess for clean isolation
+                enrich_cmd = [
+                    sys.executable,
+                    str(BASE_DIR / "enrich_exports.py"),
+                    "--export-dir", export_dir,
+                ]
+                enrich_proc = await asyncio.create_subprocess_exec(
+                    *enrich_cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    cwd=str(BASE_DIR),
+                )
+                assert enrich_proc.stdout is not None
+                async for raw_line in enrich_proc.stdout:
+                    line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
+                    state["log"].append(line)
+                    if "Enriching compounds" in line:
+                        state["progress"] = "🧪 " + line.strip()[:80]
+                    elif "Downloading 2D" in line:
+                        state["progress"] = "🖼️ " + line.strip()[:80]
+                    elif "Enriching publications" in line:
+                        state["progress"] = "📄 " + line.strip()[:80]
+                    elif "Writing Excel" in line:
+                        state["progress"] = "📊 " + line.strip()[:80]
+                    elif "Enriched Excel saved" in line:
+                        state["progress"] = "✅ Enrichment complete!"
+                await enrich_proc.wait()
+                enrich_elapsed = time.time() - enrichment_start
+                state["log"].append(f"  ✦ Enrichment pipeline completed in {enrich_elapsed:.1f}s")
+            except Exception as enrich_err:
+                state["log"].append(f"  ⚠️  Enrichment step error: {enrich_err}")
+
+            # --- Finalize ---
             state["status"] = "completed"
             state["elapsed_seconds"] = time.time() - start_time
-            # List export files
             state["export_files"] = _list_export_files(export_dir)
-            state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s"
+            enriched_exists = any(f["name"] == "enriched_data.xlsx" for f in state["export_files"])
+            if enriched_exists:
+                feats = "", " + enriched multi-sheet Excel"
+                state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s (scigraph{feats[1]})"
+            else:
+                state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s"
         else:
             state["status"] = "failed"
             state["error"] = f"Process exited with code {process.returncode}"
