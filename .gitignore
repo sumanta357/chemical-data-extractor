@@ -12,9 +12,14 @@ __pycache__/
 *.duckdb
 *.sqlite
 
-# Frontend build artifacts
-frontend/node_modules/
-frontend/dist/
+# Next.js build artifacts
+.next/
+node_modules/
+bun.lock
+bun.lockb
+
+# Isolated test copy (large)
+isolate/
 
 # IDE
 .idea/

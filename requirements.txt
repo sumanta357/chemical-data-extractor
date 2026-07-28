@@ -1,22 +1,10 @@
-# Freebuff Scientific Knowledge Graph Platform
-# Python dependencies for scigraph.py and web API
+# Python dependencies for scigraph.py (CLI engine) and enrich_exports.py
+# Web serving is handled by Next.js (Node.js) — no Python web framework needed
 
-# Core
-aiohttp>=3.9.0
-pydantic>=2.0.0
-
-# Graph & Storage
-networkx>=3.0
-duckdb>=0.9.0
-
-# Export
-openpyxl>=3.1.0
-
-# Web API (FastAPI)
-fastapi>=0.100.0
-uvicorn>=0.22.0
-
-# Optional but recommended
-pyarrow>=12.0.0
-matplotlib>=3.7.0
-orjson>=3.9.0
+aiohttp>=3.9.0           # Async HTTP for API connectors
+networkx>=3.0            # Graph data structures
+duckdb>=0.9.0            # Analytical queries
+openpyxl>=3.1.0          # Excel export & enrichment (enriched_data.xlsx)
+pyarrow>=12.0.0          # Parquet export
+matplotlib>=3.7.0        # Visualization
+requests>=2.31.0         # HTTP for enrichment pipeline (CrossRef, PubChem)

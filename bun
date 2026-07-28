@@ -1,0 +1,4 @@
+#!/bin/bash
+# Bun shim for Freebuff compatibility
+# When Freebuff runs 'bun run start', this script delegates to npm/node
+exec npm "$@"
