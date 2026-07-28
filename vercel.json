@@ -1,4 +1,4 @@
 {
-  "installCommand": "pip install -r requirements.txt && npm install",
+  "installCommand": "uv pip install -r requirements.txt && npm install",
   "buildCommand": "npx next build"
 }
