@@ -1,0 +1,4 @@
+{
+  "installCommand": "pip install -r requirements.txt && npm install",
+  "buildCommand": "npx next build"
+}
