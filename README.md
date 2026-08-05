@@ -17,10 +17,10 @@ An enterprise-grade, multi-hop automated scientific discovery engine that extrac
 pip install -r requirements.txt
 
 # Find inhibitors for a protein target
-python3 scigraph.py "tubulin" --query-type protein --hops 1
+python3 api/scigraph.py "tubulin" --query-type protein --hops 1
 
 # Find targets for a compound
-python3 scigraph.py "Aspirin" --query-type ligand --hops 1
+python3 api/scigraph.py "Aspirin" --query-type ligand --hops 1
 ```
 
 ## 🌐 Run the Web UI
@@ -77,8 +77,9 @@ User Browser → Next.js (React UI) → API Routes (Node.js) → Python Subproce
 ├── lib/                    # TypeScript library
 │   ├── types.ts            # Type definitions
 │   └── search-engine.ts    # Python subprocess manager
-├── scigraph.py             # Python CLI engine (unchanged)
-├── enrich_exports.py       # Enrichment pipeline (PubChem SMILES + CrossRef)
+├── api/scigraph.py         # Python CLI engine
+├── api/enrich_exports.py   # Enrichment pipeline (PubChem SMILES + CrossRef)
+├── api/search.py           # Hosted Python function (production search engine)
 ├── app.py                  # Legacy FastAPI (reference only)
 ├── requirements.txt        # Python dependencies
 ├── package.json            # Next.js + React dependencies

@@ -1,4 +1,9 @@
 {
-  "installCommand": "uv pip install --system -r requirements.txt && npm install",
-  "buildCommand": "npx next build"
+  "installCommand": "npm install",
+  "buildCommand": "npx next build",
+  "functions": {
+    "api/search.py": {
+      "maxDuration": 60
+    }
+  }
 }

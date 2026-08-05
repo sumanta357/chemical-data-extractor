@@ -82,7 +82,7 @@ function runSearch(
 
   const pythonCmd = 'python3';
   const pythonArgs = [
-    path.join(BASE_DIR, 'scigraph.py'),
+    path.join(BASE_DIR, 'api', 'scigraph.py'),
     query,
     '--query-type',
     queryType,
@@ -159,12 +159,93 @@ function runSearch(
     }
   });
 
-  proc.on('error', (err) => {
+  proc.on('error', (err: any) => {
+    if (err && err.code === 'ENOENT') {
+      // python3 is not available in this runtime (production hosting) —
+      // fall back to the hosted Python function (api/search.py).
+      state.log.push('⚠️ python3 not available locally — switching to hosted Python engine (api/search.py)');
+      state.progress = '🌐 Running search on hosted Python engine...';
+      void runSearchViaFunction(searchId, query, queryType, hops, exportDir, startTime);
+      return;
+    }
     state.status = 'failed';
     state.error = err.message;
     state.log.push(`❌ Spawn error: ${err.message}`);
     state.elapsed_seconds = (Date.now() - startTime) / 1000;
   });
+}
+
+// ── Hosted Python engine fallback (production) ──────────────────────────
+
+async function runSearchViaFunction(
+  searchId: string,
+  query: string,
+  queryType: string,
+  hops: number,
+  exportDir: string,
+  startTime: number
+): Promise<void> {
+  const state = searches.get(searchId)!;
+  try {
+    const baseUrl =
+      process.env.SEARCH_ENGINE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+    if (!baseUrl) {
+      throw new Error('No hosted search engine URL available (SEARCH_ENGINE_URL unset)');
+    }
+
+    state.log.push(`  Calling ${baseUrl}/api/search_engine ...`);
+    const res = await fetch(`${baseUrl}/api/search_engine`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query, query_type: queryType, hops }),
+      signal: AbortSignal.timeout(75_000),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Search engine HTTP ${res.status}: ${text.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    if (data.status === 'failed') {
+      throw new Error(data.detail || 'Search engine failed');
+    }
+
+    // Logs arrive in one batch when the hosted run completes.
+    const lines: string[] = Array.isArray(data.log) ? data.log : [];
+    for (const line of lines) {
+      if (line.trim()) {
+        state.log.push(line);
+        updateProgress(line, state);
+      }
+    }
+
+    // Files arrive base64-encoded; keep them in memory for /api/exports.
+    const files: Record<string, string> = data.files || {};
+    state.base64_files = files;
+    const exportFiles: ExportFile[] = Object.keys(files)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => {
+        const sizeBytes = Math.round((files[name].length * 3) / 4);
+        return {
+          name,
+          size_bytes: sizeBytes,
+          size_display: formatSize(sizeBytes),
+          url: `/api/exports/${encodeURIComponent(name)}?search_id=${searchId}`,
+        };
+      });
+    state.export_files = exportFiles;
+
+    state.status = 'completed';
+    state.progress = `✅ Completed in ${((Date.now() - startTime) / 1000).toFixed(1)}s (hosted engine)`;
+    state.elapsed_seconds = (Date.now() - startTime) / 1000;
+  } catch (err: any) {
+    state.status = 'failed';
+    state.error = err.message;
+    state.log.push(`❌ Hosted search engine error: ${err.message}`);
+    state.elapsed_seconds = (Date.now() - startTime) / 1000;
+  }
 }
 
 function updateProgress(line: string, state: SearchState): void {
@@ -194,7 +275,7 @@ function runEnrichment(
     const proc = spawn(
       'python3',
       [
-        path.join(BASE_DIR, 'enrich_exports.py'),
+        path.join(BASE_DIR, 'api', 'enrich_exports.py'),
         '--export-dir',
         exportDir,
       ],
@@ -319,6 +400,19 @@ export function getExportFilePath(
   const direct = path.resolve(EXPORTS_DIR, filename);
   if (fs.existsSync(direct)) return direct;
 
+  return null;
+}
+
+export function getBase64File(
+  searchId: string | undefined,
+  filename: string
+): string | null {
+  if (!searchId) return null;
+  const state = searches.get(searchId);
+  if (state?.base64_files) {
+    const b64 = state.base64_files[filename];
+    if (b64) return b64;
+  }
   return null;
 }
 

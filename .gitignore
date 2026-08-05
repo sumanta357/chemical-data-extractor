@@ -1,9 +1,9 @@
 # Generated data directories
-exports/
-exports_*/
+/exports/
+/exports_*/
 test_*/
 aspirin_hops4/
-scigraph_data/
+/scigraph_data/
 
 # Python cache
 __pycache__/

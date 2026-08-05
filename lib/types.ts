@@ -21,6 +21,8 @@ export interface SearchState {
   log: string[];
   export_files: ExportFile[];
   export_dir: string;
+  /** base64 file payloads returned by the hosted Python engine (production) */
+  base64_files?: Record<string, string>;
   created_at: string;
   elapsed_seconds: number | null;
   error: string | null;
