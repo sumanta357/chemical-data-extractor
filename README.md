@@ -79,7 +79,7 @@ User Browser → Next.js (React UI) → API Routes (Node.js) → Python Subproce
 │   └── search-engine.ts    # Python subprocess manager
 ├── api/scigraph.py         # Python CLI engine
 ├── api/enrich_exports.py   # Enrichment pipeline (PubChem SMILES + CrossRef)
-├── api/search.py           # Hosted Python function (production search engine)
+├── api/search_engine.py   # Hosted Python function (production search engine)
 ├── app.py                  # Legacy FastAPI (reference only)
 ├── requirements.txt        # Python dependencies
 ├── package.json            # Next.js + React dependencies

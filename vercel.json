@@ -1,9 +1,4 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "npx next build",
-  "functions": {
-    "api/search.py": {
-      "maxDuration": 60
-    }
-  }
+  "buildCommand": "npx next build"
 }
