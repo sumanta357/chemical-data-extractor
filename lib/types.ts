@@ -23,6 +23,10 @@ export interface SearchState {
   export_dir: string;
   /** base64 file payloads returned by the hosted Python engine (production) */
   base64_files?: Record<string, string>;
+  /** Hosted Python engine (Render) binding — set when SEARCH_ENGINE_URL is used */
+  remote_engine_url?: string;
+  /** Search id on the hosted Python engine */
+  remote_search_id?: string;
   created_at: string;
   elapsed_seconds: number | null;
   error: string | null;

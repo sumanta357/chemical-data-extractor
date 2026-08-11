@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """
-Freebuff Scientific Knowledge Graph Platform - Web API
-FastAPI backend that wraps scigraph.py CLI for deployment, then enriches results.
+SciGraph Knowledge Graph Platform - Hosted Python API (Render / any Python host)
+
+FastAPI backend that runs the scigraph search engine (api/scigraph.py) followed
+by the enrichment pipeline (api/enrich_exports.py) as background jobs, and
+exposes the polling API that the Next.js app proxies to:
+
+    POST /api/search                 -> start a search (returns immediately)
+    GET  /api/search/{id}            -> status + log + export file list
+    GET  /api/search/{id}/log        -> incremental log
+    GET  /api/exports/{filename}     -> download an export file
+    GET  /api/searches               -> recent searches
+    GET  /api/health                 -> health check
 
 Run: uvicorn app:app --host 0.0.0.0 --port $PORT
 """
 
 import asyncio
-import json
 import os
 import re
-import shutil
-import subprocess
 import sys
 import time
 import uuid
@@ -20,15 +27,14 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse, Response
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-# Enrichment pipeline import
-sys.path.insert(0, str(Path(__file__).parent))
-from enrich_exports import run_enrichment
+# Engine files (scigraph.py, enrich_exports.py) live in ../api/
+ENGINE_DIR = Path(__file__).resolve().parent.parent / "api"
+sys.path.insert(0, str(ENGINE_DIR))
 
-# ── App Setup ──────────────────────────────────────────────────────────────────
+# ── App Setup ────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="Scientific Knowledge Graph Platform",
@@ -36,17 +42,17 @@ app = FastAPI(
     version="3.1.0",
 )
 
-BASE_DIR = Path(__file__).parent
-EXPORTS_DIR = BASE_DIR / "exports"
-FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
-EXPORTS_DIR.mkdir(exist_ok=True)
+# Writable state dirs (Render /tmp is writable; repo dirs may be read-only)
+EXPORTS_DIR = Path(os.environ.get("EXPORTS_DIR", "/tmp/scigraph_exports"))
+WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/tmp/scigraph_workspace"))
+EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── In-memory search state ──────────────────────────────────────────────────────
-# Stores running/completed searches
+# ── In-memory search state ───────────────────────────────────────────────────
 searches: dict[str, dict] = {}
 
 
-# ── Models ──────────────────────────────────────────────────────────────────────
+# ── Models ───────────────────────────────────────────────────────────────────
 
 class SearchRequest(BaseModel):
     query: str
@@ -58,7 +64,7 @@ class SearchRequest(BaseModel):
 class SearchStatus(BaseModel):
     search_id: str
     query: str
-    status: str  # running | completed | failed
+    status: str  # queued | running | completed | failed
     progress: Optional[str] = None
     log: list[str] = []
     export_files: list[dict] = []
@@ -67,10 +73,10 @@ class SearchStatus(BaseModel):
     error: Optional[str] = None
 
 
-# ── Background Search Runner ────────────────────────────────────────────────────
+# ── Background Search Runner ─────────────────────────────────────────────────
 
 async def run_search_in_background(search_id: str, query: str, query_type: str, hops: int, export_dir: str):
-    """Run scigraph.py as a subprocess and capture output."""
+    """Run api/scigraph.py as a subprocess, then enrich, capturing output."""
     state = searches[search_id]
     state["status"] = "running"
     state["log"] = []
@@ -78,14 +84,17 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
 
     export_path = Path(export_dir)
     export_path.mkdir(parents=True, exist_ok=True)
+    workspace = WORKSPACE_DIR / search_id
+    workspace.mkdir(parents=True, exist_ok=True)
 
     # Build CLI command
     cmd = [
         sys.executable,
-        str(BASE_DIR / "scigraph.py"),
+        str(ENGINE_DIR / "scigraph.py"),
         query,
         "--query-type", query_type,
         "--hops", str(hops),
+        "--workspace", str(workspace),
         "--export-dir", export_dir,
     ]
 
@@ -94,25 +103,15 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
-            cwd=str(BASE_DIR),
+            cwd=str(ENGINE_DIR),
             env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
 
-        # Read output line by line
         assert process.stdout is not None
         async for raw_line in process.stdout:
             line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
             state["log"].append(line)
-
-            # Extract progress from the output
-            if "[1/6]" in line or "[2/6]" in line or "[3/6]" in line or "[4/6]" in line or "[5/6]" in line or "[6/6]" in line:
-                state["progress"] = line.strip()
-            elif "╔══ Hop" in line:
-                state["progress"] = line.strip()
-            elif "Pipeline finished" in line or "finished successfully" in line:
-                state["progress"] = "✅ Complete!"
-            elif "Error" in line or "error" in line.lower():
-                state["progress"] = f"⚠️ {line.strip()[:100]}"
+            _update_progress(state, line)
 
         await process.wait()
 
@@ -125,17 +124,16 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
             state["log"].append("═" * 60)
             enrichment_start = time.time()
             try:
-                # Run enrichment as subprocess for clean isolation
                 enrich_cmd = [
                     sys.executable,
-                    str(BASE_DIR / "enrich_exports.py"),
+                    str(ENGINE_DIR / "enrich_exports.py"),
                     "--export-dir", export_dir,
                 ]
                 enrich_proc = await asyncio.create_subprocess_exec(
                     *enrich_cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
-                    cwd=str(BASE_DIR),
+                    cwd=str(ENGINE_DIR),
                 )
                 assert enrich_proc.stdout is not None
                 async for raw_line in enrich_proc.stdout:
@@ -163,8 +161,7 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
             state["export_files"] = _list_export_files(export_dir)
             enriched_exists = any(f["name"] == "enriched_data.xlsx" for f in state["export_files"])
             if enriched_exists:
-                feats = "", " + enriched multi-sheet Excel"
-                state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s (scigraph{feats[1]})"
+                state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s + enriched multi-sheet Excel"
             else:
                 state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s"
         else:
@@ -176,6 +173,18 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
         state["status"] = "failed"
         state["error"] = str(e)
         state["elapsed_seconds"] = time.time() - start_time
+
+
+def _update_progress(state: dict, line: str):
+    if ("[1/6]" in line or "[2/6]" in line or "[3/6]" in line
+            or "[4/6]" in line or "[5/6]" in line or "[6/6]" in line):
+        state["progress"] = line.strip()
+    elif "╔══ Hop" in line:
+        state["progress"] = line.strip()
+    elif "Pipeline finished" in line or "finished successfully" in line:
+        state["progress"] = "✅ Complete!"
+    elif "Error" in line or "error" in line.lower():
+        state["progress"] = f"⚠️ {line.strip()[:100]}"
 
 
 def _list_export_files(export_dir: str) -> list[dict]:
@@ -203,7 +212,7 @@ def _format_size(size: int) -> str:
     return f"{size:.1f} GB"
 
 
-# ── API Endpoints ───────────────────────────────────────────────────────────────
+# ── API Endpoints ────────────────────────────────────────────────────────────
 
 @app.get("/api/health")
 async def health():
@@ -212,8 +221,7 @@ async def health():
 
 @app.post("/api/search", response_model=SearchStatus)
 async def start_search(request: SearchRequest, background_tasks: BackgroundTasks):
-    """Start a new knowledge graph search."""
-    # Validate
+    """Start a new knowledge graph search (runs in the background)."""
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
     if request.hops < 1 or request.hops > 4:
@@ -241,13 +249,11 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
     }
     searches[search_id] = state
 
-    # Start background task
     background_tasks.add_task(
         run_search_in_background,
         search_id, request.query, request.query_type, request.hops, export_dir
     )
 
-    # Wait a brief moment for startup
     await asyncio.sleep(0.5)
 
     return SearchStatus(**{
@@ -262,7 +268,6 @@ async def get_search_status(search_id: str):
     if not state:
         raise HTTPException(status_code=404, detail="Search not found")
 
-    # Refresh export files if completed
     if state["status"] == "completed" and not state["export_files"]:
         state["export_files"] = _list_export_files(state.get("export_dir", ""))
 
@@ -295,7 +300,6 @@ async def download_export(filename: str, search_id: Optional[str] = Query(None))
             raise HTTPException(status_code=404, detail="Search not found")
         file_path = Path(state["export_dir"]) / filename
     else:
-        # Try to find the file in any export directory
         for export_dir in [EXPORTS_DIR] + [Path(s["export_dir"]) for s in searches.values()]:
             candidate = export_dir / filename
             if candidate.exists():
@@ -336,21 +340,16 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
     ]
 
 
-# ── Static Files (Frontend) ─────────────────────────────────────────────────────
-
-if FRONTEND_DIST.exists():
-    app.mount("/", StaticFiles(directory=str(FRONTEND_DIST), html=True), name="frontend")
-else:
-    @app.get("/")
-    async def root():
-        return {
-            "message": "Scientific Knowledge Graph API",
-            "docs": "/docs",
-            "frontend_build": "Not found — run 'cd frontend && bun install && bun run build'",
-        }
+@app.get("/")
+async def root():
+    return {
+        "message": "Scientific Knowledge Graph API",
+        "docs": "/docs",
+        "health": "/api/health",
+    }
 
 
-# ── MIME helpers ────────────────────────────────────────────────────────────────
+# ── MIME helpers ─────────────────────────────────────────────────────────────
 
 def _guess_mime(filename: str) -> str:
     ext = Path(filename).suffix.lower()
@@ -368,11 +367,12 @@ def _guess_mime(filename: str) -> str:
     }.get(ext, "application/octet-stream")
 
 
-# ── Startup ─────────────────────────────────────────────────────────────────────
+# ── Startup ──────────────────────────────────────────────────────────────────
 
 @app.on_event("startup")
 async def startup():
     print(f"🔬 SciGraph API v3.1 starting...")
     print(f"   Python: {sys.version}")
+    print(f"   Engine dir: {ENGINE_DIR}")
     print(f"   Exports dir: {EXPORTS_DIR}")
-    print(f"   Frontend: {'✅ ' + str(FRONTEND_DIST) if FRONTEND_DIST.exists() else '⚠️  Not built'}")
+    print(f"   Workspace dir: {WORKSPACE_DIR}")

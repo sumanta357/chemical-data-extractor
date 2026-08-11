@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
-import { getExportFilePath, getBase64File, guessMime } from '@/lib/search-engine';
+import {
+  getExportFilePath,
+  getBase64File,
+  getRemoteExportUrl,
+  guessMime,
+} from '@/lib/search-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +24,33 @@ export async function GET(
   if (filePath) {
     fileBuffer = fs.readFileSync(filePath);
   } else {
-    // Production: exports live in memory (base64) returned by the hosted
-    // Python engine.
+    // In-memory base64 (legacy hosted-engine payloads)
     const b64 = getBase64File(searchId, filename);
     if (b64) fileBuffer = Buffer.from(b64, 'base64');
+  }
+
+  // Production: proxy the download to the hosted Python engine.
+  if (!fileBuffer) {
+    const remoteUrl = getRemoteExportUrl(searchId, filename);
+    if (remoteUrl) {
+      try {
+        const remoteRes = await fetch(remoteUrl, {
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (remoteRes.ok) {
+          const buf = Buffer.from(await remoteRes.arrayBuffer());
+          return new NextResponse(new Uint8Array(buf), {
+            headers: {
+              'Content-Type': remoteRes.headers.get('content-type') || guessMime(filename),
+              'Content-Disposition': `attachment; filename="${filename}"`,
+              'Content-Length': String(buf.length),
+            },
+          });
+        }
+      } catch {
+        // fall through to 404 below
+      }
+    }
   }
 
   if (!fileBuffer) {

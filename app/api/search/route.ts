@@ -27,7 +27,13 @@ export async function POST(request: NextRequest) {
     // Wait briefly for initial state
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const current = getSearch(state.search_id)!;
+    const current = await getSearch(state.search_id);
+    if (!current) {
+      return NextResponse.json(
+        { detail: 'Search state lost' },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({
       search_id: current.search_id,
       query: current.query,

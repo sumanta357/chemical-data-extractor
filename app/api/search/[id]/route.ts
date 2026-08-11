@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const searchId = params.id;
-  const state = getSearch(searchId);
+  const state = await getSearch(searchId);
 
   if (!state) {
     return NextResponse.json(

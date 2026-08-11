@@ -34,23 +34,38 @@ bun run start      # or: npm run start
 
 ## 🚢 Deploy on Freebuff Cloud
 
-This project is structured as a **Next.js app** with Python API routes. To deploy on Freebuff:
+This project is a **Next.js app** (frontend + API) deployed on Freebuff/Vercel, with the Python search engine running as an **always-on hosted service** (Render or any Python host). Vercel's Node runtime can't run `python3`, so searches are proxied to the hosted engine via the `SEARCH_ENGINE_URL` environment variable.
 
-1. Push to GitHub
-2. In Freebuff Cloud dashboard, configure:
-   - **Install Command:** `pip install -r requirements.txt && npm install`
-   - **Build Command:** `npx next build`
-   - **Preview Command:** `npx next start --port 3001`
-   - **Preview Port:** `3001`
+### 1. Deploy the Python engine (once)
+
+1. Push this repo to GitHub
+2. On [render.com](https://render.com), choose **New → Blueprint** and select this repo
+   - `render.yaml` at the repo root auto-creates the `scigraph-engine` web service (free plan, Python, root dir `python-api/`)
+   - Health check: `/api/health`
+3. Copy the service URL, e.g. `https://scigraph-engine.onrender.com`
+
+> The free Render plan sleeps after ~15 min of idle — the first search after idle takes ~30–60s extra to wake the service.
+
+### 2. Deploy the Next.js app
+
+1. In Freebuff Cloud dashboard, the deploy is already configured (install `npm install`, build `npx next build`)
+2. Set the production env var:
+   ```
+   SEARCH_ENGINE_URL=https://scigraph-engine.onrender.com
+   ```
 3. Click **Deploy**
 
 ### Architecture
 
 ```
-User Browser → Next.js (React UI) → API Routes (Node.js) → Python Subprocess (scigraph.py)
-                                                              ↓
-                                                         exports/ (CSV, Excel, GraphML, etc.)
+User Browser → Next.js (React UI) → /api/search (Node.js) → SEARCH_ENGINE_URL → FastAPI (python-api/app.py)
+                                                                                  ↓
+                                                                        Python subprocess (api/scigraph.py + enrich)
+                                                                                  ↓
+                                                                        /tmp exports (CSV, Excel, GraphML, etc.)
 ```
+
+In the sandbox/preview, if `SEARCH_ENGINE_URL` is unset, the Next.js app runs `python3 api/scigraph.py` directly (as before).
 
 ## 📊 Integrated Database Connectors (19)
 
@@ -79,9 +94,12 @@ User Browser → Next.js (React UI) → API Routes (Node.js) → Python Subproce
 │   └── search-engine.ts    # Python subprocess manager
 ├── api/scigraph.py         # Python CLI engine
 ├── api/enrich_exports.py   # Enrichment pipeline (PubChem SMILES + CrossRef)
-├── api/search_engine.py   # Hosted Python function (production search engine)
-├── app.py                  # Legacy FastAPI (reference only)
-├── requirements.txt        # Python dependencies
+├── python-api/             # Hosted Python service (Render blueprint)
+│   ├── app.py              # FastAPI backend (search + enrichment + exports)
+│   └── requirements.txt    # Python dependencies for the hosted service
+├── render.yaml             # Render blueprint (deploys python-api/)
+├── requirements.txt        # Python dependencies (CLI)
+├── lib/search-engine.ts    # Node runner: spawns python3 locally OR proxies to SEARCH_ENGINE_URL
 ├── package.json            # Next.js + React dependencies
 ├── next.config.js          # Next.js configuration
 ├── tailwind.config.js      # Tailwind CSS theme

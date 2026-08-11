@@ -10,8 +10,15 @@ const searches = new Map<string, SearchState>();
 const BASE_DIR = process.cwd();
 const EXPORTS_DIR = path.join(BASE_DIR, 'exports');
 
-if (!fs.existsSync(EXPORTS_DIR)) {
-  fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+// Production (Vercel) has a read-only filesystem — never crash module load
+// if we can't create the exports dir here.
+try {
+  if (!fs.existsSync(EXPORTS_DIR)) {
+    fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+  }
+} catch {
+  // read-only FS (production hosting) — exports are served via the hosted
+  // engine or kept in memory.
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -65,6 +72,100 @@ function guessMime(filename: string): string {
   return mimes[ext] || 'application/octet-stream';
 }
 
+// ── Hosted engine helpers (production) ───────────────────────────────────
+
+function hostedEngineUrl(): string | null {
+  const url = process.env.SEARCH_ENGINE_URL;
+  return url ? url.replace(/\/+$/, '') : null;
+}
+
+async function fetchJson(url: string, init?: RequestInit): Promise<any> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Engine HTTP ${res.status}: ${text.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+/**
+ * Refresh a search's state from the hosted Python engine. Mutates the
+ * SearchState in place so the Next.js routes can serve the UI unchanged.
+ */
+async function refreshRemoteState(state: SearchState): Promise<void> {
+  if (!state.remote_engine_url || !state.remote_search_id) return;
+
+  try {
+    const data = await fetchJson(
+      `${state.remote_engine_url}/api/search/${state.remote_search_id}`,
+      { signal: AbortSignal.timeout(20_000) }
+    );
+
+    state.status = data.status || state.status;
+    state.progress = data.progress ?? state.progress;
+    if (Array.isArray(data.log)) state.log = data.log;
+    if (typeof data.elapsed_seconds === 'number') {
+      state.elapsed_seconds = data.elapsed_seconds;
+    }
+    if (data.error) state.error = data.error;
+
+    if (Array.isArray(data.export_files)) {
+      state.export_files = data.export_files.map((f: any) => ({
+        name: f.name,
+        size_bytes: f.size_bytes ?? 0,
+        size_display: f.size_display ?? formatSize(f.size_bytes ?? 0),
+        // Always route downloads through this app so the UI keeps working
+        url: `/api/exports/${encodeURIComponent(f.name)}?search_id=${state.search_id}`,
+      }));
+    }
+  } catch {
+    // Engine unreachable — keep last known state; the poller will retry.
+  }
+}
+
+async function startHostedSearch(
+  searchId: string,
+  query: string,
+  queryType: string,
+  hops: number,
+  engineUrl: string,
+  startTime: number
+): Promise<void> {
+  const state = searches.get(searchId)!;
+  try {
+    state.log.push(`[${new Date().toISOString()}] Contacting hosted engine...`);
+    const data = await fetchJson(`${engineUrl}/api/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query, query_type: queryType, hops }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    state.remote_engine_url = engineUrl;
+    state.remote_search_id = data.search_id;
+    state.status = data.status || 'running';
+    state.progress = data.progress || '🌐 Hosted engine running...';
+    state.log.push(`  Hosted search started: ${data.search_id}`);
+    if (Array.isArray(data.log)) {
+      for (const line of data.log) {
+        if (line && line.trim()) {
+          state.log.push(line);
+          updateProgress(line, state);
+        }
+      }
+    }
+
+    // First refresh gets the current snapshot immediately.
+    await refreshRemoteState(state);
+    state.elapsed_seconds = (Date.now() - startTime) / 1000;
+  } catch (err: any) {
+    state.status = 'failed';
+    state.error = err.message || 'Hosted engine unreachable';
+    state.log.push(`❌ Hosted engine error: ${err.message}`);
+    state.elapsed_seconds = (Date.now() - startTime) / 1000;
+  }
+}
+
 // ── Search Runner ───────────────────────────────────────────────────────
 
 function runSearch(
@@ -77,8 +178,26 @@ function runSearch(
   const state = searches.get(searchId)!;
   const startTime = Date.now();
 
-  // Ensure export directory exists
-  fs.mkdirSync(path.resolve(exportDir), { recursive: true });
+  // Production: use the hosted Python engine (Render) — python3 and a
+  // writable FS don't exist in the Vercel Node runtime.
+  const engineUrl = hostedEngineUrl();
+  if (engineUrl) {
+    state.status = 'running';
+    state.log.push(`[${new Date().toISOString()}] Starting search via hosted engine...`);
+    state.log.push(`  Query: ${query} (${queryType}, ${hops}-hop)`);
+    void startHostedSearch(searchId, query, queryType, hops, engineUrl, startTime);
+    return;
+  }
+
+  // Sandbox/preview: run python3 locally.
+  try {
+    fs.mkdirSync(path.resolve(exportDir), { recursive: true });
+  } catch (err: any) {
+    state.status = 'failed';
+    state.error = `Cannot create export directory: ${err.message}`;
+    state.elapsed_seconds = 0;
+    return;
+  }
 
   const pythonCmd = 'python3';
   const pythonArgs = [
@@ -103,16 +222,12 @@ function runSearch(
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  let logBuffer: string[] = [];
-
   const handleOutput = (data: Buffer) => {
     const lines = data.toString('utf-8').split('\n');
     for (const raw of lines) {
       const line = raw.replace(/\r$/, '');
-      if (!line && logBuffer.length > 0 && line === '') continue;
       if (line.trim()) {
         state.log.push(line);
-        logBuffer.push(line);
         updateProgress(line, state);
       }
     }
@@ -122,9 +237,7 @@ function runSearch(
   proc.stderr?.on('data', handleOutput);
 
   proc.on('close', async (code) => {
-    state.log.push(
-      `\n═══════════════════════════════════════════════════`
-    );
+    state.log.push(`\n═══════════════════════════════════════════════════`);
     state.log.push(`  scigraph finished with exit code ${code}`);
 
     if (code === 0) {
@@ -134,7 +247,6 @@ function runSearch(
       state.log.push('  Starting Enrichment Pipeline (PubChem SMILES / CrossRef metadata)');
       state.log.push('═'.repeat(60));
 
-      // Run enrichment
       try {
         await runEnrichment(exportDir, state);
         state.log.push(`  ✦ Enrichment pipeline completed`);
@@ -161,11 +273,12 @@ function runSearch(
 
   proc.on('error', (err: any) => {
     if (err && err.code === 'ENOENT') {
-      // python3 is not available in this runtime (production hosting) —
-      // fall back to the hosted Python function (api/search.py).
-      state.log.push('⚠️ python3 not available locally — switching to hosted Python engine (api/search.py)');
-      state.progress = '🌐 Running search on hosted Python engine...';
-      void runSearchViaFunction(searchId, query, queryType, hops, exportDir, startTime);
+      state.status = 'failed';
+      state.error =
+        'python3 is not available in this runtime and SEARCH_ENGINE_URL is not configured. ' +
+        'Set SEARCH_ENGINE_URL (the hosted Python engine) to run searches in production.';
+      state.log.push(`❌ python3 not found — set SEARCH_ENGINE_URL to use the hosted engine`);
+      state.elapsed_seconds = (Date.now() - startTime) / 1000;
       return;
     }
     state.status = 'failed';
@@ -173,79 +286,6 @@ function runSearch(
     state.log.push(`❌ Spawn error: ${err.message}`);
     state.elapsed_seconds = (Date.now() - startTime) / 1000;
   });
-}
-
-// ── Hosted Python engine fallback (production) ──────────────────────────
-
-async function runSearchViaFunction(
-  searchId: string,
-  query: string,
-  queryType: string,
-  hops: number,
-  exportDir: string,
-  startTime: number
-): Promise<void> {
-  const state = searches.get(searchId)!;
-  try {
-    const baseUrl =
-      process.env.SEARCH_ENGINE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-    if (!baseUrl) {
-      throw new Error('No hosted search engine URL available (SEARCH_ENGINE_URL unset)');
-    }
-
-    state.log.push(`  Calling ${baseUrl}/api/search_engine ...`);
-    const res = await fetch(`${baseUrl}/api/search_engine`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query, query_type: queryType, hops }),
-      signal: AbortSignal.timeout(75_000),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Search engine HTTP ${res.status}: ${text.slice(0, 300)}`);
-    }
-
-    const data = await res.json();
-    if (data.status === 'failed') {
-      throw new Error(data.detail || 'Search engine failed');
-    }
-
-    // Logs arrive in one batch when the hosted run completes.
-    const lines: string[] = Array.isArray(data.log) ? data.log : [];
-    for (const line of lines) {
-      if (line.trim()) {
-        state.log.push(line);
-        updateProgress(line, state);
-      }
-    }
-
-    // Files arrive base64-encoded; keep them in memory for /api/exports.
-    const files: Record<string, string> = data.files || {};
-    state.base64_files = files;
-    const exportFiles: ExportFile[] = Object.keys(files)
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => {
-        const sizeBytes = Math.round((files[name].length * 3) / 4);
-        return {
-          name,
-          size_bytes: sizeBytes,
-          size_display: formatSize(sizeBytes),
-          url: `/api/exports/${encodeURIComponent(name)}?search_id=${searchId}`,
-        };
-      });
-    state.export_files = exportFiles;
-
-    state.status = 'completed';
-    state.progress = `✅ Completed in ${((Date.now() - startTime) / 1000).toFixed(1)}s (hosted engine)`;
-    state.elapsed_seconds = (Date.now() - startTime) / 1000;
-  } catch (err: any) {
-    state.status = 'failed';
-    state.error = err.message;
-    state.log.push(`❌ Hosted search engine error: ${err.message}`);
-    state.elapsed_seconds = (Date.now() - startTime) / 1000;
-  }
 }
 
 function updateProgress(line: string, state: SearchState): void {
@@ -360,12 +400,26 @@ export function createSearch(
   return state;
 }
 
-export function getSearch(searchId: string): SearchState | undefined {
+export async function getSearch(searchId: string): Promise<SearchState | undefined> {
   const state = searches.get(searchId);
+  if (!state) return undefined;
+
+  // Hosted engine: refresh from the Python host on every poll.
+  if (state.remote_engine_url && state.remote_search_id) {
+    await refreshRemoteState(state);
+  }
+
   if (state && state.status === 'completed' && state.export_files.length === 0) {
     state.export_files = listExportFiles(state.export_dir);
   }
   return state;
+}
+
+export async function getSearchLog(
+  searchId: string
+): Promise<{ state: SearchState | undefined }> {
+  const state = await getSearch(searchId);
+  return { state };
 }
 
 export function listSearches(limit: number = 20): SearchState[] {
@@ -390,11 +444,15 @@ export function getExportFilePath(
   }
 
   // Fallback: search all export dirs
-  for (const entry of fs.readdirSync(EXPORTS_DIR, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      const candidate = path.join(EXPORTS_DIR, entry.name, filename);
-      if (fs.existsSync(candidate)) return candidate;
+  try {
+    for (const entry of fs.readdirSync(EXPORTS_DIR, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        const candidate = path.join(EXPORTS_DIR, entry.name, filename);
+        if (fs.existsSync(candidate)) return candidate;
+      }
     }
+  } catch {
+    // exports dir unavailable (read-only FS)
   }
 
   const direct = path.resolve(EXPORTS_DIR, filename);
@@ -412,6 +470,24 @@ export function getBase64File(
   if (state?.base64_files) {
     const b64 = state.base64_files[filename];
     if (b64) return b64;
+  }
+  return null;
+}
+
+/**
+ * If the search is running on the hosted engine, return the full remote URL
+ * for a given export file so the Next.js route can proxy the download.
+ */
+export function getRemoteExportUrl(
+  searchId: string | undefined,
+  filename: string
+): string | null {
+  if (!searchId) return null;
+  const state = searches.get(searchId);
+  if (state?.remote_engine_url && state.remote_search_id) {
+    return `${state.remote_engine_url}/api/exports/${encodeURIComponent(
+      filename
+    )}?search_id=${state.remote_search_id}`;
   }
   return null;
 }
