@@ -342,7 +342,31 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
 
 @app.get("/")
 async def root():
-    resp = HTMLResponse(LANDING_PAGE_HTML)
+    # Server-side health check — embed status directly in HTML
+    # so the browser never needs a separate fetch (avoids Cloudflare/browser issues)
+    health_ok = False
+    try:
+        import urllib.request as _req
+        port = os.environ.get('PORT', '8000')
+        with _req.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=2) as r:
+            health_ok = r.status == 200
+    except Exception:
+        try:
+            with _req.urlopen('http://127.0.0.1:8000/api/health', timeout=2) as r:
+                health_ok = r.status == 200
+        except Exception:
+            pass
+
+    badge_cls = 'badge ok' if health_ok else 'badge'
+    badge_txt = '● Healthy' if health_ok else '● Starting…'
+    html = (
+        LANDING_PAGE_HTML
+        .replace('id="health-badge" title="First visit may take 30-60s (free tier cold start)">Connecting…</span>',
+                  f'id="health-badge">{badge_txt}</span>')
+        .replace('id="health-badge" class="badge waking"',
+                  f'id="health-badge" class="{badge_cls}"')
+    )
+    resp = HTMLResponse(html)
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
     resp.headers['Pragma'] = 'no-cache'
     return resp
