@@ -432,6 +432,7 @@ LANDING_PAGE_HTML = """
     color: var(--text2);
   }
   .badge.ok { border-color: rgba(34,211,238,0.3); color: var(--accent); }
+  .badge.waking { border-color: rgba(251,191,36,0.3); color: var(--warn); }
   .container {
     max-width: 820px;
     margin: 0 auto;
@@ -502,6 +503,16 @@ LANDING_PAGE_HTML = """
     border: 1px solid var(--border);
   }
   .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
+  .error-msg {
+    margin-top: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.3);
+    color: var(--error);
+    font-size: 0.85rem;
+    display: none;
+  }
 
   /* Progress */
   #progress-section { display: none; }
@@ -599,8 +610,6 @@ LANDING_PAGE_HTML = """
     border-top: 1px solid var(--border);
     margin-top: 2rem;
   }
-  .footer a { color: var(--accent); text-decoration: none; }
-  .footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -609,7 +618,7 @@ LANDING_PAGE_HTML = """
   <h1>🔬 SciGraph</h1>
   <p>Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.</p>
   <div class="badges">
-    <span class="badge ok" id="health-badge">● Connecting…</span>
+    <span class="badge waking" id="health-badge">⏳ Warming up…</span>
     <span class="badge">19 databases</span>
     <span class="badge">v3.1.0</span>
   </div>
@@ -644,6 +653,7 @@ LANDING_PAGE_HTML = """
       <button class="btn-primary" id="search-btn" onclick="startSearch()">Search</button>
       <span id="elapsed" style="font-size:0.85rem;color:var(--text2);"></span>
     </div>
+    <div class="error-msg" id="error-msg"></div>
   </div>
 
   <div class="card" id="progress-section">
@@ -666,8 +676,6 @@ LANDING_PAGE_HTML = """
 </div>
 
 <div class="footer">
-  <a href="/docs">API Docs (Swagger)</a> · <a href="/redoc">ReDoc</a> · <a href="/api/health">Health Check</a>
-  <br>
   Powered by <strong>SciGraph v3.1</strong> — 19 database connectors · Multi-hop graph traversal · Enrichment pipeline
 </div>
 
@@ -675,15 +683,39 @@ LANDING_PAGE_HTML = """
 let pollTimer = null;
 let elapsedTimer = null;
 let startTime = 0;
+let healthRetries = 0;
 
-// Health check
-fetch('/api/health').then(r=>r.json()).then(d=>{
-  document.getElementById('health-badge').className='badge ok';
-  document.getElementById('health-badge').textContent='● Healthy';
-}).catch(()=>{
-  document.getElementById('health-badge').className='badge';
-  document.getElementById('health-badge').textContent='● Unreachable';
-});
+function checkHealth() {
+  const badge = document.getElementById('health-badge');
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+  fetch('/api/health', {signal: ctrl.signal}).then(r=>r.json()).then(d=>{
+    clearTimeout(timeoutId);
+    badge.className = 'badge ok';
+    badge.textContent = '● Healthy';
+  }).catch(()=>{
+    clearTimeout(timeoutId);
+    healthRetries++;
+    if (healthRetries < 15) {
+      badge.className = 'badge waking';
+      badge.textContent = '⏳ Warming up…';
+      setTimeout(checkHealth, 3000);
+    } else {
+      badge.className = 'badge';
+      badge.textContent = '● Unreachable';
+    }
+  });
+}
+checkHealth();
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('error-msg').style.display = 'none';
+}
 
 // Enter key triggers search
 document.getElementById('query').addEventListener('keydown', e=>{ if(e.key==='Enter') startSearch(); });
@@ -694,17 +726,25 @@ async function startSearch() {
   const qtype = document.getElementById('qtype').value;
   const hops = parseInt(document.getElementById('hops').value);
 
+  hideError();
   const btn = document.getElementById('search-btn');
   btn.disabled = true;
   btn.textContent = 'Starting…';
 
   try {
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 60000);
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({query, query_type: qtype, hops})
+      body: JSON.stringify({query, query_type: qtype, hops}),
+      signal: ctrl.signal
     });
-    if (!res.ok) throw new Error(await res.text());
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(txt || 'Server returned ' + res.status);
+    }
     const data = await res.json();
 
     startTime = Date.now();
@@ -717,7 +757,10 @@ async function startSearch() {
     elapsedTimer = setInterval(updateElapsed, 200);
     pollTimer = setInterval(()=>pollSearch(data.search_id), 1500);
   } catch(err) {
-    alert('Error: ' + err.message);
+    let msg = err.name === 'AbortError'
+      ? 'Service is warming up from idle. Please wait ~30s and try again.'
+      : 'Search failed: ' + err.message;
+    showError(msg);
     btn.disabled = false;
     btn.textContent = 'Search';
   }
@@ -725,7 +768,10 @@ async function startSearch() {
 
 async function pollSearch(id) {
   try {
-    const res = await fetch('/api/search/' + id);
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+    const res = await fetch('/api/search/' + id, {signal: ctrl.signal});
+    clearTimeout(timeoutId);
     const data = await res.json();
     updateUI(data);
     if (data.status === 'completed' || data.status === 'failed') {
@@ -735,6 +781,9 @@ async function pollSearch(id) {
       document.getElementById('search-btn').textContent = 'Search';
       if (data.status === 'completed' && data.export_files && data.export_files.length > 0) {
         showResults(data);
+      }
+      if (data.status === 'failed') {
+        showError(data.error || 'Search failed. Check the log above for details.');
       }
     }
   } catch(e) { /* retry on next tick */ }
