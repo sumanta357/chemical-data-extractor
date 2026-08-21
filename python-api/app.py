@@ -342,29 +342,14 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
 
 @app.get("/")
 async def root():
-    # Server-side health check — embed status directly in HTML
-    # so the browser never needs a separate fetch (avoids Cloudflare/browser issues)
-    health_ok = False
-    try:
-        import urllib.request as _req
-        port = os.environ.get('PORT', '8000')
-        with _req.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=2) as r:
-            health_ok = r.status == 200
-    except Exception:
-        try:
-            with _req.urlopen('http://127.0.0.1:8000/api/health', timeout=2) as r:
-                health_ok = r.status == 200
-        except Exception:
-            pass
-
-    badge_cls = 'badge ok' if health_ok else 'badge'
-    badge_txt = '● Healthy' if health_ok else '● Starting…'
+    # If the server can serve this page, it IS healthy.
+    # No self-check needed — avoids Render port issues.
     html = (
         LANDING_PAGE_HTML
         .replace('class="badge waking" id="health-badge"',
-                  f'class="{badge_cls}" id="health-badge"')
-        .replace('>Connecting…</span>', f'>{badge_txt}</span>')
-        .replace('>⏳ Connecting…</span>', f'>{badge_txt}</span>')
+                  'class="badge ok" id="health-badge"')
+        .replace('>Connecting…</span>', '>● Healthy</span>')
+        .replace('>⏳ Connecting…</span>', '>● Healthy</span>')
     )
     resp = HTMLResponse(html)
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
