@@ -366,76 +366,80 @@ LANDING_PAGE_HTML = """
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SciGraph — Scientific Knowledge Graph Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0a0e1a;
+    --bg: #030712;
     --surface: #111827;
-    --surface2: #1a2234;
-    --border: #1e2d4a;
-    --accent: #22d3ee;
-    --accent2: #06b6d4;
+    --surface2: #1f2937;
+    --border: #1f2937;
+    --accent: #06b6d4;
+    --accent2: #0891b2;
     --accent3: #8b5cf6;
-    --text: #e2e8f0;
-    --text2: #94a3b8;
-    --success: #34d399;
-    --warn: #fbbf24;
-    --error: #f87171;
+    --text: #f9fafb;
+    --text2: #9ca3af;
+    --success: #10b981;
+    --warn: #f59e0b;
+    --error: #ef4444;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
     line-height: 1.6;
   }
-  .hero {
-    text-align: center;
-    padding: 3rem 1.5rem 2rem;
-    background: linear-gradient(135deg, #0a0e1a 0%, #111827 50%, #0f172a 100%);
+
+  /* Header */
+  .header {
     border-bottom: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
+    background: rgba(17,24,39,0.8);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 50;
   }
-  .hero::before {
-    content: '';
-    position: absolute;
-    top: -50%; left: -50%;
-    width: 200%; height: 200%;
-    background: radial-gradient(circle at 30% 50%, rgba(34,211,238,0.05) 0%, transparent 50%),
-                radial-gradient(circle at 70% 50%, rgba(139,92,246,0.05) 0%, transparent 50%);
-    pointer-events: none;
-  }
-  .hero h1 {
-    font-size: 2.2rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--accent), var(--accent3));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 0.5rem;
-    position: relative;
-  }
-  .hero p {
-    color: var(--text2);
-    font-size: 1rem;
-    max-width: 600px;
+  .header-inner {
+    max-width: 1200px;
     margin: 0 auto;
-    position: relative;
-  }
-  .hero .badges {
+    padding: 0.75rem 1.5rem;
     display: flex;
-    gap: 0.5rem;
-    justify-content: center;
-    margin-top: 1rem;
-    flex-wrap: wrap;
-    position: relative;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .header-brand .logo { font-size: 1.5rem; }
+  .header-brand h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+  .header-brand .version {
+    font-size: 0.7rem;
+    color: var(--text2);
+    font-weight: 500;
+    background: var(--surface2);
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+  }
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.25rem 0.65rem;
+    gap: 0.35rem;
+    padding: 0.3rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.75rem;
     font-weight: 500;
@@ -443,97 +447,204 @@ LANDING_PAGE_HTML = """
     background: var(--surface2);
     color: var(--text2);
   }
-  .badge.ok { border-color: rgba(34,211,238,0.3); color: var(--accent); }
-  .badge.waking { border-color: rgba(251,191,36,0.3); color: var(--warn); }
-  .container {
-    max-width: 820px;
+  .badge.ok { border-color: rgba(16,185,129,0.4); color: var(--success); background: rgba(16,185,129,0.1); }
+  .badge.waking { border-color: rgba(245,158,11,0.4); color: var(--warn); background: rgba(245,158,11,0.1); }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    padding: 4rem 1.5rem 3rem;
+    background: linear-gradient(180deg, #030712 0%, #0c1222 50%, #030712 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    width: 800px; height: 400px;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse, rgba(6,182,212,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero h2 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+    position: relative;
+    letter-spacing: -0.03em;
+  }
+  .hero h2 span {
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero p {
+    color: var(--text2);
+    font-size: 1.1rem;
+    max-width: 550px;
+    margin: 0 auto 1.5rem;
+    position: relative;
+  }
+  .hero-stats {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .hero-stat {
+    text-align: center;
+  }
+  .hero-stat .num {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .hero-stat .label {
+    font-size: 0.75rem;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Main layout */
+  .main {
+    max-width: 1200px;
     margin: 0 auto;
     padding: 2rem 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
+  @media (min-width: 768px) {
+    .main { grid-template-columns: 2fr 3fr; }
+  }
+
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    padding: 1.25rem;
   }
-  .card h2 {
-    font-size: 1.1rem;
+  .card h3 {
+    font-size: 0.8rem;
     font-weight: 600;
     margin-bottom: 1rem;
-    color: var(--text);
-  }
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 0.75rem;
-    align-items: end;
-  }
-  @media (max-width: 600px) {
-    .form-row { grid-template-columns: 1fr; }
-  }
-  label {
-    display: block;
-    font-size: 0.8rem;
-    font-weight: 500;
     color: var(--text2);
-    margin-bottom: 0.35rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
-  input, select {
+
+  /* Form */
+  .field { margin-bottom: 0.85rem; }
+  .field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 0.35rem;
+  }
+  .field input, .field select {
     width: 100%;
-    padding: 0.65rem 0.85rem;
+    padding: 0.6rem 0.75rem;
     border-radius: 8px;
     border: 1px solid var(--border);
-    background: var(--surface2);
+    background: var(--bg);
     color: var(--text);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+    font-family: inherit;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.15s;
   }
-  input:focus, select:focus { border-color: var(--accent); }
-  select { cursor: pointer; min-width: 120px; }
-  button {
-    padding: 0.65rem 1.5rem;
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field select { cursor: pointer; }
+
+  .type-btns, .hop-btns {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .type-btns button, .hop-btns button {
+    flex: 1;
+    padding: 0.5rem 0.25rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text2);
+    font-size: 0.8rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .type-btns button.active, .hop-btns button.active {
+    border-color: var(--accent);
+    background: rgba(6,182,212,0.1);
+    color: var(--accent);
+  }
+  .type-btns button:hover, .hop-btns button:hover:not(.active) {
+    border-color: #374151;
+    color: var(--text);
+  }
+
+  .search-btn {
+    width: 100%;
+    padding: 0.7rem;
     border-radius: 8px;
     border: none;
     font-size: 0.95rem;
     font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.2s;
-  }
-  .btn-primary {
     background: linear-gradient(135deg, var(--accent2), var(--accent));
-    color: #0a0e1a;
+    color: #030712;
+    transition: all 0.15s;
+    margin-top: 0.5rem;
   }
-  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
-  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-  .btn-secondary {
-    background: var(--surface2);
-    color: var(--text2);
-    border: 1px solid var(--border);
-  }
-  .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
+  .search-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .search-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
   .error-msg {
-    margin-top: 0.75rem;
-    padding: 0.65rem 0.85rem;
+    margin-top: 0.65rem;
+    padding: 0.6rem 0.75rem;
     border-radius: 8px;
-    background: rgba(248,113,113,0.1);
-    border: 1px solid rgba(248,113,113,0.3);
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
     color: var(--error);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     display: none;
   }
 
   /* Progress */
-  #progress-section { display: none; }
+  .progress-section { display: none; }
+  .progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  .progress-header h3 { margin-bottom: 0; }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .status-queued { background: rgba(245,158,11,0.15); color: var(--warn); }
+  .status-running { background: rgba(6,182,212,0.15); color: var(--accent); }
+  .status-completed { background: rgba(16,185,129,0.15); color: var(--success); }
+  .status-failed { background: rgba(239,68,68,0.15); color: var(--error); }
   .progress-bar {
     height: 3px;
     background: var(--surface2);
     border-radius: 2px;
     overflow: hidden;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
   }
   .progress-bar .fill {
     height: 100%;
@@ -546,149 +657,204 @@ LANDING_PAGE_HTML = """
     0% { transform: translateX(-100%); }
     100% { transform: translateX(400%); }
   }
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.3rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.8rem;
-    font-weight: 600;
+  .progress-text {
+    font-size: 0.85rem;
+    color: var(--text);
+    margin-bottom: 0.5rem;
   }
-  .status-running { background: rgba(34,211,238,0.15); color: var(--accent); }
-  .status-completed { background: rgba(52,211,153,0.15); color: var(--success); }
-  .status-failed { background: rgba(248,113,113,0.15); color: var(--error); }
-  .status-queued { background: rgba(251,191,36,0.15); color: var(--warn); }
-
   .log-box {
     background: #0d1117;
-    border: 1px solid var(--border);
+    border: 1px solid #21262d;
     border-radius: 8px;
-    padding: 1rem;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.8rem;
-    line-height: 1.5;
+    padding: 0.85rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
     color: var(--text2);
-    max-height: 350px;
+    max-height: 400px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
-    margin-top: 0.75rem;
   }
-  .log-box::-webkit-scrollbar { width: 6px; }
+  .log-box::-webkit-scrollbar { width: 5px; }
   .log-box::-webkit-scrollbar-track { background: transparent; }
-  .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .log-box::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
 
   /* Results */
-  #results-section { display: none; }
+  .results-section { display: none; }
   .exports-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 0.5rem;
-    margin-top: 0.75rem;
   }
   .export-card {
-    background: var(--surface2);
+    background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    transition: border-color 0.2s;
+    padding: 0.65rem;
+    transition: border-color 0.15s;
   }
   .export-card:hover { border-color: var(--accent); }
   .export-card .name {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 500;
     color: var(--text);
     word-break: break-all;
+    margin-bottom: 0.15rem;
   }
-  .export-card .size { font-size: 0.75rem; color: var(--text2); }
+  .export-card .size { font-size: 0.7rem; color: var(--text2); }
   .export-card a {
     display: inline-block;
-    margin-top: 0.35rem;
-    font-size: 0.8rem;
+    margin-top: 0.3rem;
+    font-size: 0.72rem;
     color: var(--accent);
     text-decoration: none;
+    font-weight: 500;
   }
   .export-card a:hover { text-decoration: underline; }
 
+  /* Features */
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 1.5rem 2rem;
+  }
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+  }
+  .feature-card .icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  .feature-card h4 { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+  .feature-card p { font-size: 0.8rem; color: var(--text2); line-height: 1.5; }
+
+  /* Footer */
   .footer {
     text-align: center;
-    padding: 2rem 1rem;
+    padding: 2rem 1.5rem;
     color: var(--text2);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     border-top: 1px solid var(--border);
-    margin-top: 2rem;
+    margin-top: 1rem;
   }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 
-<div class="hero">
-  <h1>🔬 SciGraph</h1>
-  <p>Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.</p>
-  <div class="badges">
-    <span class="badge waking" id="health-badge" title="First visit may take 30-60s (free tier cold start)">⏳ Connecting…</span>
-    <span class="badge">19 databases</span>
-    <span class="badge">v3.1.0</span>
+<!-- Header -->
+<div class="header">
+  <div class="header-inner">
+    <div class="header-brand">
+      <span class="logo">🔬</span>
+      <h1>SciGraph</h1>
+      <span class="version">v3.1</span>
+    </div>
+    <div class="header-status">
+      <span class="badge ok" id="health-badge">● Online</span>
+    </div>
   </div>
 </div>
 
-<div class="container">
+<!-- Hero -->
+<div class="hero">
+  <h2><span>Scientific Knowledge Graph</span></h2>
+  <p>Multi-hop automated discovery engine. Search proteins, compounds, and pathways across 19+ databases.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num">19+</div><div class="label">Databases</div></div>
+    <div class="hero-stat"><div class="num">4</div><div class="label">Hop Depth</div></div>
+    <div class="hero-stat"><div class="num">7+</div><div class="label">Export Formats</div></div>
+    <div class="hero-stat"><div class="num">15</div><div class="label">Export Files</div></div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <!-- Left: Search Form -->
   <div class="card">
-    <h2>Search Knowledge Graph</h2>
-    <div class="form-row">
-      <div>
-        <label for="query">Query</label>
-        <input id="query" type="text" placeholder="e.g. Aspirin, Tubulin, P23219…" autofocus>
-      </div>
-      <div>
-        <label for="qtype">Type</label>
-        <select id="qtype">
-          <option value="auto">Auto</option>
-          <option value="protein">Protein</option>
-          <option value="ligand">Ligand</option>
-        </select>
-      </div>
-      <div>
-        <label for="hops">Hops</label>
-        <select id="hops">
-          <option value="1" selected>1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-        </select>
+    <h3>Search Knowledge Graph</h3>
+    <div class="field">
+      <label>Query</label>
+      <input id="query" type="text" placeholder='e.g. &quot;Aspirin&quot;, &quot;Tubulin&quot;, &quot;EGFR&quot;, &quot;P23219&quot;' autofocus>
+    </div>
+    <div class="field">
+      <label>Query Type</label>
+      <div class="type-btns">
+        <button class="active" data-type="auto">🔄 Auto</button>
+        <button data-type="protein">🧬 Protein</button>
+        <button data-type="ligand">💊 Ligand</button>
       </div>
     </div>
-    <div style="margin-top:1rem;display:flex;gap:0.5rem;align-items:center;">
-      <button class="btn-primary" id="search-btn" onclick="startSearch()">Search</button>
-      <span id="elapsed" style="font-size:0.85rem;color:var(--text2);"></span>
+    <div class="field">
+      <label>Expansion Depth</label>
+      <div class="hop-btns">
+        <button class="active" data-hops="1">1</button>
+        <button data-hops="2">2</button>
+        <button data-hops="3">3</button>
+      </div>
     </div>
+    <button class="search-btn" id="search-btn" onclick="startSearch()">🚀 Run Search</button>
+    <span id="elapsed" style="display:block;text-align:center;font-size:0.8rem;color:var(--text2);margin-top:0.4rem;"></span>
     <div class="error-msg" id="error-msg"></div>
   </div>
 
-  <div class="card" id="progress-section">
-    <h2 style="display:flex;align-items:center;gap:0.5rem;">
-      Progress
-      <span class="status-pill status-running" id="status-pill">⏳ Queued</span>
-    </h2>
-    <div class="progress-bar"><div class="fill"></div></div>
-    <div style="font-size:0.9rem;color:var(--text);margin-bottom:0.5rem;" id="progress-text">⏳ Queued…</div>
-    <details open>
-      <summary style="font-size:0.85rem;color:var(--text2);cursor:pointer;margin-bottom:0.25rem;">Live log</summary>
-      <div class="log-box" id="log-box"></div>
-    </details>
-  </div>
+  <!-- Right: Progress + Results -->
+  <div>
+    <div class="card progress-section" id="progress-section">
+      <div class="progress-header">
+        <h3>Progress</h3>
+        <span class="status-pill status-running" id="status-pill">⏳ Queued</span>
+      </div>
+      <div class="progress-bar"><div class="fill"></div></div>
+      <div class="progress-text" id="progress-text">⏳ Queued…</div>
+      <details open>
+        <summary style="font-size:0.8rem;color:var(--text2);cursor:pointer;margin-bottom:0.5rem;">Live Log</summary>
+        <div class="log-box" id="log-box"></div>
+      </details>
+    </div>
 
-  <div class="card" id="results-section">
-    <h2 style="display:flex;align-items:center;gap:0.5rem;">📦 Export Files</h2>
-    <div class="exports-grid" id="exports-grid"></div>
+    <div class="card results-section" id="results-section">
+      <h3>Export Files</h3>
+      <div class="exports-grid" id="exports-grid"></div>
+    </div>
   </div>
 </div>
 
+<!-- Features -->
+<div class="features">
+  <div class="feature-card">
+    <div class="icon">🧬</div>
+    <h4>Multi-Hop Expansion</h4>
+    <p>Traverse knowledge graphs up to 4 hops deep to discover hidden connections.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">📊</div>
+    <h4>Rich Exports</h4>
+    <p>Excel, CSV, GraphML, Cypher, RDF, Turtle, Parquet — ready for analysis.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">🔬</div>
+    <h4>19+ Databases</h4>
+    <p>PubChem, ChEMBL, UniProt, PDB, KEGG, Reactome, and many more.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">✨</div>
+    <h4>Auto-Enrichment</h4>
+    <p>SMILES, molecular formulas, CrossRef metadata added automatically.</p>
+  </div>
+</div>
+
+<!-- Footer -->
 <div class="footer">
-  Powered by <strong>SciGraph v3.1</strong> — 19 database connectors · Multi-hop graph traversal · Enrichment pipeline
+  Powered by <strong>SciGraph v3.1</strong> — Enterprise Scientific Knowledge Graph Platform<br>
+  19 database connectors · Multi-hop graph traversal · Enrichment pipeline
 </div>
 
 <script>
@@ -696,133 +862,119 @@ let pollTimer = null;
 let elapsedTimer = null;
 let startTime = 0;
 let healthRetries = 0;
+let queryType = 'auto';
+let hops = 1;
 
+// Type buttons
+document.querySelectorAll('.type-btns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.type-btns button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    queryType = btn.dataset.type;
+  });
+});
+// Hops buttons
+document.querySelectorAll('.hop-btns button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.hop-btns button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    hops = parseInt(btn.dataset.hops);
+  });
+});
+
+// Health check (only downgrade, never override server-side Healthy)
 function checkHealth() {
   const badge = document.getElementById('health-badge');
   const ctrl = new AbortController();
-  const timeoutId = setTimeout(() => ctrl.abort(), 30000);
-  fetch('/api/health', {signal: ctrl.signal}).then(r=>{
-    clearTimeout(timeoutId);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+  const tid = setTimeout(() => ctrl.abort(), 30000);
+  fetch('/api/health', {signal: ctrl.signal}).then(r => {
+    clearTimeout(tid);
+    if (!r.ok) throw new Error();
     return r.json();
-  }).then(d=>{
+  }).then(() => {
     badge.className = 'badge ok';
-    badge.textContent = '● Healthy';
-    badge.title = 'Engine is online';
-  }).catch(()=>{
-    clearTimeout(timeoutId);
-    // Only downgrade if the badge was already Healthy (don't override server-side status)
-    if (badge.textContent.includes('Healthy')) {
+    badge.textContent = '● Online';
+  }).catch(() => {
+    clearTimeout(tid);
+    if (badge.textContent.includes('Online')) {
       healthRetries++;
       if (healthRetries < 10) {
         badge.className = 'badge waking';
-        badge.textContent = '⏳ Warming up…';
+        badge.textContent = '⏳ Waking…';
         setTimeout(checkHealth, 5000);
       } else {
         badge.className = 'badge';
-        badge.textContent = '● Unreachable';
+        badge.textContent = '● Offline';
       }
     }
   });
 }
 checkHealth();
 
-function showError(msg) {
-  const el = document.getElementById('error-msg');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-function hideError() {
-  document.getElementById('error-msg').style.display = 'none';
-}
+function showError(msg) { const e = document.getElementById('error-msg'); e.textContent = msg; e.style.display = 'block'; }
+function hideError() { document.getElementById('error-msg').style.display = 'none'; }
 
-// Enter key triggers search
-document.getElementById('query').addEventListener('keydown', e=>{ if(e.key==='Enter') startSearch(); });
+document.getElementById('query').addEventListener('keydown', e => { if (e.key === 'Enter') startSearch(); });
 
 async function startSearch() {
   const query = document.getElementById('query').value.trim();
   if (!query) { document.getElementById('query').focus(); return; }
-  const qtype = document.getElementById('qtype').value;
-  const hops = parseInt(document.getElementById('hops').value);
-
   hideError();
   const btn = document.getElementById('search-btn');
-  btn.disabled = true;
-  btn.textContent = 'Starting…';
-
+  btn.disabled = true; btn.textContent = '⏳ Starting…';
   try {
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 90000);
+    const tid = setTimeout(() => ctrl.abort(), 90000);
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({query, query_type: qtype, hops}),
+      body: JSON.stringify({query, query_type: queryType, hops}),
       signal: ctrl.signal
     });
-    clearTimeout(timeoutId);
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(txt || 'Server returned ' + res.status);
-    }
+    clearTimeout(tid);
+    if (!res.ok) throw new Error(await res.text() || 'HTTP ' + res.status);
     const data = await res.json();
-
     startTime = Date.now();
     document.getElementById('progress-section').style.display = '';
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('exports-grid').innerHTML = '';
     document.getElementById('log-box').textContent = '';
     updateUI(data);
-
-    elapsedTimer = setInterval(updateElapsed, 200);
-    pollTimer = setInterval(()=>pollSearch(data.search_id), 1500);
-  } catch(err) {
-    let msg = err.name === 'AbortError'
-      ? 'Service is warming up from idle. Please wait ~30s and try again.'
-      : 'Search failed: ' + err.message;
-    showError(msg);
-    btn.disabled = false;
-    btn.textContent = 'Search';
+    elapsedTimer = setInterval(() => {
+      document.getElementById('elapsed').textContent = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+    }, 200);
+    pollTimer = setInterval(() => pollSearch(data.search_id), 1500);
+  } catch (err) {
+    showError(err.name === 'AbortError' ? 'Service is warming up. Wait ~30s and try again.' : 'Search failed: ' + err.message);
+    btn.disabled = false; btn.textContent = '🚀 Run Search';
   }
 }
 
 async function pollSearch(id) {
   try {
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 15000);
+    const tid = setTimeout(() => ctrl.abort(), 15000);
     const res = await fetch('/api/search/' + id, {signal: ctrl.signal});
-    clearTimeout(timeoutId);
+    clearTimeout(tid);
     const data = await res.json();
     updateUI(data);
     if (data.status === 'completed' || data.status === 'failed') {
-      clearInterval(pollTimer);
-      clearInterval(elapsedTimer);
+      clearInterval(pollTimer); clearInterval(elapsedTimer);
       document.getElementById('search-btn').disabled = false;
-      document.getElementById('search-btn').textContent = 'Search';
-      if (data.status === 'completed' && data.export_files && data.export_files.length > 0) {
-        showResults(data);
-      }
-      if (data.status === 'failed') {
-        showError(data.error || 'Search failed. Check the log above for details.');
-      }
+      document.getElementById('search-btn').textContent = '🚀 Run Search';
+      if (data.status === 'completed' && data.export_files?.length > 0) showResults(data);
+      if (data.status === 'failed') showError(data.error || 'Search failed.');
     }
-  } catch(e) { /* retry on next tick */ }
+  } catch (e) { /* retry */ }
 }
 
 function updateUI(data) {
   const pill = document.getElementById('status-pill');
-  const statusMap = {
-    queued: ['⏳ Queued', 'status-queued'],
-    running: ['⚡ Running', 'status-running'],
-    completed: ['✅ Completed', 'status-completed'],
-    failed: ['❌ Failed', 'status-failed']
-  };
-  const [label, cls] = statusMap[data.status] || ['?',''];
-  pill.textContent = label;
-  pill.className = 'status-pill ' + cls;
-
+  const m = { queued: ['⏳ Queued', 'status-queued'], running: ['⚡ Running', 'status-running'], completed: ['✅ Done', 'status-completed'], failed: ['❌ Failed', 'status-failed'] };
+  const [l, c] = m[data.status] || ['?', ''];
+  pill.textContent = l; pill.className = 'status-pill ' + c;
   document.getElementById('progress-text').textContent = data.progress || '';
-
-  if (data.log && data.log.length > 0) {
+  if (data.log?.length > 0) {
     const box = document.getElementById('log-box');
     box.textContent = data.log.join('\n');
     box.scrollTop = box.scrollHeight;
@@ -831,22 +983,15 @@ function updateUI(data) {
 
 function showResults(data) {
   document.getElementById('results-section').style.display = '';
-  const grid = document.getElementById('exports-grid');
-  grid.innerHTML = '';
+  const g = document.getElementById('exports-grid');
+  g.innerHTML = '';
   for (const f of data.export_files) {
-    const card = document.createElement('div');
-    card.className = 'export-card';
-    const dlUrl = '/api/exports/' + encodeURIComponent(f.name) + '?search_id=' + data.search_id;
-    card.innerHTML = '<div class="name">📄 ' + f.name + '</div>'
-      + '<div class="size">' + f.size_display + '</div>'
-      + '<a href="' + dlUrl + '" target="_blank">Download →</a>';
-    grid.appendChild(card);
+    const d = document.createElement('div');
+    d.className = 'export-card';
+    const u = '/api/exports/' + encodeURIComponent(f.name) + '?search_id=' + data.search_id;
+    d.innerHTML = '<div class="name">📄 ' + f.name + '</div><div class="size">' + f.size_display + '</div><a href="' + u + '" target="_blank">Download →</a>';
+    g.appendChild(d);
   }
-}
-
-function updateElapsed() {
-  const sec = ((Date.now() - startTime) / 1000).toFixed(1);
-  document.getElementById('elapsed').textContent = sec + 's';
 }
 </script>
 </body>
