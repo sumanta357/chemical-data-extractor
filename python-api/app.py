@@ -711,16 +711,17 @@ function checkHealth() {
     badge.title = 'Engine is online';
   }).catch(()=>{
     clearTimeout(timeoutId);
-    healthRetries++;
-    if (healthRetries < 10) {
-      badge.className = 'badge waking';
-      const elapsed = Math.round(healthRetries * 5);
-      badge.textContent = '⏳ Warming up… (' + elapsed + 's)';
-      badge.title = 'Free-tier cold start — typically takes 30-60s';
-      setTimeout(checkHealth, 5000);
-    } else {
-      badge.className = 'badge';
-      badge.textContent = '● Unreachable';
+    // Only downgrade if the badge was already Healthy (don't override server-side status)
+    if (badge.textContent.includes('Healthy')) {
+      healthRetries++;
+      if (healthRetries < 10) {
+        badge.className = 'badge waking';
+        badge.textContent = '⏳ Warming up…';
+        setTimeout(checkHealth, 5000);
+      } else {
+        badge.className = 'badge';
+        badge.textContent = '● Unreachable';
+      }
     }
   });
 }
