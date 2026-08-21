@@ -361,10 +361,10 @@ async def root():
     badge_txt = '● Healthy' if health_ok else '● Starting…'
     html = (
         LANDING_PAGE_HTML
-        .replace('id="health-badge" title="First visit may take 30-60s (free tier cold start)">Connecting…</span>',
-                  f'id="health-badge">{badge_txt}</span>')
-        .replace('id="health-badge" class="badge waking"',
-                  f'id="health-badge" class="{badge_cls}"')
+        .replace('class="badge waking" id="health-badge"',
+                  f'class="{badge_cls}" id="health-badge"')
+        .replace('>Connecting…</span>', f'>{badge_txt}</span>')
+        .replace('>⏳ Connecting…</span>', f'>{badge_txt}</span>')
     )
     resp = HTMLResponse(html)
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
