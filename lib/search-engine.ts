@@ -98,7 +98,7 @@ async function refreshRemoteState(state: SearchState): Promise<void> {
   try {
     const data = await fetchJson(
       `${state.remote_engine_url}/api/search/${state.remote_search_id}`,
-      { signal: AbortSignal.timeout(20_000) }
+      {      signal: AbortSignal.timeout(60_000) }
     );
 
     state.status = data.status || state.status;
@@ -138,7 +138,7 @@ async function startHostedSearch(
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ query, query_type: queryType, hops }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(120_000),
     });
 
     state.remote_engine_url = engineUrl;
