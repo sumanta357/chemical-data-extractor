@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 # Engine files (scigraph.py, enrich_exports.py) live in ../api/
@@ -342,11 +342,448 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
 
 @app.get("/")
 async def root():
-    return {
-        "message": "Scientific Knowledge Graph API",
-        "docs": "/docs",
-        "health": "/api/health",
+    return HTMLResponse(LANDING_PAGE_HTML)
+
+
+# ── Landing Page HTML ────────────────────────────────────────────────────────
+
+LANDING_PAGE_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SciGraph — Scientific Knowledge Graph Platform</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2234;
+    --border: #1e2d4a;
+    --accent: #22d3ee;
+    --accent2: #06b6d4;
+    --accent3: #8b5cf6;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --success: #34d399;
+    --warn: #fbbf24;
+    --error: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+  .hero {
+    text-align: center;
+    padding: 3rem 1.5rem 2rem;
+    background: linear-gradient(135deg, #0a0e1a 0%, #111827 50%, #0f172a 100%);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle at 30% 50%, rgba(34,211,238,0.05) 0%, transparent 50%),
+                radial-gradient(circle at 70% 50%, rgba(139,92,246,0.05) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.5rem;
+    position: relative;
+  }
+  .hero p {
+    color: var(--text2);
+    font-size: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
+    position: relative;
+  }
+  .hero .badges {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text2);
+  }
+  .badge.ok { border-color: rgba(34,211,238,0.3); color: var(--accent); }
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .card h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.75rem;
+    align-items: end;
+  }
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+  }
+  label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text2);
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  input, select {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  select { cursor: pointer; min-width: 120px; }
+  button {
+    padding: 0.65rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    color: #0a0e1a;
+  }
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text2);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Progress */
+  #progress-section { display: none; }
+  .progress-bar {
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    width: 30%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent3));
+    border-radius: 2px;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .status-running { background: rgba(34,211,238,0.15); color: var(--accent); }
+  .status-completed { background: rgba(52,211,153,0.15); color: var(--success); }
+  .status-failed { background: rgba(248,113,113,0.15); color: var(--error); }
+  .status-queued { background: rgba(251,191,36,0.15); color: var(--warn); }
+
+  .log-box {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text2);
+    max-height: 350px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 0.75rem;
+  }
+  .log-box::-webkit-scrollbar { width: 6px; }
+  .log-box::-webkit-scrollbar-track { background: transparent; }
+  .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* Results */
+  #results-section { display: none; }
+  .exports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .export-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: border-color 0.2s;
+  }
+  .export-card:hover { border-color: var(--accent); }
+  .export-card .name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .export-card .size { font-size: 0.75rem; color: var(--text2); }
+  .export-card a {
+    display: inline-block;
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .export-card a:hover { text-decoration: underline; }
+
+  .footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text2);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🔬 SciGraph</h1>
+  <p>Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.</p>
+  <div class="badges">
+    <span class="badge ok" id="health-badge">● Connecting…</span>
+    <span class="badge">19 databases</span>
+    <span class="badge">v3.1.0</span>
+  </div>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h2>Search Knowledge Graph</h2>
+    <div class="form-row">
+      <div>
+        <label for="query">Query</label>
+        <input id="query" type="text" placeholder="e.g. Aspirin, Tubulin, P23219…" autofocus>
+      </div>
+      <div>
+        <label for="qtype">Type</label>
+        <select id="qtype">
+          <option value="auto">Auto</option>
+          <option value="protein">Protein</option>
+          <option value="ligand">Ligand</option>
+        </select>
+      </div>
+      <div>
+        <label for="hops">Hops</label>
+        <select id="hops">
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:1rem;display:flex;gap:0.5rem;align-items:center;">
+      <button class="btn-primary" id="search-btn" onclick="startSearch()">Search</button>
+      <span id="elapsed" style="font-size:0.85rem;color:var(--text2);"></span>
+    </div>
+  </div>
+
+  <div class="card" id="progress-section">
+    <h2 style="display:flex;align-items:center;gap:0.5rem;">
+      Progress
+      <span class="status-pill status-running" id="status-pill">⏳ Queued</span>
+    </h2>
+    <div class="progress-bar"><div class="fill"></div></div>
+    <div style="font-size:0.9rem;color:var(--text);margin-bottom:0.5rem;" id="progress-text">⏳ Queued…</div>
+    <details open>
+      <summary style="font-size:0.85rem;color:var(--text2);cursor:pointer;margin-bottom:0.25rem;">Live log</summary>
+      <div class="log-box" id="log-box"></div>
+    </details>
+  </div>
+
+  <div class="card" id="results-section">
+    <h2 style="display:flex;align-items:center;gap:0.5rem;">📦 Export Files</h2>
+    <div class="exports-grid" id="exports-grid"></div>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="/docs">API Docs (Swagger)</a> · <a href="/redoc">ReDoc</a> · <a href="/api/health">Health Check</a>
+  <br>
+  Powered by <strong>SciGraph v3.1</strong> — 19 database connectors · Multi-hop graph traversal · Enrichment pipeline
+</div>
+
+<script>
+let pollTimer = null;
+let elapsedTimer = null;
+let startTime = 0;
+
+// Health check
+fetch('/api/health').then(r=>r.json()).then(d=>{
+  document.getElementById('health-badge').className='badge ok';
+  document.getElementById('health-badge').textContent='● Healthy';
+}).catch(()=>{
+  document.getElementById('health-badge').className='badge';
+  document.getElementById('health-badge').textContent='● Unreachable';
+});
+
+// Enter key triggers search
+document.getElementById('query').addEventListener('keydown', e=>{ if(e.key==='Enter') startSearch(); });
+
+async function startSearch() {
+  const query = document.getElementById('query').value.trim();
+  if (!query) { document.getElementById('query').focus(); return; }
+  const qtype = document.getElementById('qtype').value;
+  const hops = parseInt(document.getElementById('hops').value);
+
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  try {
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query, query_type: qtype, hops})
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    startTime = Date.now();
+    document.getElementById('progress-section').style.display = '';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('exports-grid').innerHTML = '';
+    document.getElementById('log-box').textContent = '';
+    updateUI(data);
+
+    elapsedTimer = setInterval(updateElapsed, 200);
+    pollTimer = setInterval(()=>pollSearch(data.search_id), 1500);
+  } catch(err) {
+    alert('Error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+}
+
+async function pollSearch(id) {
+  try {
+    const res = await fetch('/api/search/' + id);
+    const data = await res.json();
+    updateUI(data);
+    if (data.status === 'completed' || data.status === 'failed') {
+      clearInterval(pollTimer);
+      clearInterval(elapsedTimer);
+      document.getElementById('search-btn').disabled = false;
+      document.getElementById('search-btn').textContent = 'Search';
+      if (data.status === 'completed' && data.export_files && data.export_files.length > 0) {
+        showResults(data);
+      }
     }
+  } catch(e) { /* retry on next tick */ }
+}
+
+function updateUI(data) {
+  const pill = document.getElementById('status-pill');
+  const statusMap = {
+    queued: ['⏳ Queued', 'status-queued'],
+    running: ['⚡ Running', 'status-running'],
+    completed: ['✅ Completed', 'status-completed'],
+    failed: ['❌ Failed', 'status-failed']
+  };
+  const [label, cls] = statusMap[data.status] || ['?',''];
+  pill.textContent = label;
+  pill.className = 'status-pill ' + cls;
+
+  document.getElementById('progress-text').textContent = data.progress || '';
+
+  if (data.log && data.log.length > 0) {
+    const box = document.getElementById('log-box');
+    box.textContent = data.log.join('\n');
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+function showResults(data) {
+  document.getElementById('results-section').style.display = '';
+  const grid = document.getElementById('exports-grid');
+  grid.innerHTML = '';
+  for (const f of data.export_files) {
+    const card = document.createElement('div');
+    card.className = 'export-card';
+    const dlUrl = '/api/exports/' + encodeURIComponent(f.name) + '?search_id=' + data.search_id;
+    card.innerHTML = '<div class="name">📄 ' + f.name + '</div>'
+      + '<div class="size">' + f.size_display + '</div>'
+      + '<a href="' + dlUrl + '" target="_blank">Download →</a>';
+    grid.appendChild(card);
+  }
+}
+
+function updateElapsed() {
+  const sec = ((Date.now() - startTime) / 1000).toFixed(1);
+  document.getElementById('elapsed').textContent = sec + 's';
+}
+</script>
+</body>
+</html>
+"""
 
 
 # ── MIME helpers ─────────────────────────────────────────────────────────────
