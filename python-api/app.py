@@ -342,7 +342,10 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
 
 @app.get("/")
 async def root():
-    return HTMLResponse(LANDING_PAGE_HTML)
+    resp = HTMLResponse(LANDING_PAGE_HTML)
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
 
 
 # ── Landing Page HTML ────────────────────────────────────────────────────────
@@ -688,18 +691,21 @@ let healthRetries = 0;
 function checkHealth() {
   const badge = document.getElementById('health-badge');
   const ctrl = new AbortController();
-  const timeoutId = setTimeout(() => ctrl.abort(), 8000);
-  fetch('/api/health', {signal: ctrl.signal}).then(r=>r.json()).then(d=>{
+  const timeoutId = setTimeout(() => ctrl.abort(), 20000);
+  fetch('/api/health', {signal: ctrl.signal}).then(r=>{
     clearTimeout(timeoutId);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(d=>{
     badge.className = 'badge ok';
     badge.textContent = '● Healthy';
   }).catch(()=>{
     clearTimeout(timeoutId);
     healthRetries++;
-    if (healthRetries < 15) {
+    if (healthRetries < 20) {
       badge.className = 'badge waking';
-      badge.textContent = '⏳ Warming up…';
-      setTimeout(checkHealth, 3000);
+      badge.textContent = '⏳ Warming up… (' + healthRetries + '/20)';
+      setTimeout(checkHealth, 4000);
     } else {
       badge.className = 'badge';
       badge.textContent = '● Unreachable';
