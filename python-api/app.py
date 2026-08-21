@@ -621,7 +621,7 @@ LANDING_PAGE_HTML = """
   <h1>🔬 SciGraph</h1>
   <p>Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.</p>
   <div class="badges">
-    <span class="badge waking" id="health-badge">⏳ Warming up…</span>
+    <span class="badge waking" id="health-badge" title="First visit may take 30-60s (free tier cold start)">⏳ Connecting…</span>
     <span class="badge">19 databases</span>
     <span class="badge">v3.1.0</span>
   </div>
@@ -691,7 +691,7 @@ let healthRetries = 0;
 function checkHealth() {
   const badge = document.getElementById('health-badge');
   const ctrl = new AbortController();
-  const timeoutId = setTimeout(() => ctrl.abort(), 20000);
+  const timeoutId = setTimeout(() => ctrl.abort(), 30000);
   fetch('/api/health', {signal: ctrl.signal}).then(r=>{
     clearTimeout(timeoutId);
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -699,13 +699,16 @@ function checkHealth() {
   }).then(d=>{
     badge.className = 'badge ok';
     badge.textContent = '● Healthy';
+    badge.title = 'Engine is online';
   }).catch(()=>{
     clearTimeout(timeoutId);
     healthRetries++;
-    if (healthRetries < 20) {
+    if (healthRetries < 10) {
       badge.className = 'badge waking';
-      badge.textContent = '⏳ Warming up… (' + healthRetries + '/20)';
-      setTimeout(checkHealth, 4000);
+      const elapsed = Math.round(healthRetries * 5);
+      badge.textContent = '⏳ Warming up… (' + elapsed + 's)';
+      badge.title = 'Free-tier cold start — typically takes 30-60s';
+      setTimeout(checkHealth, 5000);
     } else {
       badge.className = 'badge';
       badge.textContent = '● Unreachable';
@@ -739,7 +742,7 @@ async function startSearch() {
 
   try {
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 60000);
+    const timeoutId = setTimeout(() => ctrl.abort(), 90000);
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
