@@ -1,7 +1,26 @@
-scigraph_data/
+# Generated data directories
+/exports/
+/exports_*/
+test_*/
+aspirin_hops4/
+/scigraph_data/
+
+# Python cache
 __pycache__/
 .pytest_cache/
-exports_BKP/
 *.pyc
 *.duckdb
 *.sqlite
+
+# Next.js build artifacts
+.next/
+node_modules/
+bun.lock
+bun.lockb
+
+# Isolated test copy (large)
+isolate/
+
+# IDE
+.idea/
+.vscode/

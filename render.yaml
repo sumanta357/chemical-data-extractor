@@ -1,0 +1,17 @@
+# Render Blueprint — deploys the Python search engine as an always-on web service.
+# The Next.js app (deployed on Freebuff/Vercel) proxies search calls here via the
+# SEARCH_ENGINE_URL environment variable.
+#
+# To deploy: connect this repo to Render, pick "Blueprint", and Render will create
+# the service automatically. The free plan works; it sleeps after ~15 min of idle
+# (first request wakes it in ~30-60s).
+services:
+  - type: web
+    name: scigraph-engine
+    runtime: python
+    rootDir: python-api
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true

@@ -1,0 +1,13 @@
+# Hosted Python API (python-api/) — FastAPI web layer
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.5.0
+
+# Engine deps (shared with api/scigraph.py and api/enrich_exports.py)
+aiohttp>=3.9.0           # Async HTTP for API connectors
+networkx>=3.0            # Graph data structures
+duckdb>=0.9.0            # Analytical queries
+openpyxl>=3.1.0          # Excel export & enrichment (enriched_data.xlsx)
+pyarrow>=12.0.0          # Parquet export
+matplotlib>=3.7.0        # Visualization
+requests>=2.31.0         # HTTP for enrichment pipeline (CrossRef, PubChem)
