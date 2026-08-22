@@ -715,14 +715,7 @@ LANDING_PAGE_HTML = """
 
   /* Features */
   .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-top: 2rem;
-    max-width: 1200px;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 0 1.5rem 2rem;
+    display: none;
   }
   .feature-card {
     background: var(--surface);
@@ -888,7 +881,7 @@ document.querySelectorAll('.hop-btns button').forEach(btn => {
 function checkHealth() {
   const badge = document.getElementById('health-badge');
   const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), 30000);
+  const tid = setTimeout(() => ctrl.abort(), 60000);
   fetch('/api/health', {signal: ctrl.signal}).then(r => {
     clearTimeout(tid);
     if (!r.ok) throw new Error();
@@ -900,7 +893,7 @@ function checkHealth() {
     clearTimeout(tid);
     if (badge.textContent.includes('Online')) {
       healthRetries++;
-      if (healthRetries < 10) {
+      if (healthRetries < 12) {
         badge.className = 'badge waking';
         badge.textContent = '⏳ Waking…';
         setTimeout(checkHealth, 5000);
@@ -927,7 +920,7 @@ async function startSearch(retries) {
   btn.disabled = true; btn.textContent = '⏳ Starting…';
   try {
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 150000);
+    const tid = setTimeout(() => ctrl.abort(), 180000);
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -948,13 +941,14 @@ async function startSearch(retries) {
     }, 200);
     pollTimer = setInterval(() => pollSearch(data.search_id), 1500);
   } catch (err) {
-    if (err.name === 'AbortError' && retries < 2) {
-      document.getElementById('error-msg').textContent = '⏳ Server is waking up, retrying in 5s...';
+    if (err.name === 'AbortError' && retries < 3) {
+      const waitTime = retries === 0 ? 8000 : retries === 1 ? 10000 : 12000;
+      document.getElementById('error-msg').textContent = '⏳ Server is waking up (cold start), retrying in ' + (waitTime/1000) + 's... (attempt ' + (retries+1) + '/3)';
       document.getElementById('error-msg').style.display = 'block';
-      setTimeout(() => startSearch(retries + 1), 5000);
+      setTimeout(() => startSearch(retries + 1), waitTime);
       return;
     }
-    showError(err.name === 'AbortError' ? 'Service is still warming up. Wait 30s and try again.' : 'Search failed: ' + err.message);
+    showError(err.name === 'AbortError' ? 'Service is still warming up from cold start. Wait 60s and try again.' : 'Search failed: ' + err.message);
     btn.disabled = false; btn.textContent = '🚀 Run Search';
   }
 }
