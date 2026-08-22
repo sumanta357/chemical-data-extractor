@@ -798,6 +798,7 @@ LANDING_PAGE_HTML = """
         <button class="active" data-hops="1">1</button>
         <button data-hops="2">2</button>
         <button data-hops="3">3</button>
+        <button data-hops="4">4</button>
       </div>
     </div>
     <button class="search-btn" id="search-btn" onclick="startSearch()">🚀 Run Search</button>
@@ -832,7 +833,8 @@ LANDING_PAGE_HTML = """
   <div class="feature-card">
     <div class="icon">🧬</div>
     <h4>Multi-Hop Expansion</h4>
-    <p>Traverse knowledge graphs up to 4 hops deep to discover hidden connections.</p>
+    <p>  Traverse knowledge graphs up to 4 hops deep to discover hidden connections.
+  Note: Higher hop counts may take longer on first visit (server cold start).</p>
   </div>
   <div class="feature-card">
     <div class="icon">📊</div>
@@ -916,7 +918,8 @@ function hideError() { document.getElementById('error-msg').style.display = 'non
 
 document.getElementById('query').addEventListener('keydown', e => { if (e.key === 'Enter') startSearch(); });
 
-async function startSearch() {
+async function startSearch(retries) {
+  retries = retries || 0;
   const query = document.getElementById('query').value.trim();
   if (!query) { document.getElementById('query').focus(); return; }
   hideError();
@@ -924,7 +927,7 @@ async function startSearch() {
   btn.disabled = true; btn.textContent = '⏳ Starting…';
   try {
     const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 90000);
+    const tid = setTimeout(() => ctrl.abort(), 150000);
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -945,7 +948,13 @@ async function startSearch() {
     }, 200);
     pollTimer = setInterval(() => pollSearch(data.search_id), 1500);
   } catch (err) {
-    showError(err.name === 'AbortError' ? 'Service is warming up. Wait ~30s and try again.' : 'Search failed: ' + err.message);
+    if (err.name === 'AbortError' && retries < 2) {
+      document.getElementById('error-msg').textContent = '⏳ Server is waking up, retrying in 5s...';
+      document.getElementById('error-msg').style.display = 'block';
+      setTimeout(() => startSearch(retries + 1), 5000);
+      return;
+    }
+    showError(err.name === 'AbortError' ? 'Service is still warming up. Wait 30s and try again.' : 'Search failed: ' + err.message);
     btn.disabled = false; btn.textContent = '🚀 Run Search';
   }
 }
