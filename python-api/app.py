@@ -39,7 +39,7 @@ sys.path.insert(0, str(ENGINE_DIR))
 app = FastAPI(
     title="Scientific Knowledge Graph Platform",
     description="Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.",
-    version="3.1.1",
+    version="3.2.0",
 )
 
 # Writable state dirs (Render /tmp is writable; repo dirs may be read-only)
@@ -1005,7 +1005,7 @@ def _guess_mime(filename: str) -> str:
 
 @app.on_event("startup")
 async def startup():
-    print(f"🔬 SciGraph API v3.1.1 starting...")
+    print(f"🔬 SciGraph API v3.2.0 starting...")
     print(f"   Python: {sys.version}")
     print(f"   Engine dir: {ENGINE_DIR}")
     print(f"   Exports dir: {EXPORTS_DIR}")
