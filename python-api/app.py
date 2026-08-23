@@ -39,7 +39,7 @@ sys.path.insert(0, str(ENGINE_DIR))
 app = FastAPI(
     title="Scientific Knowledge Graph Platform",
     description="Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.",
-    version="3.1.0",
+    version="3.1.1",
 )
 
 # Writable state dirs (Render /tmp is writable; repo dirs may be read-only)
@@ -821,31 +821,6 @@ LANDING_PAGE_HTML = """
   </div>
 </div>
 
-<!-- Features -->
-<div class="features">
-  <div class="feature-card">
-    <div class="icon">🧬</div>
-    <h4>Multi-Hop Expansion</h4>
-    <p>  Traverse knowledge graphs up to 4 hops deep to discover hidden connections.
-  Note: Higher hop counts may take longer on first visit (server cold start).</p>
-  </div>
-  <div class="feature-card">
-    <div class="icon">📊</div>
-    <h4>Rich Exports</h4>
-    <p>Excel, CSV, GraphML, Cypher, RDF, Turtle, Parquet — ready for analysis.</p>
-  </div>
-  <div class="feature-card">
-    <div class="icon">🔬</div>
-    <h4>19+ Databases</h4>
-    <p>PubChem, ChEMBL, UniProt, PDB, KEGG, Reactome, and many more.</p>
-  </div>
-  <div class="feature-card">
-    <div class="icon">✨</div>
-    <h4>Auto-Enrichment</h4>
-    <p>SMILES, molecular formulas, CrossRef metadata added automatically.</p>
-  </div>
-</div>
-
 <!-- Footer -->
 <div class="footer">
   Powered by <strong>SciGraph v3.1</strong> — Enterprise Scientific Knowledge Graph Platform<br>
@@ -924,7 +899,7 @@ async function startSearch(retries) {
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({query, query_type: queryType, hops}),
+      body: JSON.stringify({query, query_type: queryType, hops: hops}),
       signal: ctrl.signal
     });
     clearTimeout(tid);
@@ -941,14 +916,16 @@ async function startSearch(retries) {
     }, 200);
     pollTimer = setInterval(() => pollSearch(data.search_id), 1500);
   } catch (err) {
+    console.error('Search error:', err);
     if (err.name === 'AbortError' && retries < 3) {
-      const waitTime = retries === 0 ? 8000 : retries === 1 ? 10000 : 12000;
-      document.getElementById('error-msg').textContent = '⏳ Server is waking up (cold start), retrying in ' + (waitTime/1000) + 's... (attempt ' + (retries+1) + '/3)';
-      document.getElementById('error-msg').style.display = 'block';
+      const waitTime = [8000, 10000, 12000][retries];
+      showError('⏳ Server cold start — retrying in ' + (waitTime/1000) + 's... (attempt ' + (retries+1) + '/3)');
       setTimeout(() => startSearch(retries + 1), waitTime);
       return;
     }
-    showError(err.name === 'AbortError' ? 'Service is still warming up from cold start. Wait 60s and try again.' : 'Search failed: ' + err.message);
+    showError(err.name === 'AbortError'
+      ? 'Service is warming up (cold start). Please wait 60s and try again.'
+      : 'Search failed: ' + err.message);
     btn.disabled = false; btn.textContent = '🚀 Run Search';
   }
 }
@@ -968,7 +945,11 @@ async function pollSearch(id) {
       if (data.status === 'completed' && data.export_files?.length > 0) showResults(data);
       if (data.status === 'failed') showError(data.error || 'Search failed.');
     }
-  } catch (e) { /* retry */ }
+  } catch (e) {
+    // Silently continue — next poll will try again
+    // Only log if it's not a routine abort
+    if (e.name !== 'AbortError') console.warn('Poll error:', e);
+  }
 }
 
 function updateUI(data) {
@@ -1024,7 +1005,7 @@ def _guess_mime(filename: str) -> str:
 
 @app.on_event("startup")
 async def startup():
-    print(f"🔬 SciGraph API v3.1 starting...")
+    print(f"🔬 SciGraph API v3.1.1 starting...")
     print(f"   Python: {sys.version}")
     print(f"   Engine dir: {ENGINE_DIR}")
     print(f"   Exports dir: {EXPORTS_DIR}")
