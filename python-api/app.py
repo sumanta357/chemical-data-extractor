@@ -942,7 +942,14 @@ async function pollSearch(id) {
       clearInterval(pollTimer); clearInterval(elapsedTimer);
       document.getElementById('search-btn').disabled = false;
       document.getElementById('search-btn').textContent = '🚀 Run Search';
-      if (data.status === 'completed' && data.export_files?.length > 0) showResults(data);
+      if (data.status === 'completed') {
+        if (data.export_files?.length > 0) {
+          showResults(data);
+        } else {
+          // Files may not be listed yet — re-fetch after 2s
+          setTimeout(() => pollSearch(id), 2000);
+        }
+      }
       if (data.status === 'failed') showError(data.error || 'Search failed.');
     }
   } catch (e) {
