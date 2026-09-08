@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Node.js (not needed in Python image)
+node_modules
+.next
+package.json
+package-lock.json
+bun.lock
+bun.lockb
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+
+# Build artifacts
+dist
+build
+*.egg-info
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Test files
+test_*.py
+isolate/
+
+# Generated data
+exports/
+exports_*/
+scigraph_data/
+*.duckdb
+*.sqlite
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# Render/Freebuff
+render.yaml
+runtime.txt
+
+# Logs
+*.log
