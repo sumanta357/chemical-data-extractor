@@ -216,7 +216,7 @@ def _format_size(size: int) -> str:
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "scigraph-api", "version": "3.1.0"}
+    return {"status": "ok", "service": "scigraph-api", "version": "3.2.0"}
 
 
 @app.post("/api/search", response_model=SearchStatus)
@@ -748,7 +748,7 @@ LANDING_PAGE_HTML = """
     <div class="header-brand">
       <span class="logo">🔬</span>
       <h1>SciGraph</h1>
-      <span class="version">v3.1</span>
+      <span class="version">v3.2.0</span>
     </div>
     <div class="header-status">
       <span class="badge ok" id="health-badge">● Online</span>
@@ -823,7 +823,7 @@ LANDING_PAGE_HTML = """
 
 <!-- Footer -->
 <div class="footer">
-  Powered by <strong>SciGraph v3.1</strong> — Enterprise Scientific Knowledge Graph Platform<br>
+  Powered by <strong>SciGraph v3.2.0</strong> — Enterprise Scientific Knowledge Graph Platform<br>
   19 database connectors · Multi-hop graph traversal · Enrichment pipeline
 </div>
 
