@@ -960,7 +960,7 @@ function updateUI(data) {
   document.getElementById('progress-text').textContent = data.progress || '';
   if (data.log?.length > 0) {
     const box = document.getElementById('log-box');
-    box.textContent = data.log.join('\n');
+    box.textContent = data.log.join('\\n');
     box.scrollTop = box.scrollHeight;
   }
 }
