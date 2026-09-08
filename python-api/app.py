@@ -906,7 +906,7 @@ async function startSearch(retries) {
     if (!res.ok) throw new Error(await res.text() || 'HTTP ' + res.status);
     const data = await res.json();
     startTime = Date.now();
-    document.getElementById('progress-section').style.display = '';
+    document.getElementById('progress-section').style.display = 'block';
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('exports-grid').innerHTML = '';
     document.getElementById('log-box').textContent = '';
@@ -973,7 +973,7 @@ function updateUI(data) {
 }
 
 function showResults(data) {
-  document.getElementById('results-section').style.display = '';
+  document.getElementById('results-section').style.display = 'block';
   const g = document.getElementById('exports-grid');
   g.innerHTML = '';
   for (const f of data.export_files) {
