@@ -39,7 +39,7 @@ sys.path.insert(0, str(ENGINE_DIR))
 app = FastAPI(
     title="Scientific Knowledge Graph Platform",
     description="Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.",
-    version="3.2.0",
+    version="3.2.1",
 )
 
 # Writable state dirs (Render /tmp is writable; repo dirs may be read-only)
