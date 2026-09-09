@@ -48,8 +48,72 @@ WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/tmp/scigraph_workspace"))
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── In-memory search state ───────────────────────────────────────────────────
+# ── Persistent search state (SQLite) ─────────────────────────────────────────
+import sqlite3
+import json as _json
+
+SEARCH_DB = Path(os.environ.get("SEARCH_DB", "/tmp/scigraph_searches.db"))
+
+def _init_db():
+    with sqlite3.connect(str(SEARCH_DB)) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS searches (
+                search_id TEXT PRIMARY KEY,
+                query TEXT NOT NULL,
+                query_type TEXT DEFAULT 'auto',
+                hops INTEGER DEFAULT 1,
+                status TEXT DEFAULT 'queued',
+                progress TEXT DEFAULT '',
+                log TEXT DEFAULT '[]',
+                export_files TEXT DEFAULT '[]',
+                export_dir TEXT DEFAULT '',
+                created_at TEXT DEFAULT '',
+                elapsed_seconds REAL,
+                error TEXT
+            )
+        """)
+    # In-memory cache for active searches (fast access during polling)
 searches: dict[str, dict] = {}
+
+# Load any completed searches from DB on startup
+try:
+    with sqlite3.connect(str(SEARCH_DB)) as conn:
+        conn.row_factory = sqlite3.Row
+        for row in conn.execute("SELECT * FROM searches WHERE status IN ('completed','failed') ORDER BY created_at DESC LIMIT 50"):
+            sid = row["search_id"]
+            searches[sid] = {
+                "search_id": sid, "query": row["query"], "query_type": row["query_type"],
+                "hops": row["hops"], "status": row["status"], "progress": row["progress"],
+                "log": _json.loads(row["log"]), "export_files": _json.loads(row["export_files"]),
+                "export_dir": row["export_dir"], "created_at": row["created_at"],
+                "elapsed_seconds": row["elapsed_seconds"], "error": row["error"],
+            }
+except Exception:
+    pass
+
+def _save_search(state: dict):
+    """Persist search state to SQLite."""
+    try:
+        with sqlite3.connect(str(SEARCH_DB)) as conn:
+            conn.execute("""
+                INSERT INTO searches (search_id, query, query_type, hops, status, progress,
+                    log, export_files, export_dir, created_at, elapsed_seconds, error)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(search_id) DO UPDATE SET
+                    status=excluded.status, progress=excluded.progress, log=excluded.log,
+                    export_files=excluded.export_files, elapsed_seconds=excluded.elapsed_seconds,
+                    error=excluded.error
+            """, (
+                state["search_id"], state["query"], state.get("query_type","auto"),
+                state.get("hops",1), state["status"], state.get("progress",""),
+                _json.dumps(state.get("log",[])), _json.dumps(state.get("export_files",[])),
+                state.get("export_dir",""), state.get("created_at",""),
+                state.get("elapsed_seconds"), state.get("error"),
+            ))
+    except Exception:
+        pass
+
+_init_db()
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -81,6 +145,7 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
     state["status"] = "running"
     state["log"] = []
     start_time = time.time()
+    _save_search(state)
 
     export_path = Path(export_dir)
     export_path.mkdir(parents=True, exist_ok=True)
@@ -164,15 +229,18 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
                 state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s + enriched multi-sheet Excel"
             else:
                 state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s"
+            _save_search(state)
         else:
             state["status"] = "failed"
             state["error"] = f"Process exited with code {process.returncode}"
             state["elapsed_seconds"] = time.time() - start_time
+            _save_search(state)
 
     except Exception as e:
         state["status"] = "failed"
         state["error"] = str(e)
         state["elapsed_seconds"] = time.time() - start_time
+        _save_search(state)
 
 
 def _update_progress(state: dict, line: str):
