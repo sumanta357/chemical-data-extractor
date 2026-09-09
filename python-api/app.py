@@ -363,9 +363,8 @@ LANDING_PAGE_HTML = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SciGraph — Scientific Knowledge Graph Platform</title>
+<meta charset="utf-8">    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<title>Chemical Data Extractor — Scientific Knowledge Graph Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -747,7 +746,7 @@ LANDING_PAGE_HTML = """
   <div class="header-inner">
     <div class="header-brand">
       <span class="logo">🔬</span>
-      <h1>SciGraph</h1>
+      <h1>Chemical Data Extractor</h1>
       <span class="version">v3.2.0</span>
     </div>
     <div class="header-status">
@@ -757,8 +756,7 @@ LANDING_PAGE_HTML = """
 </div>
 
 <!-- Hero -->
-<div class="hero">
-  <h2><span>Scientific Knowledge Graph</span></h2>
+<div class="hero">      <h2><span>Chemical Data Extractor</span></h2>
   <p>Multi-hop automated discovery engine. Search proteins, compounds, and pathways across 19+ databases.</p>
   <div class="hero-stats">
     <div class="hero-stat"><div class="num">19+</div><div class="label">Databases</div></div>
@@ -773,6 +771,29 @@ LANDING_PAGE_HTML = """
   <!-- Left: Search Form -->
   <div class="card">
     <h3>Search Knowledge Graph</h3>
+
+    <!-- How it works -->
+    <div style="background:rgba(3,7,18,0.7);border:1px solid var(--border);border-radius:8px;padding:0.85rem;margin-bottom:1rem;">
+      <div style="font-size:0.7rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">How it works</div>
+      <ol style="font-size:0.78rem;color:var(--text2);list-style:none;padding:0;margin:0;">
+        <li style="display:flex;gap:0.5rem;margin-bottom:0.4rem;"><span style="color:var(--accent);font-weight:700;">1.</span> Enter a <strong style="color:var(--text);">protein</strong> (e.g. "tubulin", "EGFR") or <strong style="color:var(--text);">compound</strong> (e.g. "Aspirin", "Ibuprofen")</li>
+        <li style="display:flex;gap:0.5rem;margin-bottom:0.4rem;"><span style="color:var(--accent);font-weight:700;">2.</span> Choose <strong style="color:var(--text);">Auto</strong> to detect, or pick <strong style="color:var(--text);">Protein/Ligand</strong> manually</li>
+        <li style="display:flex;gap:0.5rem;margin-bottom:0.4rem;"><span style="color:var(--accent);font-weight:700;">3.</span> Select <strong style="color:var(--text);">hops</strong> — how many connection steps to explore</li>
+        <li style="display:flex;gap:0.5rem;"><span style="color:var(--accent);font-weight:700;">4.</span> Click <strong style="color:var(--text);">Run Search</strong> and watch the extraction in real-time</li>
+      </ol>
+    </div>
+
+    <!-- What are Hops? -->
+    <div style="background:rgba(3,7,18,0.7);border:1px solid var(--border);border-radius:8px;padding:0.85rem;margin-bottom:1rem;">
+      <div style="font-size:0.7rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">What are Hops?</div>
+      <div style="font-size:0.75rem;color:var(--text2);">
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;"><span style="color:var(--success);font-family:monospace;font-weight:700;">1-hop</span><span>Direct connections (e.g., Aspirin → COX-1 enzyme)</span></div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;"><span style="color:var(--accent);font-family:monospace;font-weight:700;">2-hop</span><span>Follow one more step (e.g., Aspirin → COX-1 → Prostaglandin pathway)</span></div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;"><span style="color:var(--accent3);font-family:monospace;font-weight:700;">3-hop</span><span>Deeper network (e.g., ... → Related diseases)</span></div>
+        <div style="display:flex;gap:0.5rem;"><span style="color:var(--warn);font-family:monospace;font-weight:700;">4-hop</span><span>Maximum depth — comprehensive graph (slower)</span></div>
+      </div>
+    </div>
+
     <div class="field">
       <label>Query</label>
       <input id="query" type="text" placeholder='e.g. &quot;Aspirin&quot;, &quot;Tubulin&quot;, &quot;EGFR&quot;, &quot;P23219&quot;' autofocus>
@@ -823,8 +844,8 @@ LANDING_PAGE_HTML = """
 
 <!-- Footer -->
 <div class="footer">
-  Powered by <strong>SciGraph v3.2.0</strong> — Enterprise Scientific Knowledge Graph Platform<br>
-  19 database connectors · Multi-hop graph traversal · Enrichment pipeline
+  Chemical Data Extractor — 19 database connectors · Multi-hop graph traversal<br>
+  <span style="margin-top:0.35rem;display:inline-block;">Developed with ❤️ by <strong style="color:var(--accent);">Sumanta</strong></span>
 </div>
 
 <script>
