@@ -359,6 +359,73 @@ async def get_search_log(search_id: str, offset: int = Query(0, ge=0)):
     }
 
 
+@app.get("/api/search/{search_id}/graph")
+async def get_search_graph(search_id: str):
+    """Return nodes and edges as Cytoscape.js-compatible JSON for interactive graph visualization."""
+    import csv as _csv
+    state = searches.get(search_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Search not found")
+
+    export_dir = Path(state.get("export_dir", ""))
+    nodes_file = export_dir / "nodes.csv"
+    edges_file = export_dir / "edges.csv"
+
+    if not nodes_file.exists() or not edges_file.exists():
+        raise HTTPException(status_code=404, detail="Graph data not available yet")
+
+    COLOR_MAP = {
+        "COMPOUND": "#3b82f6", "LIGAND": "#3b82f6",  # Blue
+        "PROTEIN": "#ef4444", "TARGET": "#ef4444",    # Red
+        "STRUCTURE": "#22c55e", "PDB": "#22c55e",      # Green
+        "ENZYME": "#f97316",                            # Orange
+        "GENE": "#a855f7", "PATHWAY": "#eab308",       # Purple, Yellow
+    }
+
+    nodes = []
+    with open(nodes_file, "r", encoding="utf-8") as f:
+        for row in _csv.DictReader(f):
+            uid = row.get("uid:ID", "")
+            label = row.get(":LABEL", "Other")
+            name = row.get("name", uid)
+            color = COLOR_MAP.get(label.upper(), "#6b7280")  # Gray default
+            nodes.append({
+                "data": {
+                    "id": uid,
+                    "label": name[:30],
+                    "type": label,
+                    "color": color,
+                    "smiles": row.get("smiles", ""),
+                    "formula": row.get("formula", ""),
+                }
+            })
+
+    edges = []
+    with open(edges_file, "r", encoding="utf-8") as f:
+        for row in _csv.DictReader(f):
+            src = row.get(":START_ID", "")
+            tgt = row.get(":END_ID", "")
+            rel = row.get(":TYPE", "interacts")
+            activity = row.get("activity_type", "")
+            value = row.get("activity_value", "")
+            edge_label = f"{activity}={value}" if value else rel
+            edges.append({
+                "data": {
+                    "source": src,
+                    "target": tgt,
+                    "label": edge_label[:40],
+                    "relation": rel,
+                }
+            })
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+    }
+
+
 @app.get("/api/exports/{filename:path}")
 async def download_export(filename: str, search_id: Optional[str] = Query(None)):
     """Download an export file. Optionally specify a search_id to find the right directory."""
