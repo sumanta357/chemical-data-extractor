@@ -7,7 +7,7 @@
 # (first request wakes it in ~30-60s).
 services:
   - type: web
-    name: scigraph-engine
+    name: chemical-data-extractor
     runtime: docker
     plan: free
     healthCheckPath: /api/health
