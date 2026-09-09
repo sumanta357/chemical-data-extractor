@@ -114,38 +114,44 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative">
+      {/* Animated particles */}
+      <div className="particle-container" id="particles" />
+
+      {/* Grid overlay */}
+      <div className="grid-overlay" />
+
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-gray-800/50 bg-[rgb(3,7,18)]/85 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🔬</span>
+            <span className="text-2xl animate-pulse-glow">🔬</span>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white">
-                SciGraph
+                Chemical Data Extractor
               </h1>
-              <p className="text-xs text-gray-500 -mt-0.5">
-                Knowledge Graph Platform v3.1
+              <p className="text-xs text-cyan-400/70 -mt-0.5 font-medium">
+                Knowledge Graph Platform v3.2
               </p>
             </div>
           </div>
           <nav className="flex gap-1">
             <button
               onClick={() => setActiveTab('search')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'search'
-                  ? 'bg-cyan-600/20 text-cyan-400'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
               }`}
             >
               🔎 Search
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'history'
-                  ? 'bg-cyan-600/20 text-cyan-400'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
               }`}
             >
               📋 History
@@ -154,8 +160,61 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* Hero */}
+      <div className="relative z-10 text-center py-12 px-4 overflow-hidden">
+        {/* Hero glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-radial from-cyan-500/5 via-purple-500/3 to-transparent pointer-events-none" />
+
+        {/* Floating molecules */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {['⚗️','🧬','💊','🔬','⚛️','🧪'].map((emoji, i) => (
+            <span
+              key={i}
+              className="absolute text-2xl opacity-10"
+              style={{
+                left: `${15 + i * 14}%`,
+                top: `${20 + (i % 3) * 25}%`,
+                animation: `molecule-drift ${20 + i * 2}s ease-in-out infinite`,
+                animationDelay: `${-i * 3}s`,
+              }}
+            >
+              {emoji}
+            </span>
+          ))}
+        </div>
+
+        <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 relative">
+          <span className="gradient-text">Chemical Data Extractor</span>
+        </h2>
+        <p className="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed relative">
+          Multi-hop automated discovery engine. Extract chemical compounds,
+          bioactivities, protein targets, and biological pathways from 19+ scientific databases.
+        </p>
+
+        {/* Stats */}
+        <div className="flex gap-6 justify-center flex-wrap mt-8 relative">
+          {[
+            { num: '19+', label: 'Databases' },
+            { num: '4', label: 'Hop Depth' },
+            { num: '7+', label: 'Export Formats' },
+            { num: '15', label: 'Export Files' },
+          ].map((stat, i) => (
+            <div
+              key={stat.label}
+              className="glass-card px-6 py-4 text-center min-w-[100px] fade-in-up"
+              style={{ animationDelay: `${i * 0.1}s` }}
+            >
+              <div className="text-2xl font-extrabold gradient-text">{stat.num}</div>
+              <div className="text-[0.65rem] text-gray-500 uppercase tracking-widest font-semibold mt-1">
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Main */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 relative z-10">
         {activeTab === 'search' && (
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Left: Search form */}
@@ -173,35 +232,37 @@ export default function HomePage() {
               {search ? (
                 <ProgressView search={search} logLines={logLines} />
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-600 py-10 lg:py-20">
-                  <div className="text-center max-w-md mx-auto px-4">
-                    <div className="text-5xl mb-4">🔬</div>
-                    <p className="text-lg font-medium text-gray-300">
-                      Enter a query to start searching
-                    </p>
-                    <p className="text-sm mt-2 text-gray-500 leading-relaxed">
-                      Extract chemical compounds, bioactivities, protein targets,
-                      3D structures, and biological pathways from 19+ scientific databases.
-                    </p>
-                    <div className="mt-6 grid grid-cols-3 gap-3 text-xs">
-                      <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
-                        <div className="text-lg mb-1">🧬</div>
-                        <div className="text-gray-400 font-medium">Proteins</div>
-                        <div className="text-gray-600">UniProt, PDB, AlphaFold</div>
-                      </div>
-                      <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
-                        <div className="text-lg mb-1">💊</div>
-                        <div className="text-gray-400 font-medium">Compounds</div>
-                        <div className="text-gray-600">PubChem, ChEMBL, ChEBI</div>
-                      </div>
-                      <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
-                        <div className="text-lg mb-1">🔗</div>
-                        <div className="text-gray-400 font-medium">Pathways</div>
-                        <div className="text-gray-600">KEGG, Reactome, GO</div>
-                      </div>
+                <>
+                  <div className="glass-card flex items-center justify-center text-gray-600 py-16">
+                    <div className="text-center">
+                      <div className="text-5xl mb-4 animate-float">🔬</div>
+                      <p className="text-lg font-semibold text-gray-300">
+                        Enter a query to start searching
+                      </p>
+                      <p className="text-sm mt-2 text-gray-500 leading-relaxed max-w-sm mx-auto">
+                        Extract chemical compounds, bioactivities, protein targets,
+                        3D structures, and biological pathways from 19+ scientific databases.
+                      </p>
                     </div>
                   </div>
-                </div>
+                  <div className="grid grid-cols-3 gap-4 mt-6">
+                    {[
+                      { icon: '🧬', title: 'Proteins', desc: 'UniProt, PDB, AlphaFold' },
+                      { icon: '💊', title: 'Compounds', desc: 'PubChem, ChEMBL, ChEBI' },
+                      { icon: '🔗', title: 'Pathways', desc: 'KEGG, Reactome, GO' },
+                    ].map((card, i) => (
+                      <div
+                        key={card.title}
+                        className="glass-card p-4 text-center fade-in-up"
+                        style={{ animationDelay: `${0.1 + i * 0.1}s` }}
+                      >
+                        <div className="text-2xl mb-2">{card.icon}</div>
+                        <div className="text-sm font-semibold text-gray-300">{card.title}</div>
+                        <div className="text-xs text-gray-500 mt-1">{card.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -213,12 +274,12 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 py-4 text-center text-xs text-gray-600">
+      <footer className="border-t border-gray-800/50 py-5 text-center text-xs text-gray-600 relative z-10 bg-[rgb(3,7,18)]/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4">
-          <p>Chemical Data Extractor — 19 Database Connectors · Multi-Hop Expansion</p>
-          <p className="mt-1.5 text-gray-500">
-            Developed with ❤️ by{' '}
-            <span className="text-cyan-400 font-medium">Sumanta</span>
+          <p className="font-semibold text-gray-400 text-sm">Chemical Data Extractor</p>
+          <p className="mt-1">19 database connectors · Multi-hop graph traversal · Enrichment pipeline</p>
+          <p className="mt-2 text-gray-500">
+            Developed with ❤️ by <span className="text-cyan-400 font-semibold">Sumanta</span>
           </p>
         </div>
       </footer>

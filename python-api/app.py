@@ -363,24 +363,29 @@ LANDING_PAGE_HTML = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <title>Chemical Data Extractor — Scientific Knowledge Graph Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #030712;
-    --surface: #111827;
+    --bg2: #0a0f1e;
+    --surface: rgba(17,24,39,0.6);
     --surface2: #1f2937;
-    --border: #1f2937;
+    --border: rgba(55,65,81,0.5);
     --accent: #06b6d4;
     --accent2: #0891b2;
     --accent3: #8b5cf6;
+    --accent4: #a78bfa;
     --text: #f9fafb;
     --text2: #9ca3af;
+    --text3: #6b7280;
     --success: #10b981;
     --warn: #f59e0b;
     --error: #ef4444;
+    --glow: rgba(6,182,212,0.15);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -389,19 +394,55 @@ LANDING_PAGE_HTML = """
     color: var(--text);
     min-height: 100vh;
     line-height: 1.6;
+    overflow-x: hidden;
   }
 
-  /* Header */
+  /* ── Animated particle background ── */
+  #particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    animation: float-up linear infinite;
+  }
+  @keyframes float-up {
+    0% { opacity: 0; transform: translateY(100vh) scale(0); }
+    10% { opacity: 0.6; }
+    90% { opacity: 0.3; }
+    100% { opacity: 0; transform: translateY(-10vh) scale(1); }
+  }
+
+  /* ── Grid background ── */
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(6,182,212,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6,182,212,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  /* ── Header ── */
   .header {
     border-bottom: 1px solid var(--border);
-    background: rgba(17,24,39,0.8);
-    backdrop-filter: blur(12px);
+    background: rgba(3,7,18,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 100;
   }
   .header-inner {
-    max-width: 1200px;
+    max-width: 1280px;
     margin: 0 auto;
     padding: 0.75rem 1.5rem;
     display: flex;
@@ -413,7 +454,15 @@ LANDING_PAGE_HTML = """
     align-items: center;
     gap: 0.75rem;
   }
-  .header-brand .logo { font-size: 1.5rem; }
+  .header-brand .logo {
+    font-size: 1.6rem;
+    filter: drop-shadow(0 0 8px rgba(6,182,212,0.5));
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(6,182,212,0.3)); }
+    50% { filter: drop-shadow(0 0 16px rgba(6,182,212,0.7)); }
+  }
   .header-brand h1 {
     font-size: 1.1rem;
     font-weight: 700;
@@ -421,18 +470,13 @@ LANDING_PAGE_HTML = """
     letter-spacing: -0.02em;
   }
   .header-brand .version {
-    font-size: 0.7rem;
-    color: var(--text2);
-    font-weight: 500;
-    background: var(--surface2);
+    font-size: 0.65rem;
+    color: var(--accent);
+    font-weight: 600;
+    background: rgba(6,182,212,0.1);
     padding: 0.15rem 0.5rem;
     border-radius: 9999px;
-    border: 1px solid var(--border);
-  }
-  .header-status {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    border: 1px solid rgba(6,182,212,0.2);
   }
   .badge {
     display: inline-flex;
@@ -440,217 +484,399 @@ LANDING_PAGE_HTML = """
     gap: 0.35rem;
     padding: 0.3rem 0.75rem;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 500;
     border: 1px solid var(--border);
-    background: var(--surface2);
+    background: var(--surface);
     color: var(--text2);
+    backdrop-filter: blur(10px);
   }
-  .badge.ok { border-color: rgba(16,185,129,0.4); color: var(--success); background: rgba(16,185,129,0.1); }
-  .badge.waking { border-color: rgba(245,158,11,0.4); color: var(--warn); background: rgba(245,158,11,0.1); }
+  .badge.ok { border-color: rgba(16,185,129,0.4); color: var(--success); background: rgba(16,185,129,0.08); }
+  .badge.waking { border-color: rgba(245,158,11,0.4); color: var(--warn); background: rgba(245,158,11,0.08); }
 
-  /* Hero */
+  /* ── Hero ── */
   .hero {
     text-align: center;
-    padding: 4rem 1.5rem 3rem;
-    background: linear-gradient(180deg, #030712 0%, #0c1222 50%, #030712 100%);
+    padding: 5rem 1.5rem 3.5rem;
     position: relative;
+    z-index: 1;
     overflow: hidden;
   }
   .hero::before {
     content: '';
     position: absolute;
-    top: 0; left: 50%;
-    width: 800px; height: 400px;
+    top: -200px; left: 50%;
+    width: 1000px; height: 600px;
     transform: translateX(-50%);
-    background: radial-gradient(ellipse, rgba(6,182,212,0.08) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(6,182,212,0.08) 0%, rgba(139,92,246,0.04) 40%, transparent 70%);
     pointer-events: none;
+    animation: hero-glow 8s ease-in-out infinite alternate;
+  }
+  @keyframes hero-glow {
+    0% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+    100% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+  }
+  .hero .molecules {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .molecule {
+    position: absolute;
+    font-size: 1.5rem;
+    opacity: 0.15;
+    animation: molecule-float 20s ease-in-out infinite;
+  }
+  .molecule:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 25s; }
+  .molecule:nth-child(2) { left: 85%; top: 30%; animation-delay: -5s; animation-duration: 22s; }
+  .molecule:nth-child(3) { left: 20%; top: 70%; animation-delay: -10s; animation-duration: 28s; }
+  .molecule:nth-child(4) { left: 75%; top: 65%; animation-delay: -7s; animation-duration: 20s; }
+  .molecule:nth-child(5) { left: 50%; top: 15%; animation-delay: -3s; animation-duration: 23s; }
+  .molecule:nth-child(6) { left: 35%; top: 80%; animation-delay: -12s; animation-duration: 26s; }
+  @keyframes molecule-float {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(30px, -20px) rotate(90deg); }
+    50% { transform: translate(-20px, 15px) rotate(180deg); }
+    75% { transform: translate(15px, 25px) rotate(270deg); }
   }
   .hero h2 {
-    font-size: 2.5rem;
-    font-weight: 700;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
     color: var(--text);
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
     position: relative;
     letter-spacing: -0.03em;
+    line-height: 1.1;
   }
   .hero h2 span {
-    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent3) 50%, var(--accent4) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    background-size: 200% 200%;
+    animation: gradient-shift 6s ease-in-out infinite;
+  }
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
   }
   .hero p {
     color: var(--text2);
     font-size: 1.1rem;
-    max-width: 550px;
-    margin: 0 auto 1.5rem;
+    max-width: 580px;
+    margin: 0 auto 2rem;
     position: relative;
+    line-height: 1.7;
   }
   .hero-stats {
     display: flex;
-    gap: 2rem;
+    gap: 2.5rem;
     justify-content: center;
     flex-wrap: wrap;
     position: relative;
   }
   .hero-stat {
     text-align: center;
+    padding: 1rem;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    min-width: 100px;
+    transition: all 0.3s ease;
+  }
+  .hero-stat:hover {
+    border-color: rgba(6,182,212,0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(6,182,212,0.1);
   }
   .hero-stat .num {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--accent);
+    font-size: 1.8rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
   .hero-stat .label {
-    font-size: 0.75rem;
-    color: var(--text2);
+    font-size: 0.7rem;
+    color: var(--text3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    margin-top: 0.25rem;
   }
 
-  /* Main layout */
+  /* ── Main layout ── */
   .main {
-    max-width: 1200px;
+    max-width: 1280px;
     margin: 0 auto;
-    padding: 2rem 1.5rem;
+    padding: 2rem 1.5rem 3rem;
     display: grid;
     grid-template-columns: 1fr;
     gap: 1.5rem;
+    position: relative;
+    z-index: 1;
   }
   @media (min-width: 768px) {
     .main { grid-template-columns: 2fr 3fr; }
   }
 
+  /* ── Glass card ── */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem;
+    border-radius: 16px;
+    padding: 1.5rem;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(6,182,212,0.3), transparent);
+  }
+  .card:hover {
+    border-color: rgba(6,182,212,0.2);
+    box-shadow: 0 8px 32px rgba(6,182,212,0.05);
   }
   .card h3 {
     font-size: 0.8rem;
     font-weight: 600;
-    margin-bottom: 1rem;
+    margin-bottom: 1.25rem;
     color: var(--text2);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
   }
 
-  /* Form */
-  .field { margin-bottom: 0.85rem; }
+  /* ── Instruction boxes ── */
+  .info-box {
+    background: rgba(6,182,212,0.04);
+    border: 1px solid rgba(6,182,212,0.12);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+  }
+  .info-box:hover {
+    border-color: rgba(6,182,212,0.25);
+    background: rgba(6,182,212,0.06);
+  }
+  .info-box .label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .info-box .label::before {
+    content: '';
+    width: 3px;
+    height: 12px;
+    background: linear-gradient(180deg, var(--accent), var(--accent3));
+    border-radius: 2px;
+  }
+  .step {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+  .step:last-child { margin-bottom: 0; }
+  .step-num {
+    color: var(--accent);
+    font-weight: 800;
+    font-size: 0.75rem;
+    min-width: 1.2rem;
+    flex-shrink: 0;
+  }
+  .step strong { color: var(--text); font-weight: 600; }
+  .hop-row {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text2);
+  }
+  .hop-row:last-child { margin-bottom: 0; }
+  .hop-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.72rem;
+    min-width: 3.5rem;
+    flex-shrink: 0;
+  }
+  .hop-1 { color: var(--success); }
+  .hop-2 { color: var(--accent); }
+  .hop-3 { color: var(--accent3); }
+  .hop-4 { color: var(--warn); }
+
+  /* ── Form fields ── */
+  .field { margin-bottom: 1rem; }
   .field label {
     display: block;
     font-size: 0.75rem;
     font-weight: 500;
-    color: var(--text2);
-    margin-bottom: 0.35rem;
+    color: var(--text3);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
   .field input, .field select {
     width: 100%;
-    padding: 0.6rem 0.75rem;
-    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
     border: 1px solid var(--border);
-    background: var(--bg);
+    background: rgba(3,7,18,0.6);
     color: var(--text);
     font-size: 0.9rem;
     font-family: inherit;
     outline: none;
-    transition: border-color 0.15s;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(5px);
   }
-  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--text3); }
+  .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(6,182,212,0.1), 0 0 20px rgba(6,182,212,0.05);
+  }
   .field select { cursor: pointer; }
 
   .type-btns, .hop-btns {
     display: flex;
-    gap: 0.4rem;
+    gap: 0.5rem;
   }
   .type-btns button, .hop-btns button {
     flex: 1;
-    padding: 0.5rem 0.25rem;
-    border-radius: 8px;
+    padding: 0.65rem 0.5rem;
+    border-radius: 10px;
     border: 1px solid var(--border);
-    background: var(--bg);
+    background: rgba(3,7,18,0.4);
     color: var(--text2);
     font-size: 0.8rem;
     font-weight: 500;
     font-family: inherit;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(5px);
   }
   .type-btns button.active, .hop-btns button.active {
     border-color: var(--accent);
     background: rgba(6,182,212,0.1);
     color: var(--accent);
+    box-shadow: 0 0 15px rgba(6,182,212,0.1);
   }
   .type-btns button:hover, .hop-btns button:hover:not(.active) {
-    border-color: #374151;
+    border-color: #4b5563;
     color: var(--text);
+    background: rgba(31,41,55,0.5);
   }
 
   .search-btn {
     width: 100%;
-    padding: 0.7rem;
-    border-radius: 8px;
+    padding: 0.85rem;
+    border-radius: 10px;
     border: none;
     font-size: 0.95rem;
-    font-weight: 600;
+    font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    background: linear-gradient(135deg, var(--accent2), var(--accent));
-    color: #030712;
-    transition: all 0.15s;
-    margin-top: 0.5rem;
+    background: linear-gradient(135deg, var(--accent2), var(--accent), var(--accent3));
+    background-size: 200% 200%;
+    color: #fff;
+    transition: all 0.3s ease;
+    margin-top: 0.75rem;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.02em;
   }
-  .search-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
-  .search-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .search-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+  }
+  .search-btn:hover::before { transform: translateX(100%); }
+  .search-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(6,182,212,0.3);
+    background-position: 100% 0;
+  }
+  .search-btn:active { transform: translateY(0); }
+  .search-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .search-btn:disabled::before { display: none; }
 
   .error-msg {
-    margin-top: 0.65rem;
-    padding: 0.6rem 0.75rem;
-    border-radius: 8px;
-    background: rgba(239,68,68,0.1);
-    border: 1px solid rgba(239,68,68,0.3);
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
     color: var(--error);
     font-size: 0.8rem;
     display: none;
+    animation: shake 0.3s ease;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
   }
 
-  /* Progress */
+  /* ── Progress ── */
   .progress-section { display: none; }
   .progress-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
   }
   .progress-header h3 { margin-bottom: 0; }
   .status-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.2rem 0.6rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     font-size: 0.7rem;
     font-weight: 600;
+    animation: pill-pulse 2s ease-in-out infinite;
   }
-  .status-queued { background: rgba(245,158,11,0.15); color: var(--warn); }
-  .status-running { background: rgba(6,182,212,0.15); color: var(--accent); }
-  .status-completed { background: rgba(16,185,129,0.15); color: var(--success); }
-  .status-failed { background: rgba(239,68,68,0.15); color: var(--error); }
+  @keyframes pill-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+  .status-queued { background: rgba(245,158,11,0.12); color: var(--warn); border: 1px solid rgba(245,158,11,0.2); }
+  .status-running { background: rgba(6,182,212,0.12); color: var(--accent); border: 1px solid rgba(6,182,212,0.2); }
+  .status-completed { background: rgba(16,185,129,0.12); color: var(--success); border: 1px solid rgba(16,185,129,0.2); }
+  .status-failed { background: rgba(239,68,68,0.12); color: var(--error); border: 1px solid rgba(239,68,68,0.2); }
   .progress-bar {
-    height: 3px;
-    background: var(--surface2);
-    border-radius: 2px;
+    height: 4px;
+    background: rgba(31,41,55,0.8);
+    border-radius: 4px;
     overflow: hidden;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
   }
   .progress-bar .fill {
     height: 100%;
     width: 30%;
-    background: linear-gradient(90deg, var(--accent2), var(--accent3));
-    border-radius: 2px;
-    animation: shimmer 1.5s infinite;
+    background: linear-gradient(90deg, var(--accent2), var(--accent3), var(--accent));
+    border-radius: 4px;
+    animation: shimmer 2s ease-in-out infinite;
   }
   @keyframes shimmer {
     0% { transform: translateX(-100%); }
@@ -659,18 +885,19 @@ LANDING_PAGE_HTML = """
   .progress-text {
     font-size: 0.85rem;
     color: var(--text);
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-weight: 500;
   }
   .log-box {
-    background: #0d1117;
-    border: 1px solid #21262d;
-    border-radius: 8px;
-    padding: 0.85rem;
+    background: rgba(3,7,18,0.8);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 0.72rem;
-    line-height: 1.6;
+    line-height: 1.7;
     color: var(--text2);
-    max-height: 400px;
+    max-height: 450px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
@@ -679,67 +906,156 @@ LANDING_PAGE_HTML = """
   .log-box::-webkit-scrollbar-track { background: transparent; }
   .log-box::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
 
-  /* Results */
+  /* ── Results ── */
   .results-section { display: none; }
   .exports-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0.75rem;
   }
   .export-card {
-    background: var(--bg);
+    background: rgba(3,7,18,0.5);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.65rem;
-    transition: border-color 0.15s;
+    border-radius: 10px;
+    padding: 0.85rem;
+    transition: all 0.2s ease;
   }
-  .export-card:hover { border-color: var(--accent); }
+  .export-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(6,182,212,0.1);
+  }
   .export-card .name {
     font-size: 0.78rem;
     font-weight: 500;
     color: var(--text);
     word-break: break-all;
-    margin-bottom: 0.15rem;
+    margin-bottom: 0.2rem;
   }
-  .export-card .size { font-size: 0.7rem; color: var(--text2); }
+  .export-card .size { font-size: 0.7rem; color: var(--text3); }
   .export-card a {
     display: inline-block;
-    margin-top: 0.3rem;
+    margin-top: 0.4rem;
     font-size: 0.72rem;
     color: var(--accent);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: 600;
+    transition: color 0.2s;
   }
-  .export-card a:hover { text-decoration: underline; }
+  .export-card a:hover { color: var(--accent3); }
 
-  /* Features */
-  .features {
-    display: none;
+  /* ── Database cards ── */
+  .db-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-top: 2rem;
+    position: relative;
   }
-  .feature-card {
+  @media (max-width: 640px) { .db-cards { grid-template-columns: 1fr; } }
+  .db-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 1.25rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
   }
-  .feature-card .icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
-  .feature-card h4 { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
-  .feature-card p { font-size: 0.8rem; color: var(--text2); line-height: 1.5; }
+  .db-card:hover {
+    border-color: rgba(6,182,212,0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(6,182,212,0.08);
+  }
+  .db-card .icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .db-card h4 { font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }
+  .db-card p { font-size: 0.7rem; color: var(--text3); line-height: 1.5; }
 
-  /* Footer */
+  /* ── Idle state ── */
+  .idle-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+  }
+  .idle-state .content { max-width: 500px; }
+  .idle-state .icon { font-size: 4rem; margin-bottom: 1rem; animation: float 4s ease-in-out infinite; }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  .idle-state h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+  .idle-state p {
+    color: var(--text3);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  /* ── Footer ── */
   .footer {
     text-align: center;
-    padding: 2rem 1.5rem;
-    color: var(--text2);
+    padding: 3rem 1.5rem;
+    color: var(--text3);
     font-size: 0.75rem;
     border-top: 1px solid var(--border);
-    margin-top: 1rem;
+    position: relative;
+    z-index: 1;
+    background: rgba(3,7,18,0.5);
+    backdrop-filter: blur(10px);
   }
-  .footer a { color: var(--accent); text-decoration: none; }
-  .footer a:hover { text-decoration: underline; }
+  .footer .brand {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 0.5rem;
+  }
+  .footer .credit {
+    margin-top: 0.5rem;
+    color: var(--text3);
+  }
+  .footer .credit strong {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero { padding: 3rem 1rem 2rem; }
+    .hero h2 { font-size: 1.8rem; }
+    .hero p { font-size: 0.95rem; }
+    .hero-stats { gap: 1rem; }
+    .hero-stat { min-width: 80px; padding: 0.75rem; }
+    .hero-stat .num { font-size: 1.4rem; }
+    .main { padding: 1rem; }
+    .card { padding: 1.25rem; border-radius: 12px; }
+    .header-brand h1 { font-size: 0.95rem; }
+  }
+
+  /* ── Scroll fade-in ── */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.6s ease forwards;
+  }
+  @keyframes fadeInUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in:nth-child(2) { animation-delay: 0.1s; }
+  .fade-in:nth-child(3) { animation-delay: 0.2s; }
+  .fade-in:nth-child(4) { animation-delay: 0.3s; }
 </style>
 </head>
 <body>
+
+<!-- Animated particles -->
+<div id="particles"></div>
+<div class="grid-bg"></div>
 
 <!-- Header -->
 <div class="header">
@@ -749,54 +1065,57 @@ LANDING_PAGE_HTML = """
       <h1>Chemical Data Extractor</h1>
       <span class="version">v3.2.0</span>
     </div>
-    <div class="header-status">
-      <span class="badge ok" id="health-badge">● Online</span>
-    </div>
+    <span class="badge ok" id="health-badge">● Online</span>
   </div>
 </div>
 
 <!-- Hero -->
-<div class="hero">      <h2><span>Chemical Data Extractor</span></h2>
-  <p>Multi-hop automated discovery engine. Search proteins, compounds, and pathways across 19+ databases.</p>
+<div class="hero">
+  <div class="molecules">
+    <span class="molecule">⚗️</span>
+    <span class="molecule">🧬</span>
+    <span class="molecule">💊</span>
+    <span class="molecule">🔬</span>
+    <span class="molecule">⚛️</span>
+    <span class="molecule">🧪</span>
+  </div>
+  <h2><span>Chemical Data Extractor</span></h2>
+  <p>Multi-hop automated discovery engine. Extract chemical compounds, bioactivities, protein targets, and biological pathways from 19+ scientific databases.</p>
   <div class="hero-stats">
-    <div class="hero-stat"><div class="num">19+</div><div class="label">Databases</div></div>
-    <div class="hero-stat"><div class="num">4</div><div class="label">Hop Depth</div></div>
-    <div class="hero-stat"><div class="num">7+</div><div class="label">Export Formats</div></div>
-    <div class="hero-stat"><div class="num">15</div><div class="label">Export Files</div></div>
+    <div class="hero-stat fade-in"><div class="num">19+</div><div class="label">Databases</div></div>
+    <div class="hero-stat fade-in"><div class="num">4</div><div class="label">Hop Depth</div></div>
+    <div class="hero-stat fade-in"><div class="num">7+</div><div class="label">Export Formats</div></div>
+    <div class="hero-stat fade-in"><div class="num">15</div><div class="label">Export Files</div></div>
   </div>
 </div>
 
 <!-- Main Content -->
 <div class="main">
   <!-- Left: Search Form -->
-  <div class="card">
+  <div class="card fade-in">
     <h3>Search Knowledge Graph</h3>
 
     <!-- How it works -->
-    <div style="background:rgba(3,7,18,0.7);border:1px solid var(--border);border-radius:8px;padding:0.85rem;margin-bottom:1rem;">
-      <div style="font-size:0.7rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">How it works</div>
-      <ol style="font-size:0.78rem;color:var(--text2);list-style:none;padding:0;margin:0;">
-        <li style="display:flex;gap:0.5rem;margin-bottom:0.4rem;"><span style="color:var(--accent);font-weight:700;">1.</span> Enter a <strong style="color:var(--text);">protein</strong> (e.g. "tubulin", "EGFR") or <strong style="color:var(--text);">compound</strong> (e.g. "Aspirin", "Ibuprofen")</li>
-        <li style="display:flex;gap:0.5rem;margin-bottom:0.4rem;"><span style="color:var(--accent);font-weight:700;">2.</span> Choose <strong style="color:var(--text);">Auto</strong> to detect, or pick <strong style="color:var(--text);">Protein/Ligand</strong> manually</li>
-        <li style="display:flex;gap:0.5rem;margin-bottom:0.4rem;"><span style="color:var(--accent);font-weight:700;">3.</span> Select <strong style="color:var(--text);">hops</strong> — how many connection steps to explore</li>
-        <li style="display:flex;gap:0.5rem;"><span style="color:var(--accent);font-weight:700;">4.</span> Click <strong style="color:var(--text);">Run Search</strong> and watch the extraction in real-time</li>
-      </ol>
+    <div class="info-box">
+      <div class="label">How it works</div>
+      <div class="step"><span class="step-num">1.</span><span>Enter a <strong>protein</strong> (e.g. "tubulin", "EGFR") or <strong>compound</strong> (e.g. "Aspirin", "Ibuprofen")</span></div>
+      <div class="step"><span class="step-num">2.</span><span>Choose <strong>Auto</strong> to detect, or pick <strong>Protein/Ligand</strong> manually</span></div>
+      <div class="step"><span class="step-num">3.</span><span>Select <strong>hops</strong> — how many connection steps to explore</span></div>
+      <div class="step"><span class="step-num">4.</span><span>Click <strong>Run Search</strong> and watch the extraction in real-time</span></div>
     </div>
 
     <!-- What are Hops? -->
-    <div style="background:rgba(3,7,18,0.7);border:1px solid var(--border);border-radius:8px;padding:0.85rem;margin-bottom:1rem;">
-      <div style="font-size:0.7rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem;">What are Hops?</div>
-      <div style="font-size:0.75rem;color:var(--text2);">
-        <div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;"><span style="color:var(--success);font-family:monospace;font-weight:700;">1-hop</span><span>Direct connections (e.g., Aspirin → COX-1 enzyme)</span></div>
-        <div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;"><span style="color:var(--accent);font-family:monospace;font-weight:700;">2-hop</span><span>Follow one more step (e.g., Aspirin → COX-1 → Prostaglandin pathway)</span></div>
-        <div style="display:flex;gap:0.5rem;margin-bottom:0.3rem;"><span style="color:var(--accent3);font-family:monospace;font-weight:700;">3-hop</span><span>Deeper network (e.g., ... → Related diseases)</span></div>
-        <div style="display:flex;gap:0.5rem;"><span style="color:var(--warn);font-family:monospace;font-weight:700;">4-hop</span><span>Maximum depth — comprehensive graph (slower)</span></div>
-      </div>
+    <div class="info-box">
+      <div class="label">What are Hops?</div>
+      <div class="hop-row"><span class="hop-tag hop-1">1-hop</span><span>Direct connections (e.g., Aspirin → COX-1 enzyme)</span></div>
+      <div class="hop-row"><span class="hop-tag hop-2">2-hop</span><span>Follow one more step (e.g., Aspirin → COX-1 → Prostaglandin pathway)</span></div>
+      <div class="hop-row"><span class="hop-tag hop-3">3-hop</span><span>Deeper network (e.g., ... → Related diseases)</span></div>
+      <div class="hop-row"><span class="hop-tag hop-4">4-hop</span><span>Maximum depth — comprehensive graph (slower)</span></div>
     </div>
 
     <div class="field">
       <label>Query</label>
-      <input id="query" type="text" placeholder='e.g. &quot;Aspirin&quot;, &quot;Tubulin&quot;, &quot;EGFR&quot;, &quot;P23219&quot;' autofocus>
+      <input id="query" type="text" placeholder='e.g. "Aspirin", "Tubulin", "EGFR", "P23219"' autofocus>
     </div>
     <div class="field">
       <label>Query Type</label>
@@ -816,13 +1135,13 @@ LANDING_PAGE_HTML = """
       </div>
     </div>
     <button class="search-btn" id="search-btn" onclick="startSearch()">🚀 Run Search</button>
-    <span id="elapsed" style="display:block;text-align:center;font-size:0.8rem;color:var(--text2);margin-top:0.4rem;"></span>
+    <span id="elapsed" style="display:block;text-align:center;font-size:0.8rem;color:var(--text3);margin-top:0.5rem;font-family:'JetBrains Mono',monospace;"></span>
     <div class="error-msg" id="error-msg"></div>
   </div>
 
-  <!-- Right: Progress + Results -->
+  <!-- Right: Progress + Results + Idle -->
   <div>
-    <div class="card progress-section" id="progress-section">
+    <div class="card progress-section fade-in" id="progress-section">
       <div class="progress-header">
         <h3>Progress</h3>
         <span class="status-pill status-running" id="status-pill">⏳ Queued</span>
@@ -830,33 +1149,72 @@ LANDING_PAGE_HTML = """
       <div class="progress-bar"><div class="fill"></div></div>
       <div class="progress-text" id="progress-text">⏳ Queued…</div>
       <details open>
-        <summary style="font-size:0.8rem;color:var(--text2);cursor:pointer;margin-bottom:0.5rem;">Live Log</summary>
+        <summary style="font-size:0.78rem;color:var(--text3);cursor:pointer;margin-bottom:0.5rem;font-weight:500;">Live Log</summary>
         <div class="log-box" id="log-box"></div>
       </details>
     </div>
 
-    <div class="card results-section" id="results-section">
+    <div class="card results-section fade-in" id="results-section">
       <h3>Export Files</h3>
       <div class="exports-grid" id="exports-grid"></div>
+    </div>
+
+    <!-- Idle state with DB cards -->
+    <div id="idle-section">
+      <div class="card fade-in">
+        <div class="idle-state">
+          <div class="content">
+            <div class="icon">🔬</div>
+            <h3>Enter a query to start searching</h3>
+            <p>Extract chemical compounds, bioactivities, protein targets, 3D structures, and biological pathways from 19+ scientific databases.</p>
+          </div>
+        </div>
+      </div>
+      <div class="db-cards">
+        <div class="db-card fade-in">
+          <div class="icon">🧬</div>
+          <h4>Proteins</h4>
+          <p>UniProt, PDB, AlphaFold, STRING</p>
+        </div>
+        <div class="db-card fade-in">
+          <div class="icon">💊</div>
+          <h4>Compounds</h4>
+          <p>PubChem, ChEMBL, ChEBI, BindingDB</p>
+        </div>
+        <div class="db-card fade-in">
+          <div class="icon">🔗</div>
+          <h4>Pathways</h4>
+          <p>KEGG, Reactome, Gene Ontology</p>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- Footer -->
 <div class="footer">
-  Chemical Data Extractor — 19 database connectors · Multi-hop graph traversal<br>
-  <span style="margin-top:0.35rem;display:inline-block;">Developed with ❤️ by <strong style="color:var(--accent);">Sumanta</strong></span>
+  <div class="brand">Chemical Data Extractor</div>
+  <div>19 database connectors · Multi-hop graph traversal · Enrichment pipeline</div>
+  <div class="credit">Developed with ❤️ by <strong>Sumanta</strong></div>
 </div>
 
 <script>
-let pollTimer = null;
-let elapsedTimer = null;
-let startTime = 0;
-let healthRetries = 0;
-let queryType = 'auto';
-let hops = 1;
+// ── Particle system ──
+(function() {
+  const c = document.getElementById('particles');
+  const colors = ['#06b6d4','#8b5cf6','#10b981','#f59e0b'];
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 3 + 1;
+    p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;animation-duration:${Math.random()*15+10}s;animation-delay:${Math.random()*10}s;background:${colors[Math.floor(Math.random()*colors.length)]}`;
+    c.appendChild(p);
+  }
+})();
 
-// Type buttons
+// ── JS Logic ──
+let pollTimer = null, elapsedTimer = null, startTime = 0, healthRetries = 0, queryType = 'auto', hops = 1;
+
 document.querySelectorAll('.type-btns button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.type-btns button').forEach(b => b.classList.remove('active'));
@@ -864,7 +1222,6 @@ document.querySelectorAll('.type-btns button').forEach(btn => {
     queryType = btn.dataset.type;
   });
 });
-// Hops buttons
 document.querySelectorAll('.hop-btns button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.hop-btns button').forEach(b => b.classList.remove('active'));
@@ -873,7 +1230,6 @@ document.querySelectorAll('.hop-btns button').forEach(btn => {
   });
 });
 
-// Health check (only downgrade, never override server-side Healthy)
 function checkHealth() {
   const badge = document.getElementById('health-badge');
   const ctrl = new AbortController();
@@ -929,6 +1285,7 @@ async function startSearch(retries) {
     startTime = Date.now();
     document.getElementById('progress-section').style.display = 'block';
     document.getElementById('results-section').style.display = 'none';
+    document.getElementById('idle-section').style.display = 'none';
     document.getElementById('exports-grid').innerHTML = '';
     document.getElementById('log-box').textContent = '';
     updateUI(data);
@@ -967,15 +1324,12 @@ async function pollSearch(id) {
         if (data.export_files?.length > 0) {
           showResults(data);
         } else {
-          // Files may not be listed yet — re-fetch after 2s
           setTimeout(() => pollSearch(id), 2000);
         }
       }
       if (data.status === 'failed') showError(data.error || 'Search failed.');
     }
   } catch (e) {
-    // Silently continue — next poll will try again
-    // Only log if it's not a routine abort
     if (e.name !== 'AbortError') console.warn('Poll error:', e);
   }
 }
@@ -988,7 +1342,7 @@ function updateUI(data) {
   document.getElementById('progress-text').textContent = data.progress || '';
   if (data.log?.length > 0) {
     const box = document.getElementById('log-box');
-    box.textContent = data.log.join('\\n');
+    box.textContent = data.log.join('\n');
     box.scrollTop = box.scrollHeight;
   }
 }
