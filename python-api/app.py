@@ -39,7 +39,7 @@ sys.path.insert(0, str(ENGINE_DIR))
 app = FastAPI(
     title="Scientific Knowledge Graph Platform",
     description="Multi-hop automated scientific discovery engine. Search proteins, compounds, and pathways across 19 databases.",
-    version="3.2.1",
+    version="3.2.2",
 )
 
 # Writable state dirs (Render /tmp is writable; repo dirs may be read-only)
@@ -216,7 +216,7 @@ def _format_size(size: int) -> str:
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "scigraph-api", "version": "3.2.0"}
+    return {"status": "ok", "service": "scigraph-api", "version": "3.2.2"}
 
 
 @app.post("/api/search", response_model=SearchStatus)
@@ -1084,7 +1084,7 @@ LANDING_PAGE_HTML = """
     <div class="header-brand">
       <span class="logo">🔬</span>
       <h1>Chemical Data Extractor</h1>
-      <span class="version">v3.2.0</span>
+      <span class="version">v3.2.2</span>
     </div>
     <span class="badge ok" id="health-badge">● Online</span>
   </div>
