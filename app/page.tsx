@@ -173,14 +173,33 @@ export default function HomePage() {
               {search ? (
                 <ProgressView search={search} logLines={logLines} />
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-600 py-20">
-                  <div className="text-center">
+                <div className="h-full flex items-center justify-center text-gray-600 py-10 lg:py-20">
+                  <div className="text-center max-w-md mx-auto px-4">
                     <div className="text-5xl mb-4">🔬</div>
-                    <p className="text-lg">Enter a query to start searching</p>
-                    <p className="text-sm mt-1">
-                      Search proteins, compounds, and pathways across 19+
-                      databases
+                    <p className="text-lg font-medium text-gray-300">
+                      Enter a query to start searching
                     </p>
+                    <p className="text-sm mt-2 text-gray-500 leading-relaxed">
+                      Extract chemical compounds, bioactivities, protein targets,
+                      3D structures, and biological pathways from 19+ scientific databases.
+                    </p>
+                    <div className="mt-6 grid grid-cols-3 gap-3 text-xs">
+                      <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
+                        <div className="text-lg mb-1">🧬</div>
+                        <div className="text-gray-400 font-medium">Proteins</div>
+                        <div className="text-gray-600">UniProt, PDB, AlphaFold</div>
+                      </div>
+                      <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
+                        <div className="text-lg mb-1">💊</div>
+                        <div className="text-gray-400 font-medium">Compounds</div>
+                        <div className="text-gray-600">PubChem, ChEMBL, ChEBI</div>
+                      </div>
+                      <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
+                        <div className="text-lg mb-1">🔗</div>
+                        <div className="text-gray-400 font-medium">Pathways</div>
+                        <div className="text-gray-600">KEGG, Reactome, GO</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -194,9 +213,14 @@ export default function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 py-3 text-center text-xs text-gray-600">
-        SciGraph v3.1 — 19 Database Connectors · Multi-Hop Expansion · Enterprise
-        Knowledge Graph
+      <footer className="border-t border-gray-800 py-4 text-center text-xs text-gray-600">
+        <div className="max-w-7xl mx-auto px-4">
+          <p>Chemical Data Extractor — 19 Database Connectors · Multi-Hop Expansion</p>
+          <p className="mt-1.5 text-gray-500">
+            Developed with ❤️ by{' '}
+            <span className="text-cyan-400 font-medium">Sumanta</span>
+          </p>
+        </div>
       </footer>
     </div>
   );

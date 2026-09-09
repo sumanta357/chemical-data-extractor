@@ -27,6 +27,56 @@ export default function SearchForm({ onSearch, isRunning }: Props) {
         New Search
       </h2>
 
+      {/* Instructions */}
+      <div className="bg-gray-950/70 border border-gray-800 rounded-lg p-4 space-y-3">
+        <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
+          How it works
+        </h3>
+        <ol className="text-xs text-gray-400 space-y-2">
+          <li className="flex gap-2">
+            <span className="text-cyan-500 font-bold shrink-0">1.</span>
+            <span>Enter a <strong className="text-gray-300">protein</strong> (e.g. "tubulin", "EGFR") or <strong className="text-gray-300">compound</strong> (e.g. "Aspirin", "Ibuprofen")</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-cyan-500 font-bold shrink-0">2.</span>
+            <span>Choose <strong className="text-gray-300">Auto</strong> to detect, or pick <strong className="text-gray-300">Protein/Ligand</strong> manually</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-cyan-500 font-bold shrink-0">3.</span>
+            <span>Select <strong className="text-gray-300">hops</strong> — how many connection steps to explore</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-cyan-500 font-bold shrink-0">4.</span>
+            <span>Click <strong className="text-gray-300">Run Search</strong> and watch the extraction in real-time</span>
+          </li>
+        </ol>
+      </div>
+
+      {/* What are Hops? */}
+      <div className="bg-gray-950/70 border border-gray-800 rounded-lg p-4">
+        <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">
+          What are Hops?
+        </h3>
+        <div className="text-xs text-gray-400 space-y-1.5">
+          <div className="flex items-start gap-2">
+            <span className="text-green-400 font-mono font-bold shrink-0">1-hop</span>
+            <span>Direct connections only (e.g., Aspirin → COX-1 enzyme)</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-cyan-400 font-mono font-bold shrink-0">2-hop</span>
+            <span>Follow one more step (e.g., Aspirin → COX-1 → Prostaglandin pathway)</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-purple-400 font-mono font-bold shrink-0">3-hop</span>
+            <span>Deeper network (e.g., Aspirin → COX-1 → Pathway → Related diseases)</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="text-orange-400 font-mono font-bold shrink-0">4-hop</span>
+            <span>Maximum depth — comprehensive knowledge graph (slower)</span>
+          </div>
+        </div>
+      </div>
+
       {/* Query input */}
       <div>
         <label className="block text-xs text-gray-500 mb-1.5">Query</label>
