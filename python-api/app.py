@@ -1546,12 +1546,13 @@ def _guess_mime(filename: str) -> str:
 
 MAX_STORAGE_MB = int(os.environ.get("MAX_STORAGE_MB", "500"))
 MAX_LOG_LINES_COMPLETED = 100  # Keep only last 100 log lines for completed searches
-EXPORT_MAX_AGE_DAYS = 7  # Auto-delete exports older than 7 days
+EXPORT_MAX_AGE_MINUTES = 30  # Auto-delete exports older than 30 minutes
+CLEANUP_INTERVAL_SECONDS = 1800  # Run cleanup every 30 minutes
 
 def _cleanup_old_exports():
-    """Delete export directories older than EXPORT_MAX_AGE_DAYS."""
+    """Delete export directories older than EXPORT_MAX_AGE_MINUTES."""
     import shutil
-    cutoff = time.time() - (EXPORT_MAX_AGE_DAYS * 86400)
+    cutoff = time.time() - (EXPORT_MAX_AGE_MINUTES * 60)
     cleaned = 0
     for export_dir in EXPORTS_DIR.iterdir():
         if export_dir.is_dir() and export_dir.stat().st_mtime < cutoff:
@@ -1623,5 +1624,12 @@ async def startup():
     print(f"   Engine dir: {ENGINE_DIR}")
     print(f"   Exports dir: {EXPORTS_DIR}")
     print(f"   Workspace dir: {WORKSPACE_DIR}")
-    print(f"   Storage limit: {MAX_STORAGE_MB}MB | Export retention: {EXPORT_MAX_AGE_DAYS} days")
+    print(f"   Storage limit: {MAX_STORAGE_MB}MB | Export retention: {EXPORT_MAX_AGE_MINUTES}min")
     _run_storage_cleanup()
+    # Schedule recurring cleanup every 30 minutes
+    import asyncio
+    async def _periodic_cleanup():
+        while True:
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+            _run_storage_cleanup()
+    asyncio.ensure_future(_periodic_cleanup())
