@@ -395,6 +395,10 @@ LANDING_PAGE_HTML = """
     min-height: 100vh;
     line-height: 1.6;
     overflow-x: hidden;
+    background-image: radial-gradient(ellipse at 20% 50%, rgba(6,182,212,0.03) 0%, transparent 50%),
+                      radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.03) 0%, transparent 50%),
+                      radial-gradient(ellipse at 50% 80%, rgba(16,185,129,0.02) 0%, transparent 50%);
+    background-attachment: fixed;
   }
 
   /* ── Animated particle background ── */
@@ -414,7 +418,8 @@ LANDING_PAGE_HTML = """
   }
   @keyframes float-up {
     0% { opacity: 0; transform: translateY(100vh) scale(0); }
-    10% { opacity: 0.6; }
+    10% { opacity: 0.8; }
+    50% { opacity: 0.5; }
     90% { opacity: 0.3; }
     100% { opacity: 0; transform: translateY(-10vh) scale(1); }
   }
@@ -425,9 +430,9 @@ LANDING_PAGE_HTML = """
     inset: 0;
     z-index: 0;
     background-image:
-      linear-gradient(rgba(6,182,212,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(6,182,212,0.03) 1px, transparent 1px);
-    background-size: 60px 60px;
+      linear-gradient(rgba(6,182,212,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6,182,212,0.06) 1px, transparent 1px);
+    background-size: 50px 50px;
     pointer-events: none;
   }
 
@@ -460,8 +465,8 @@ LANDING_PAGE_HTML = """
     animation: pulse-glow 3s ease-in-out infinite;
   }
   @keyframes pulse-glow {
-    0%, 100% { filter: drop-shadow(0 0 8px rgba(6,182,212,0.3)); }
-    50% { filter: drop-shadow(0 0 16px rgba(6,182,212,0.7)); }
+    0%, 100% { filter: drop-shadow(0 0 8px rgba(6,182,212,0.3)); transform: scale(1); }
+    50% { filter: drop-shadow(0 0 20px rgba(6,182,212,0.8)); transform: scale(1.05); }
   }
   .header-brand h1 {
     font-size: 1.1rem;
@@ -508,9 +513,9 @@ LANDING_PAGE_HTML = """
     top: -200px; left: 50%;
     width: 1000px; height: 600px;
     transform: translateX(-50%);
-    background: radial-gradient(ellipse, rgba(6,182,212,0.08) 0%, rgba(139,92,246,0.04) 40%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(6,182,212,0.12) 0%, rgba(139,92,246,0.06) 40%, transparent 70%);
     pointer-events: none;
-    animation: hero-glow 8s ease-in-out infinite alternate;
+    animation: hero-glow 6s ease-in-out infinite alternate;
   }
   @keyframes hero-glow {
     0% { opacity: 0.6; transform: translateX(-50%) scale(1); }
@@ -525,20 +530,21 @@ LANDING_PAGE_HTML = """
   .molecule {
     position: absolute;
     font-size: 1.5rem;
-    opacity: 0.15;
-    animation: molecule-float 20s ease-in-out infinite;
+    opacity: 0.3;
+    filter: drop-shadow(0 0 6px currentColor);
+    animation: molecule-float 15s ease-in-out infinite;
   }
-  .molecule:nth-child(1) { left: 10%; top: 20%; animation-delay: 0s; animation-duration: 25s; }
-  .molecule:nth-child(2) { left: 85%; top: 30%; animation-delay: -5s; animation-duration: 22s; }
-  .molecule:nth-child(3) { left: 20%; top: 70%; animation-delay: -10s; animation-duration: 28s; }
-  .molecule:nth-child(4) { left: 75%; top: 65%; animation-delay: -7s; animation-duration: 20s; }
-  .molecule:nth-child(5) { left: 50%; top: 15%; animation-delay: -3s; animation-duration: 23s; }
-  .molecule:nth-child(6) { left: 35%; top: 80%; animation-delay: -12s; animation-duration: 26s; }
+  .molecule:nth-child(1) { left: 5%; top: 15%; animation-delay: 0s; animation-duration: 18s; }
+  .molecule:nth-child(2) { left: 90%; top: 25%; animation-delay: -5s; animation-duration: 16s; }
+  .molecule:nth-child(3) { left: 15%; top: 75%; animation-delay: -10s; animation-duration: 20s; }
+  .molecule:nth-child(4) { left: 80%; top: 70%; animation-delay: -7s; animation-duration: 15s; }
+  .molecule:nth-child(5) { left: 50%; top: 10%; animation-delay: -3s; animation-duration: 17s; }
+  .molecule:nth-child(6) { left: 30%; top: 85%; animation-delay: -12s; animation-duration: 19s; }
   @keyframes molecule-float {
-    0%, 100% { transform: translate(0, 0) rotate(0deg); }
-    25% { transform: translate(30px, -20px) rotate(90deg); }
-    50% { transform: translate(-20px, 15px) rotate(180deg); }
-    75% { transform: translate(15px, 25px) rotate(270deg); }
+    0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+    25% { transform: translate(40px, -30px) rotate(90deg) scale(1.1); }
+    50% { transform: translate(-30px, 20px) rotate(180deg) scale(0.95); }
+    75% { transform: translate(20px, 35px) rotate(270deg) scale(1.05); }
   }
   .hero h2 {
     font-size: clamp(2rem, 5vw, 3.2rem);
@@ -590,6 +596,16 @@ LANDING_PAGE_HTML = """
     border-color: rgba(6,182,212,0.3);
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(6,182,212,0.1);
+  }
+  .hero-stat {
+    animation: stat-glow 4s ease-in-out infinite;
+  }
+  .hero-stat:nth-child(2) { animation-delay: 0.5s; }
+  .hero-stat:nth-child(3) { animation-delay: 1s; }
+  .hero-stat:nth-child(4) { animation-delay: 1.5s; }
+  @keyframes stat-glow {
+    0%, 100% { box-shadow: 0 0 0 rgba(6,182,212,0); }
+    50% { box-shadow: 0 0 20px rgba(6,182,212,0.08); }
   }
   .hero-stat .num {
     font-size: 1.8rem;
@@ -643,8 +659,8 @@ LANDING_PAGE_HTML = """
     background: linear-gradient(90deg, transparent, rgba(6,182,212,0.3), transparent);
   }
   .card:hover {
-    border-color: rgba(6,182,212,0.2);
-    box-shadow: 0 8px 32px rgba(6,182,212,0.05);
+    border-color: rgba(6,182,212,0.25);
+    box-shadow: 0 8px 32px rgba(6,182,212,0.08), 0 0 60px rgba(6,182,212,0.03);
   }
   .card h3 {
     font-size: 0.8rem;
@@ -801,6 +817,11 @@ LANDING_PAGE_HTML = """
     position: relative;
     overflow: hidden;
     letter-spacing: 0.02em;
+    animation: btn-glow 3s ease-in-out infinite;
+  }
+  @keyframes btn-glow {
+    0%, 100% { box-shadow: 0 4px 15px rgba(6,182,212,0.2); }
+    50% { box-shadow: 0 4px 25px rgba(6,182,212,0.4), 0 0 40px rgba(139,92,246,0.15); }
   }
   .search-btn::before {
     content: '';
@@ -854,7 +875,7 @@ LANDING_PAGE_HTML = """
     border-radius: 9999px;
     font-size: 0.7rem;
     font-weight: 600;
-    animation: pill-pulse 2s ease-in-out infinite;
+    animation: pill-pulse 1.5s ease-in-out infinite;
   }
   @keyframes pill-pulse {
     0%, 100% { opacity: 1; }
@@ -980,10 +1001,10 @@ LANDING_PAGE_HTML = """
     padding: 2rem;
   }
   .idle-state .content { max-width: 500px; }
-  .idle-state .icon { font-size: 4rem; margin-bottom: 1rem; animation: float 4s ease-in-out infinite; }
+  .idle-state .icon { font-size: 4rem; margin-bottom: 1rem; animation: float 3s ease-in-out infinite; filter: drop-shadow(0 0 20px rgba(6,182,212,0.4)); }
   @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-15px) rotate(5deg); }
   }
   .idle-state h3 {
     font-size: 1.2rem;
@@ -1206,7 +1227,7 @@ LANDING_PAGE_HTML = """
   for (let i = 0; i < 30; i++) {
     const p = document.createElement('div');
     p.className = 'particle';
-    const size = Math.random() * 3 + 1;
+    const size = Math.random() * 8 + 4;
     p.style.cssText = `width:${size}px;height:${size}px;left:${Math.random()*100}%;animation-duration:${Math.random()*15+10}s;animation-delay:${Math.random()*10}s;background:${colors[Math.floor(Math.random()*colors.length)]}`;
     c.appendChild(p);
   }
