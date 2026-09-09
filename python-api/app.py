@@ -1515,6 +1515,35 @@ function showResults(data) {
     g.appendChild(d);
   }
 }
+
+// --- Session restore: resume active search or show latest results after refresh ---
+async function restoreSession() {
+  try {
+    const list = await (await fetch('/api/searches?limit=10')).json();
+    if (!Array.isArray(list) || list.length === 0) return;
+    const active = list.find(s => s.status === 'queued' || s.status === 'running');
+    const done = !active && list.find(s => s.status === 'completed');
+    if (!active && !done) return;
+    const data = await (await fetch('/api/search/' + (active ? active.search_id : done.search_id))).json();
+    if (data.query) document.getElementById('query').value = data.query;
+    if (active) {
+      startTime = new Date(data.created_at).getTime() || Date.now();
+      document.getElementById('progress-section').style.display = 'block';
+      document.getElementById('idle-section').style.display = 'none';
+      document.getElementById('results-section').style.display = 'none';
+      updateUI(data);
+      document.getElementById('search-btn').disabled = true;
+      document.getElementById('search-btn').textContent = 'Running...';
+      elapsedTimer = setInterval(() => {
+        document.getElementById('elapsed').textContent = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+      }, 200);
+      pollTimer = setInterval(() => pollSearch(active.search_id), 1500);
+    } else if (data.export_files && data.export_files.length > 0) {
+      showResults(data);
+    }
+  } catch (e) { console.warn('Session restore skipped:', e); }
+}
+restoreSession();
 </script>
 </body>
 </html>
