@@ -594,15 +594,6 @@ LANDING_PAGE_HTML = """
     align-items: center;
     gap: 0.75rem;
   }
-  .header-brand .logo {
-    font-size: 1.6rem;
-    filter: drop-shadow(0 0 8px rgba(6,182,212,0.5));
-    animation: pulse-glow 3s ease-in-out infinite;
-  }
-  @keyframes pulse-glow {
-    0%, 100% { filter: drop-shadow(0 0 8px rgba(6,182,212,0.3)); transform: scale(1); }
-    50% { filter: drop-shadow(0 0 20px rgba(6,182,212,0.8)); transform: scale(1.05); }
-  }
   .header-brand h1 {
     font-size: 1.1rem;
     font-weight: 700;
@@ -656,51 +647,14 @@ LANDING_PAGE_HTML = """
     0% { opacity: 0.6; transform: translateX(-50%) scale(1); }
     100% { opacity: 1; transform: translateX(-50%) scale(1.1); }
   }
-  .hero .molecules {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    overflow: hidden;
-  }
-  .molecule {
-    position: absolute;
-    font-size: 1.5rem;
-    opacity: 0.3;
-    filter: drop-shadow(0 0 6px currentColor);
-    animation: molecule-float 15s ease-in-out infinite;
-  }
-  .molecule:nth-child(1) { left: 5%; top: 15%; animation-delay: 0s; animation-duration: 18s; }
-  .molecule:nth-child(2) { left: 90%; top: 25%; animation-delay: -5s; animation-duration: 16s; }
-  .molecule:nth-child(3) { left: 15%; top: 75%; animation-delay: -10s; animation-duration: 20s; }
-  .molecule:nth-child(4) { left: 80%; top: 70%; animation-delay: -7s; animation-duration: 15s; }
-  .molecule:nth-child(5) { left: 50%; top: 10%; animation-delay: -3s; animation-duration: 17s; }
-  .molecule:nth-child(6) { left: 30%; top: 85%; animation-delay: -12s; animation-duration: 19s; }
-  @keyframes molecule-float {
-    0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
-    25% { transform: translate(40px, -30px) rotate(90deg) scale(1.1); }
-    50% { transform: translate(-30px, 20px) rotate(180deg) scale(0.95); }
-    75% { transform: translate(20px, 35px) rotate(270deg) scale(1.05); }
-  }
   .hero h2 {
-    font-size: clamp(2rem, 5vw, 3.2rem);
-    font-weight: 800;
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 600;
     color: var(--text);
-    margin-bottom: 1rem;
+    margin-bottom: 0.875rem;
     position: relative;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-  }
-  .hero h2 span {
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent3) 50%, var(--accent4) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    background-size: 200% 200%;
-    animation: gradient-shift 6s ease-in-out infinite;
-  }
-  @keyframes gradient-shift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+    letter-spacing: -0.02em;
+    line-height: 1.2;
   }
   .hero p {
     color: var(--text2);
@@ -732,23 +686,12 @@ LANDING_PAGE_HTML = """
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(6,182,212,0.1);
   }
-  .hero-stat {
-    animation: stat-glow 4s ease-in-out infinite;
-  }
-  .hero-stat:nth-child(2) { animation-delay: 0.5s; }
-  .hero-stat:nth-child(3) { animation-delay: 1s; }
-  .hero-stat:nth-child(4) { animation-delay: 1.5s; }
-  @keyframes stat-glow {
-    0%, 100% { box-shadow: 0 0 0 rgba(6,182,212,0); }
-    50% { box-shadow: 0 0 20px rgba(6,182,212,0.08); }
-  }
+
   .hero-stat .num {
-    font-size: 1.8rem;
-    font-weight: 800;
-    background: linear-gradient(135deg, var(--accent), var(--accent3));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
   }
   .hero-stat .label {
     font-size: 0.7rem;
@@ -874,6 +817,42 @@ LANDING_PAGE_HTML = """
   .hop-3 { color: var(--accent3); }
   .hop-4 { color: var(--warn); }
 
+
+  /* ── Example chips ── */
+  .examples {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .examples-label {
+    font-size: 0.72rem;
+    color: var(--text3);
+    font-weight: 500;
+  }
+  .example-chip {
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text2);
+    font-size: 0.78rem;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .example-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .exports-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--text3);
+    font-size: 0.85rem;
+  }
+
   /* ── Form fields ── */
   .field { margin-bottom: 1rem; }
   .field label {
@@ -944,19 +923,13 @@ LANDING_PAGE_HTML = """
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    background: linear-gradient(135deg, var(--accent2), var(--accent), var(--accent3));
-    background-size: 200% 200%;
+    background: var(--accent2);
     color: #fff;
     transition: all 0.3s ease;
     margin-top: 0.75rem;
     position: relative;
     overflow: hidden;
-    letter-spacing: 0.02em;
-    animation: btn-glow 3s ease-in-out infinite;
-  }
-  @keyframes btn-glow {
-    0%, 100% { box-shadow: 0 4px 15px rgba(6,182,212,0.2); }
-    50% { box-shadow: 0 4px 25px rgba(6,182,212,0.4), 0 0 40px rgba(139,92,246,0.15); }
+    letter-spacing: 0.01em;
   }
   .search-btn::before {
     content: '';
@@ -1217,9 +1190,7 @@ LANDING_PAGE_HTML = """
 <div class="header">
   <div class="header-inner">
     <div class="header-brand">
-      <span class="logo">🔬</span>
       <h1>Chemical Data Extractor</h1>
-      <span class="version">v3.2.2</span>
     </div>
     <span class="badge ok" id="health-badge">● Online</span>
   </div>
@@ -1227,15 +1198,7 @@ LANDING_PAGE_HTML = """
 
 <!-- Hero -->
 <div class="hero">
-  <div class="molecules">
-    <span class="molecule">⚗️</span>
-    <span class="molecule">🧬</span>
-    <span class="molecule">💊</span>
-    <span class="molecule">🔬</span>
-    <span class="molecule">⚛️</span>
-    <span class="molecule">🧪</span>
-  </div>
-  <h2><span>Chemical Data Extractor</span></h2>
+  <h2>Chemical Data Extractor</h2>
   <p>Multi-hop automated discovery engine. Extract chemical compounds, bioactivities, protein targets, and biological pathways from 19+ scientific databases.</p>
   <div class="hero-stats">
     <div class="hero-stat fade-in"><div class="num">19+</div><div class="label">Databases</div></div>
@@ -1251,22 +1214,12 @@ LANDING_PAGE_HTML = """
   <div class="card fade-in">
     <h3>Search Knowledge Graph</h3>
 
-    <!-- How it works -->
-    <div class="info-box">
-      <div class="label">How it works</div>
-      <div class="step"><span class="step-num">1.</span><span>Enter a <strong>protein</strong> (e.g. "tubulin", "EGFR") or <strong>compound</strong> (e.g. "Aspirin", "Ibuprofen")</span></div>
-      <div class="step"><span class="step-num">2.</span><span>Choose <strong>Auto</strong> to detect, or pick <strong>Protein/Ligand</strong> manually</span></div>
-      <div class="step"><span class="step-num">3.</span><span>Select <strong>hops</strong> — how many connection steps to explore</span></div>
-      <div class="step"><span class="step-num">4.</span><span>Click <strong>Run Search</strong> and watch the extraction in real-time</span></div>
-    </div>
-
-    <!-- What are Hops? -->
-    <div class="info-box">
-      <div class="label">What are Hops?</div>
-      <div class="hop-row"><span class="hop-tag hop-1">1-hop</span><span>Direct connections (e.g., Aspirin → COX-1 enzyme)</span></div>
-      <div class="hop-row"><span class="hop-tag hop-2">2-hop</span><span>Follow one more step (e.g., Aspirin → COX-1 → Prostaglandin pathway)</span></div>
-      <div class="hop-row"><span class="hop-tag hop-3">3-hop</span><span>Deeper network (e.g., ... → Related diseases)</span></div>
-      <div class="hop-row"><span class="hop-tag hop-4">4-hop</span><span>Maximum depth — comprehensive graph (slower)</span></div>
+    <div class="examples">
+      <span class="examples-label">Try:</span>
+      <button class="example-chip" data-q="Aspirin">Aspirin</button>
+      <button class="example-chip" data-q="EGFR">EGFR</button>
+      <button class="example-chip" data-q="Tubulin">Tubulin</button>
+      <button class="example-chip" data-q="P23219">P23219</button>
     </div>
 
     <div class="field">
@@ -1276,9 +1229,9 @@ LANDING_PAGE_HTML = """
     <div class="field">
       <label>Query Type</label>
       <div class="type-btns">
-        <button class="active" data-type="auto">🔄 Auto</button>
-        <button data-type="protein">🧬 Protein</button>
-        <button data-type="ligand">💊 Ligand</button>
+        <button class="active" data-type="auto">Auto</button>
+        <button data-type="protein">Protein</button>
+        <button data-type="ligand">Ligand</button>
       </div>
     </div>
     <div class="field">
@@ -1290,7 +1243,7 @@ LANDING_PAGE_HTML = """
         <button data-hops="4">4</button>
       </div>
     </div>
-    <button class="search-btn" id="search-btn" onclick="startSearch()">🚀 Run Search</button>
+    <button class="search-btn" id="search-btn" onclick="startSearch()">Run Search</button>
     <span id="elapsed" style="display:block;text-align:center;font-size:0.8rem;color:var(--text3);margin-top:0.5rem;font-family:'JetBrains Mono',monospace;"></span>
     <div class="error-msg" id="error-msg"></div>
   </div>
@@ -1300,10 +1253,10 @@ LANDING_PAGE_HTML = """
     <div class="card progress-section fade-in" id="progress-section">
       <div class="progress-header">
         <h3>Progress</h3>
-        <span class="status-pill status-running" id="status-pill">⏳ Queued</span>
+        <span class="status-pill status-queued" id="status-pill">Queued</span>
       </div>
       <div class="progress-bar"><div class="fill"></div></div>
-      <div class="progress-text" id="progress-text">⏳ Queued…</div>
+      <div class="progress-text" id="progress-text">Queued...</div>
       <details open>
         <summary style="font-size:0.78rem;color:var(--text3);cursor:pointer;margin-bottom:0.5rem;font-weight:500;">Live Log</summary>
         <div class="log-box" id="log-box"></div>
@@ -1320,7 +1273,7 @@ LANDING_PAGE_HTML = """
       <div class="card fade-in">
         <div class="idle-state">
           <div class="content">
-            <div class="icon">🔬</div>
+            
             <h3>Enter a query to start searching</h3>
             <p>Extract chemical compounds, bioactivities, protein targets, 3D structures, and biological pathways from 19+ scientific databases.</p>
           </div>
@@ -1328,17 +1281,17 @@ LANDING_PAGE_HTML = """
       </div>
       <div class="db-cards">
         <div class="db-card fade-in">
-          <div class="icon">🧬</div>
+          
           <h4>Proteins</h4>
           <p>UniProt, PDB, AlphaFold, STRING</p>
         </div>
         <div class="db-card fade-in">
-          <div class="icon">💊</div>
+          
           <h4>Compounds</h4>
           <p>PubChem, ChEMBL, ChEBI, BindingDB</p>
         </div>
         <div class="db-card fade-in">
-          <div class="icon">🔗</div>
+          
           <h4>Pathways</h4>
           <p>KEGG, Reactome, Gene Ontology</p>
         </div>
@@ -1351,7 +1304,7 @@ LANDING_PAGE_HTML = """
 <div class="footer">
   <div class="brand">Chemical Data Extractor</div>
   <div>19 database connectors · Multi-hop graph traversal · Enrichment pipeline</div>
-  <div class="credit">Developed with ❤️ by <strong>Sumanta</strong></div>
+  <div class="credit">Built by Sumanta</div>
 </div>
 
 <script>
@@ -1386,6 +1339,14 @@ document.querySelectorAll('.hop-btns button').forEach(btn => {
   });
 });
 
+document.querySelectorAll('.example-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const q = document.getElementById('query');
+    q.value = chip.dataset.q;
+    q.focus();
+  });
+});
+
 function checkHealth() {
   const badge = document.getElementById('health-badge');
   const ctrl = new AbortController();
@@ -1396,19 +1357,17 @@ function checkHealth() {
     return r.json();
   }).then(() => {
     badge.className = 'badge ok';
-    badge.textContent = '● Online';
+    badge.textContent = 'Online';
   }).catch(() => {
     clearTimeout(tid);
-    if (badge.textContent.includes('Online')) {
-      healthRetries++;
-      if (healthRetries < 12) {
-        badge.className = 'badge waking';
-        badge.textContent = '⏳ Waking…';
-        setTimeout(checkHealth, 5000);
-      } else {
-        badge.className = 'badge';
-        badge.textContent = '● Offline';
-      }
+    healthRetries++;
+    if (healthRetries < 12) {
+      badge.className = 'badge waking';
+      badge.textContent = 'Waking...';
+      setTimeout(checkHealth, 5000);
+    } else {
+      badge.className = 'badge';
+      badge.textContent = 'Offline';
     }
   });
 }
@@ -1421,11 +1380,12 @@ document.getElementById('query').addEventListener('keydown', e => { if (e.key ==
 
 async function startSearch(retries) {
   retries = retries || 0;
+  if (pollTimer) return;  // guard: a search is already running
   const query = document.getElementById('query').value.trim();
   if (!query) { document.getElementById('query').focus(); return; }
   hideError();
   const btn = document.getElementById('search-btn');
-  btn.disabled = true; btn.textContent = '⏳ Starting…';
+  btn.disabled = true; btn.textContent = 'Starting...';
   try {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 180000);
@@ -1453,14 +1413,14 @@ async function startSearch(retries) {
     console.error('Search error:', err);
     if (err.name === 'AbortError' && retries < 3) {
       const waitTime = [8000, 10000, 12000][retries];
-      showError('⏳ Server cold start — retrying in ' + (waitTime/1000) + 's... (attempt ' + (retries+1) + '/3)');
+      showError('Server cold start — retrying in ' + (waitTime/1000) + 's... (attempt ' + (retries+1) + '/3)');
       setTimeout(() => startSearch(retries + 1), waitTime);
       return;
     }
     showError(err.name === 'AbortError'
       ? 'Service is warming up (cold start). Please wait 60s and try again.'
       : 'Search failed: ' + err.message);
-    btn.disabled = false; btn.textContent = '🚀 Run Search';
+    btn.disabled = false; btn.textContent = 'Run Search';
   }
 }
 
@@ -1470,18 +1430,16 @@ async function pollSearch(id) {
     const tid = setTimeout(() => ctrl.abort(), 15000);
     const res = await fetch('/api/search/' + id, {signal: ctrl.signal});
     clearTimeout(tid);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     updateUI(data);
     if (data.status === 'completed' || data.status === 'failed') {
       clearInterval(pollTimer); clearInterval(elapsedTimer);
+      pollTimer = null; elapsedTimer = null;
       document.getElementById('search-btn').disabled = false;
-      document.getElementById('search-btn').textContent = '🚀 Run Search';
+      document.getElementById('search-btn').textContent = 'Run Search';
       if (data.status === 'completed') {
-        if (data.export_files?.length > 0) {
-          showResults(data);
-        } else {
-          setTimeout(() => pollSearch(id), 2000);
-        }
+        showResults(data);  // handles empty file lists gracefully
       }
       if (data.status === 'failed') showError(data.error || 'Search failed.');
     }
@@ -1492,11 +1450,11 @@ async function pollSearch(id) {
 
 function updateUI(data) {
   const pill = document.getElementById('status-pill');
-  const m = { queued: ['⏳ Queued', 'status-queued'], running: ['⚡ Running', 'status-running'], completed: ['✅ Done', 'status-completed'], failed: ['❌ Failed', 'status-failed'] };
-  const [l, c] = m[data.status] || ['?', ''];
+  const m = { queued: ['Queued', 'status-queued'], running: ['Running', 'status-running'], completed: ['Done', 'status-completed'], failed: ['Failed', 'status-failed'] };
+  const [l, c] = m[data.status] || ['—', ''];
   pill.textContent = l; pill.className = 'status-pill ' + c;
   document.getElementById('progress-text').textContent = data.progress || '';
-  if (data.log?.length > 0) {
+  if (Array.isArray(data.log) && data.log.length > 0) {
     const box = document.getElementById('log-box');
     box.textContent = data.log.join(String.fromCharCode(10));
     box.scrollTop = box.scrollHeight;
@@ -1504,14 +1462,20 @@ function updateUI(data) {
 }
 
 function showResults(data) {
+  document.getElementById('idle-section').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'none';
   document.getElementById('results-section').style.display = 'block';
   const g = document.getElementById('exports-grid');
   g.innerHTML = '';
+  if (!data.export_files || data.export_files.length === 0) {
+    g.innerHTML = '<div class="exports-empty">No export files were generated for this search.</div>';
+    return;
+  }
   for (const f of data.export_files) {
     const d = document.createElement('div');
     d.className = 'export-card';
     const u = '/api/exports/' + encodeURIComponent(f.name) + '?search_id=' + data.search_id;
-    d.innerHTML = '<div class="name">📄 ' + f.name + '</div><div class="size">' + f.size_display + '</div><a href="' + u + '" target="_blank">Download →</a>';
+    d.innerHTML = '<div class="name">' + f.name + '</div><div class="size">' + f.size_display + '</div><a href="' + u + '" target="_blank">Download →</a>';
     g.appendChild(d);
   }
 }
