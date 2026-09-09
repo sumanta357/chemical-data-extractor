@@ -1541,6 +1541,81 @@ def _guess_mime(filename: str) -> str:
 
 # ── Startup ──────────────────────────────────────────────────────────────────
 
+
+# ── Storage Management ───────────────────────────────────────────────────────
+
+MAX_STORAGE_MB = int(os.environ.get("MAX_STORAGE_MB", "500"))
+MAX_LOG_LINES_COMPLETED = 100  # Keep only last 100 log lines for completed searches
+EXPORT_MAX_AGE_DAYS = 7  # Auto-delete exports older than 7 days
+
+def _cleanup_old_exports():
+    """Delete export directories older than EXPORT_MAX_AGE_DAYS."""
+    import shutil
+    cutoff = time.time() - (EXPORT_MAX_AGE_DAYS * 86400)
+    cleaned = 0
+    for export_dir in EXPORTS_DIR.iterdir():
+        if export_dir.is_dir() and export_dir.stat().st_mtime < cutoff:
+            try:
+                shutil.rmtree(export_dir)
+                cleaned += 1
+            except Exception:
+                pass
+    for ws_dir in WORKSPACE_DIR.iterdir():
+        if ws_dir.is_dir() and ws_dir.stat().st_mtime < cutoff:
+            try:
+                shutil.rmtree(ws_dir)
+                cleaned += 1
+            except Exception:
+                pass
+    if cleaned:
+        print(f"  🧹 Cleaned {cleaned} old export/workspace directories")
+
+def _enforce_storage_limit():
+    """Delete oldest exports if total storage exceeds MAX_STORAGE_MB."""
+    import shutil
+    max_bytes = MAX_STORAGE_MB * 1024 * 1024
+    total = sum(f.stat().st_size for f in EXPORTS_DIR.rglob("*") if f.is_file())
+    if total <= max_bytes:
+        return
+    dirs = sorted(EXPORTS_DIR.iterdir(), key=lambda d: d.stat().st_mtime)
+    for d in dirs:
+        if total <= max_bytes * 0.8:
+            break
+        if d.is_dir():
+            size = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
+            try:
+                shutil.rmtree(d)
+                total -= size
+            except Exception:
+                pass
+    print(f"  📦 Storage enforced: {total / 1024 / 1024:.1f}MB used (limit: {MAX_STORAGE_MB}MB)")
+
+def _truncate_completed_logs():
+    """Truncate logs for completed/failed searches to save SQLite space."""
+    try:
+        with sqlite3.connect(str(SEARCH_DB)) as conn:
+            conn.execute("""
+                UPDATE searches
+                SET log = ?
+                WHERE status IN ('completed', 'failed')
+                  AND length(log) > ?
+            """, ("[Log truncated for storage optimization]", 10000))
+            conn.execute("""
+                DELETE FROM searches
+                WHERE created_at < datetime('now', '-30 days')
+            """)
+    except Exception:
+        pass
+
+def _run_storage_cleanup():
+    """Run all storage cleanup tasks."""
+    try:
+        _cleanup_old_exports()
+        _enforce_storage_limit()
+        _truncate_completed_logs()
+    except Exception as e:
+        print(f"  ⚠️ Storage cleanup error: {e}")
+
 @app.on_event("startup")
 async def startup():
     print(f"🔬 SciGraph API v3.2.0 starting...")
@@ -1548,3 +1623,5 @@ async def startup():
     print(f"   Engine dir: {ENGINE_DIR}")
     print(f"   Exports dir: {EXPORTS_DIR}")
     print(f"   Workspace dir: {WORKSPACE_DIR}")
+    print(f"   Storage limit: {MAX_STORAGE_MB}MB | Export retention: {EXPORT_MAX_AGE_DAYS} days")
+    _run_storage_cleanup()
