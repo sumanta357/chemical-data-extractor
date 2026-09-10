@@ -17,8 +17,10 @@ Run: uvicorn app:app --host 0.0.0.0 --port $PORT
 """
 
 import asyncio
+import logging
 import os
 import re
+import shutil
 import sys
 import time
 import uuid
@@ -47,6 +49,14 @@ EXPORTS_DIR = Path(os.environ.get("EXPORTS_DIR", "/tmp/scigraph_exports"))
 WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/tmp/scigraph_workspace"))
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Persistent runtime logger (stderr/stdout outside poll logs)
+LOG = logging.getLogger("scigraph.runtime")
+LOG.setLevel(logging.DEBUG)
+if not LOG.handlers:
+    h = logging.StreamHandler(sys.stderr)
+    h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    LOG.addHandler(h)
 
 # ── Persistent search state (SQLite) ─────────────────────────────────────────
 import sqlite3
@@ -125,7 +135,23 @@ class SearchRequest(BaseModel):
     export_dir: Optional[str] = None
 
 
+def _clean_status(d: dict) -> dict:
+    """Strip empty/None fields and convert truncated log strings to empty lists."""
+    out = {}
+    for k, v in d.items():
+        if v is None:
+            continue
+        if k == "log" and isinstance(v, str):
+            out[k] = []
+        elif k == "export_files" and (not v or (isinstance(v, list) and not v)):
+            continue
+        else:
+            out[k] = v
+    return out
+
+
 class SearchStatus(BaseModel):
+    """Public search status. Empty fields are omitted on the wire."""
     search_id: str
     query: str
     status: str  # queued | running | completed | failed
@@ -141,16 +167,14 @@ class SearchStatus(BaseModel):
 
 async def run_search_in_background(search_id: str, query: str, query_type: str, hops: int, export_dir: str):
     """Run api/scigraph.py as a subprocess, then enrich, capturing output."""
-    state = searches[search_id]
+    state = searches.get(search_id)
+    if state is None:
+        LOG.error("Background runner: no in-memory state for search_id=%s", search_id)
+        return
     state["status"] = "running"
     state["log"] = []
     start_time = time.time()
     _save_search(state)
-
-    export_path = Path(export_dir)
-    export_path.mkdir(parents=True, exist_ok=True)
-    workspace = WORKSPACE_DIR / search_id
-    workspace.mkdir(parents=True, exist_ok=True)
 
     # Build CLI command
     cmd = [
@@ -159,9 +183,10 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
         query,
         "--query-type", query_type,
         "--hops", str(hops),
-        "--workspace", str(workspace),
+        "--workspace", str(WORKSPACE_DIR),
         "--export-dir", export_dir,
     ]
+    LOG.info("Launching scigraph search search_id=%s query=%r hops=%s", search_id, query, hops)
 
     try:
         process = await asyncio.create_subprocess_exec(
@@ -179,8 +204,9 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
             _update_progress(state, line)
 
         await process.wait()
+        rc = process.returncode
 
-        if process.returncode == 0:
+        if rc == 0:
             # --- Run enrichment pipeline ---
             state["progress"] = "🧪 Enriching compounds with PubChem & CrossRef..."
             state["log"].append("")
@@ -218,7 +244,8 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
                 enrich_elapsed = time.time() - enrichment_start
                 state["log"].append(f"  ✦ Enrichment pipeline completed in {enrich_elapsed:.1f}s")
             except Exception as enrich_err:
-                state["log"].append(f"  ⚠️  Enrichment step error: {enrich_err}")
+                LOG.warning("Enrichment step failed for search_id=%s: %s", search_id, enrich_err, exc_info=True)
+                state["log"].append(f"  Enrichment step error: {enrich_err}")
 
             # --- Finalize ---
             state["status"] = "completed"
@@ -232,7 +259,7 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
             _save_search(state)
         else:
             state["status"] = "failed"
-            state["error"] = f"Process exited with code {process.returncode}"
+            state["error"] = f"Process exited with code {rc}"
             state["elapsed_seconds"] = time.time() - start_time
             _save_search(state)
 
@@ -256,23 +283,29 @@ def _update_progress(state: dict, line: str):
 
 
 def _list_export_files(export_dir: str) -> list[dict]:
-    """List all files in the export directory with metadata."""
-    files = []
+    """List files in the export directory. Directory missing means nothing to list."""
+    files: list[dict] = []
     path = Path(export_dir)
     if not path.exists():
         return files
     for f in sorted(path.iterdir()):
         if f.is_file() and not f.name.startswith("."):
+            try:
+                st = f.stat()
+            except OSError:
+                continue
             files.append({
                 "name": f.name,
-                "size_bytes": f.stat().st_size,
-                "size_display": _format_size(f.stat().st_size),
+                "size_bytes": st.st_size,
+                "size_display": _format_size(st.st_size),
                 "url": f"/api/exports/{f.name}",
             })
     return files
 
 
 def _format_size(size: int) -> str:
+    if size < 0:
+        return "0 B"
     for unit in ["B", "KB", "MB"]:
         if size < 1024:
             return f"{size:.0f} {unit}"
@@ -284,7 +317,14 @@ def _format_size(size: int) -> str:
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "scigraph-api", "version": "3.2.2"}
+    return {
+        "status": "ok",
+        "service": "scigraph-api",
+        "version": "3.2.2",
+        "exports_dir": str(EXPORTS_DIR),
+        "workspace_dir": str(WORKSPACE_DIR),
+        "search_db": str(SEARCH_DB),
+    }
 
 
 @app.post("/api/search", response_model=SearchStatus)
@@ -307,7 +347,7 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
         "query_type": request.query_type,
         "hops": request.hops,
         "status": "queued",
-        "progress": "⏳ Queued...",
+        "progress": "Queued...",
         "log": [],
         "export_files": [],
         "export_dir": export_dir,
@@ -316,17 +356,22 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
         "error": None,
     }
     searches[search_id] = state
+    _save_search(state)
 
     background_tasks.add_task(
         run_search_in_background,
         search_id, request.query, request.query_type, request.hops, export_dir
     )
 
-    await asyncio.sleep(0.5)
+    # Brief pause so the reader sees "queued" rather than an immediate start.
+    try:
+        await asyncio.sleep(0.5)
+    except asyncio.CancelledError:
+        pass
 
-    return SearchStatus(**{
+    return SearchStatus(**_clean_status({
         k: v for k, v in state.items() if k != "export_dir"
-    })
+    }))
 
 
 @app.get("/api/search/{search_id}", response_model=SearchStatus)
@@ -336,12 +381,17 @@ async def get_search_status(search_id: str):
     if not state:
         raise HTTPException(status_code=404, detail="Search not found")
 
-    if state["status"] == "completed" and not state["export_files"]:
+    if state.get("status") == "completed" and not state.get("export_files"):
         state["export_files"] = _list_export_files(state.get("export_dir", ""))
+        _save_search(state)
 
-    return SearchStatus(**{
+    # Purge cached state that is no longer useful.
+    if state.get("status") in ("completed", "failed") and not state.get("export_files"):
+        searches.pop(search_id, None)
+
+    return SearchStatus(**_clean_status({
         k: v for k, v in state.items() if k != "export_dir"
-    })
+    }))
 
 
 @app.get("/api/search/{search_id}/log")
@@ -350,12 +400,17 @@ async def get_search_log(search_id: str, offset: int = Query(0, ge=0)):
     state = searches.get(search_id)
     if not state:
         raise HTTPException(status_code=404, detail="Search not found")
+    log = state.get("log")
+    if isinstance(log, str):
+        log = []
+    elif not isinstance(log, list):
+        log = []
     return {
         "search_id": search_id,
         "status": state["status"],
         "offset": offset,
-        "total_lines": len(state["log"]),
-        "new_lines": state["log"][offset:],
+        "total_lines": len(log),
+        "new_lines": log[offset:],
     }
 
 
@@ -382,41 +437,53 @@ async def get_search_graph(search_id: str):
         "GENE": "#a855f7", "PATHWAY": "#eab308",       # Purple, Yellow
     }
 
-    nodes = []
-    with open(nodes_file, "r", encoding="utf-8") as f:
-        for row in _csv.DictReader(f):
-            uid = row.get("uid:ID", "")
-            label = row.get(":LABEL", "Other")
-            name = row.get("name", uid)
-            color = COLOR_MAP.get(label.upper(), "#6b7280")  # Gray default
-            nodes.append({
-                "data": {
-                    "id": uid,
-                    "label": name[:30],
-                    "type": label,
-                    "color": color,
-                    "smiles": row.get("smiles", ""),
-                    "formula": row.get("formula", ""),
-                }
-            })
+    nodes: list[dict] = []
+    try:
+        with open(nodes_file, "r", encoding="utf-8", newline="") as f:
+            for row in _csv.DictReader(f):
+                uid = row.get("uid:ID", "").strip()
+                if not uid:
+                    continue
+                label = row.get(":LABEL", "Other")
+                name = row.get("name", uid)
+                color = COLOR_MAP.get(label.upper(), "#6b7280")
+                nodes.append({
+                    "data": {
+                        "id": uid,
+                        "label": name[:30],
+                        "type": label,
+                        "color": color,
+                        "smiles": row.get("smiles", ""),
+                        "formula": row.get("formula", ""),
+                    }
+                })
+    except OSError as e:
+        LOG.warning("Failed to read graph nodes for search_id=%s: %s", search_id, e)
+        raise HTTPException(status_code=500, detail="Graph node read error")
 
-    edges = []
-    with open(edges_file, "r", encoding="utf-8") as f:
-        for row in _csv.DictReader(f):
-            src = row.get(":START_ID", "")
-            tgt = row.get(":END_ID", "")
-            rel = row.get(":TYPE", "interacts")
-            activity = row.get("activity_type", "")
-            value = row.get("activity_value", "")
-            edge_label = f"{activity}={value}" if value else rel
-            edges.append({
-                "data": {
-                    "source": src,
-                    "target": tgt,
-                    "label": edge_label[:40],
-                    "relation": rel,
-                }
-            })
+    edges: list[dict] = []
+    try:
+        with open(edges_file, "r", encoding="utf-8", newline="") as f:
+            for row in _csv.DictReader(f):
+                src = row.get(":START_ID", "").strip()
+                tgt = row.get(":END_ID", "").strip()
+                if not src or not tgt:
+                    continue
+                rel = row.get(":TYPE", "interacts")
+                activity = row.get("activity_type", "")
+                value = row.get("activity_value", "")
+                edge_label = f"{activity}={value}" if value else rel
+                edges.append({
+                    "data": {
+                        "source": src,
+                        "target": tgt,
+                        "label": edge_label[:40],
+                        "relation": rel,
+                    }
+                })
+    except OSError as e:
+        LOG.warning("Failed to read graph edges for search_id=%s: %s", search_id, e)
+        raise HTTPException(status_code=500, detail="Graph edge read error")
 
     return {
         "nodes": nodes,
@@ -429,21 +496,29 @@ async def get_search_graph(search_id: str):
 @app.get("/api/exports/{filename:path}")
 async def download_export(filename: str, search_id: Optional[str] = Query(None)):
     """Download an export file. Optionally specify a search_id to find the right directory."""
+    filename = filename.strip()
+    if not filename or filename in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    safe = Path(filename)
+    if safe.parts != (filename,):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path: Optional[Path] = None
     if search_id:
         state = searches.get(search_id)
-        if not state:
-            raise HTTPException(status_code=404, detail="Search not found")
-        file_path = Path(state["export_dir"]) / filename
+        if state:
+            file_path = Path(state.get("export_dir", "")) / filename
     else:
-        for export_dir in [EXPORTS_DIR] + [Path(s["export_dir"]) for s in searches.values()]:
-            candidate = export_dir / filename
-            if candidate.exists():
+        for s in searches.values():
+            candidate = Path(s.get("export_dir", "")) / filename
+            if candidate.exists() and candidate.is_file():
                 file_path = candidate
                 break
-        else:
-            file_path = EXPORTS_DIR / filename
-
-    if not file_path.exists() or not file_path.is_file():
+    if file_path is None:
+        candidate = EXPORTS_DIR / filename
+        if candidate.exists() and candidate.is_file():
+            file_path = candidate
+    if file_path is None or not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail=f"File not found: {filename}")
 
     return FileResponse(
@@ -456,11 +531,11 @@ async def download_export(filename: str, search_id: Optional[str] = Query(None))
 @app.get("/api/searches")
 async def list_searches(limit: int = Query(20, ge=1, le=100)):
     """List recent searches."""
-    recent = sorted(
+    rows = sorted(
         searches.values(),
-        key=lambda s: s["created_at"],
+        key=lambda s: s.get("created_at", "") or "",
         reverse=True,
-    )[:limit]
+    )
     return [
         {
             "search_id": s["search_id"],
@@ -469,9 +544,9 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
             "progress": s["progress"],
             "created_at": s["created_at"],
             "elapsed_seconds": s["elapsed_seconds"],
-            "file_count": len(s.get("export_files", [])),
+            "file_count": len(s.get("export_files", [])) if isinstance(s.get("export_files"), list) else 0,
         }
-        for s in recent
+        for s in rows[:limit]
     ]
 
 
@@ -479,6 +554,12 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
 async def root():
     # If the server can serve this page, it IS healthy.
     # No self-check needed — avoids Render port issues.
+    global _cleanup_done
+    if not _cleanup_done:
+        _run_storage_cleanup()
+        _cleanup_done = True
+        LOG.info("First-request cleanup complete")
+
     html = (
         LANDING_PAGE_HTML
         .replace('class="badge waking" id="health-badge"',
@@ -1456,7 +1537,8 @@ function updateUI(data) {
   document.getElementById('progress-text').textContent = data.progress || '';
   if (Array.isArray(data.log) && data.log.length > 0) {
     const box = document.getElementById('log-box');
-    box.textContent = data.log.join(String.fromCharCode(10));
+    const nl = String.fromCharCode(10);
+    box.textContent = data.log.join(nl);
     box.scrollTop = box.scrollHeight;
   }
 }
@@ -1468,7 +1550,7 @@ function showResults(data) {
   const g = document.getElementById('exports-grid');
   g.innerHTML = '';
   if (!data.export_files || data.export_files.length === 0) {
-    g.innerHTML = '<div class="exports-empty">No export files were generated for this search.</div>';
+    g.innerHTML = '<div class="exports-empty">No export files were generated this run. They may still be processing or were cleaned up to free space. Start a new search to try again.</div>';
     return;
   }
   for (const f of data.export_files) {
@@ -1562,7 +1644,7 @@ def _cleanup_old_exports():
             except Exception:
                 pass
     if cleaned:
-        print(f"  🧹 Cleaned {cleaned} old export/workspace directories")
+        LOG.info("Cleaned %d old export/workspace directories", cleaned)
 
 def _enforce_storage_limit():
     """Delete oldest exports if total storage exceeds MAX_STORAGE_MB."""
@@ -1612,12 +1694,11 @@ def _run_storage_cleanup():
 
 @app.on_event("startup")
 async def startup():
-    print(f"🔬 SciGraph API v3.2.0 starting...")
-    print(f"   Python: {sys.version}")
-    print(f"   Engine dir: {ENGINE_DIR}")
-    print(f"   Exports dir: {EXPORTS_DIR}")
-    print(f"   Workspace dir: {WORKSPACE_DIR}")
-    print(f"   Storage limit: {MAX_STORAGE_MB}MB | Export retention: {EXPORT_MAX_AGE_MINUTES}min")
+    LOG.info("SciGraph API v3.2.2 starting")
+    LOG.info("   Engine dir: %s", ENGINE_DIR)
+    LOG.info("   Exports dir: %s", EXPORTS_DIR)
+    LOG.info("   Workspace dir: %s", WORKSPACE_DIR)
+    LOG.info("   Storage limit: %sMB | Export retention: %s min", MAX_STORAGE_MB, EXPORT_MAX_AGE_MINUTES)
     _run_storage_cleanup()
     # Schedule recurring cleanup every 30 minutes
     import asyncio
