@@ -66,6 +66,9 @@ SEARCH_DB = Path(os.environ.get("SEARCH_DB", "/tmp/scigraph_searches.db"))
 
 def _init_db():
     with sqlite3.connect(str(SEARCH_DB)) as conn:
+        # Enable WAL mode for concurrent read/write without blocking
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS searches (
                 search_id TEXT PRIMARY KEY,
@@ -104,7 +107,7 @@ except Exception:
 def _save_search(state: dict):
     """Persist search state to SQLite."""
     try:
-        with sqlite3.connect(str(SEARCH_DB)) as conn:
+        with sqlite3.connect(str(SEARCH_DB), timeout=10) as conn:
             conn.execute("""
                 INSERT INTO searches (search_id, query, query_type, hops, status, progress,
                     log, export_files, export_dir, created_at, elapsed_seconds, error)
@@ -120,10 +123,16 @@ def _save_search(state: dict):
                 state.get("export_dir",""), state.get("created_at",""),
                 state.get("elapsed_seconds"), state.get("error"),
             ))
-    except Exception:
-        pass
+    except Exception as e:
+        LOG.warning("Failed to save search %s: %s", state.get("search_id","?"), e)
 
 _init_db()
+
+# Flag to guard first-request cleanup (defined at module level so root() never gets NameError)
+_cleanup_done: bool = False
+
+# Shutdown event for the periodic cleanup coroutine
+_shutdown = asyncio.Event()
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -1634,15 +1643,15 @@ def _cleanup_old_exports():
             try:
                 shutil.rmtree(export_dir)
                 cleaned += 1
-            except Exception:
-                pass
+            except OSError as e:
+                LOG.warning("Could not remove export dir %s: %s", export_dir.name, e)
     for ws_dir in WORKSPACE_DIR.iterdir():
         if ws_dir.is_dir() and ws_dir.stat().st_mtime < cutoff:
             try:
                 shutil.rmtree(ws_dir)
                 cleaned += 1
-            except Exception:
-                pass
+            except OSError as e:
+                LOG.warning("Could not remove workspace dir %s: %s", ws_dir.name, e)
     if cleaned:
         LOG.info("Cleaned %d old export/workspace directories", cleaned)
 
@@ -1662,14 +1671,14 @@ def _enforce_storage_limit():
             try:
                 shutil.rmtree(d)
                 total -= size
-            except Exception:
-                pass
-    print(f"  📦 Storage enforced: {total / 1024 / 1024:.1f}MB used (limit: {MAX_STORAGE_MB}MB)")
+            except OSError as e:
+                LOG.warning("Could not remove dir %s during storage enforcement: %s", d.name, e)
+    LOG.info("Storage enforced: %.1fMB used (limit: %sMB)", total / 1024 / 1024, MAX_STORAGE_MB)
 
 def _truncate_completed_logs():
     """Truncate logs for completed/failed searches to save SQLite space."""
     try:
-        with sqlite3.connect(str(SEARCH_DB)) as conn:
+        with sqlite3.connect(str(SEARCH_DB), timeout=10) as conn:
             conn.execute("""
                 UPDATE searches
                 SET log = ?
@@ -1680,8 +1689,8 @@ def _truncate_completed_logs():
                 DELETE FROM searches
                 WHERE created_at < datetime('now', '-30 days')
             """)
-    except Exception:
-        pass
+    except Exception as e:
+        LOG.warning("Log truncation skipped: %s", e)
 
 def _run_storage_cleanup():
     """Run all storage cleanup tasks."""
@@ -1700,10 +1709,16 @@ async def startup():
     LOG.info("   Workspace dir: %s", WORKSPACE_DIR)
     LOG.info("   Storage limit: %sMB | Export retention: %s min", MAX_STORAGE_MB, EXPORT_MAX_AGE_MINUTES)
     _run_storage_cleanup()
-    # Schedule recurring cleanup every 30 minutes
-    import asyncio
+    # Schedule recurring cleanup every 30 minutes (cancelled on shutdown)
     async def _periodic_cleanup():
-        while True:
-            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
-            _run_storage_cleanup()
+        while not _shutdown.is_set():
+            try:
+                await asyncio.wait_for(_shutdown.wait(), timeout=CLEANUP_INTERVAL_SECONDS)
+            except asyncio.TimeoutError:
+                _run_storage_cleanup()
     asyncio.ensure_future(_periodic_cleanup())
+
+@app.on_event("shutdown")
+async def shutdown():
+    _shutdown.set()
+    LOG.info("SciGraph API shutting down")
