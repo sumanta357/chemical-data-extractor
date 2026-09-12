@@ -7,111 +7,112 @@ interface Props {
   logLines?: string[];
 }
 
-const statusConfig = {
-  queued: { color: 'text-yellow-400', icon: '⏳' },
-  running: { color: 'text-cyan-400', icon: '🔄' },
-  completed: { color: 'text-green-400', icon: '✅' },
-  failed: { color: 'text-red-400', icon: '❌' },
-} as const;
+const statusMeta = {
+  queued:     { label: 'Queued',     bar: 'bg-[#f0c63a]', pulse: 'bg-[#f0c63a]' },
+  running:    { label: 'Running',    bar: 'bg-[#5fb2c9]', pulse: 'bg-[#5fb2c9]' },
+  completed:  { label: 'Completed',  bar: 'bg-[#3fb950]', pulse: 'bg-[#3fb950]' },
+  failed:     { label: 'Failed',     bar: 'bg-[#f87171]', pulse: 'bg-[#f87171]' },
+};
 
 export default function ProgressView({ search, logLines }: Props) {
-  const cfg = statusConfig[search.status] || statusConfig.queued;
-
-  const lines = logLines || search.log;
+  const meta = statusMeta[search.status] ?? statusMeta.queued;
+  const lines = logLines ?? search.log;
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden glow-border">
-      {/* Status Header */}
-      <div className="p-4 border-b border-gray-800">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{cfg.icon}</span>
-            <span className={`font-semibold ${cfg.color}`}>
-              {search.status.charAt(0).toUpperCase() + search.status.slice(1)}
-            </span>
-          </div>
-          <span className="text-xs text-gray-500 font-mono">{search.search_id}</span>
+    <div className="card overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-[rgb(var(--border))] flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-semibold text-[rgb(var(--muted))] uppercase tracking-wider">
+            {meta.label}
+          </span>
+          <span className="text-xs font-mono text-[rgb(var(--muted))]">{search.search_id}</span>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-cyan-400 font-medium truncate">{search.query}</span>
-          <span className="text-gray-600">·</span>
-          <span className="text-gray-400">{search.hops}-hop</span>
-          {search.elapsed_seconds && (
-            <>
-              <span className="text-gray-600">·</span>
-              <span className="text-gray-400">{search.elapsed_seconds.toFixed(1)}s</span>
-            </>
-          )}
+        <div className="text-right">
+          <p className="text-sm font-medium text-[rgb(200 208 220)] truncate max-w-[220px]">
+            {search.query}
+          </p>
+          <p className="text-[10px] text-[rgb(var(--muted))] mt-0.5">
+            {search.hops}-hop · {search.elapsed_seconds ? search.elapsed_seconds.toFixed(1) + 's' : '—'}
+          </p>
         </div>
       </div>
 
-      {/* Progress Bar */}
+      {/* Progress bar (queued/running only) */}
       {(search.status === 'running' || search.status === 'queued') && (
-        <div className="h-1 bg-gray-800">
+        <div className="h-1 bg-[rgb(30 33 42)]">
           <div
-            className="h-full bg-cyan-500 animate-pulse rounded-r-full"
-            style={{ width: '40%' }}
+            className="h-full rounded-r-full transition-all duration-300"
+            style={{
+              width: search.progress ? Math.min(92, 12 + (search.progress.length % 20) * 4) + '%' : '22%',
+              background: meta.bar,
+            }}
           />
         </div>
       )}
 
       {/* Progress message */}
       {search.progress && (
-        <div className="px-4 py-2 bg-gray-950/50 border-b border-gray-800">
-          <p className="text-sm text-cyan-300 font-mono">{search.progress}</p>
+        <div className="px-4 py-2 bg-[rgb(18 21 30)] border-b border-[rgb(var(--border))] flex items-center gap-2">
+          <span className="spinner-square shrink-0" />
+          <p className="text-xs text-[rgb(150 160 180)] font-mono truncate">{search.progress}</p>
         </div>
       )}
 
-      {/* Log Output */}
-      <div
-        className="p-4 bg-gray-950 overflow-y-auto max-h-[60vh]"
-        style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
-      >
+      {/* Log output */}
+      <div className="p-4 bg-[rgb(10 12 18)] overflow-y-auto max-h-[60vh] font-mono text-[12px] leading-[1.5]">
         {lines.length === 0 && search.status === 'running' && (
-          <p className="text-gray-600 text-sm animate-pulse">Waiting for output...</p>
+          <p className="text-[rgb(80 90 110)]">Waiting for output…</p>
         )}
-        {lines.map((line, i) => (
-          <div
-            key={i}
-            className="text-[13px] leading-relaxed whitespace-pre-wrap"
-            style={{
-              color: line.includes('Error')
-                ? '#f87171'
-                : line.includes('✅') || line.includes('[OK]')
-                ? '#4ade80'
-                : line.includes('⚠️') || line.includes('❌')
-                ? '#fb923c'
-                : line.includes('╔══') || line.includes('║') || line.includes('╚')
-                ? '#67e8f9'
-                : line.includes('[*]') ||
-                  line.includes('[1/6]') ||
-                  line.includes('[2/6]') ||
-                  line.includes('[3/6]') ||
-                  line.includes('[4/6]') ||
-                  line.includes('[5/6]') ||
-                  line.includes('[6/6]')
-                ? '#c084fc'
-                : line.includes('http') || line.includes('://')
-                ? '#60a5fa'
-                : '#d1d5db',
-            }}
-          >
-            {line || '\u00A0'}
-          </div>
-        ))}
+        {lines.map((line, i) => {
+          const style: React.CSSProperties = {
+            color: lineIncludes(line, 'Error')
+              ? '#f87171'
+              : lineIncludes(line, '[OK]') || lineIncludes(line, '✅')
+              ? '#4ade80'
+              : lineIncludes(line, '⚠️') || lineIncludes(line, '❌')
+              ? '#fb923c'
+              : lineIncludes(line, '╔══') || lineIncludes(line, '║') || lineIncludes(line, '╚')
+              ? '#67e8f9'
+              : lineIncludesAny(line, ['[1/6]', '[2/6]', '[3/6]', '[4/6]', '[5/6]', '[6/6]', '[*]'])
+              ? '#c084fc'
+              : lineIncludes(line, 'http') || lineIncludes(line, '://')
+              ? '#60a5fa'
+              : '#d1d5db',
+          };
+          return (
+            <div key={i} className="whitespace-pre-wrap" style={style}>
+              {line || '\u00A0'}
+            </div>
+          );
+        })}
+
         {search.status === 'running' && (
-          <div className="flex items-center gap-1.5 mt-2 text-gray-600">
-            <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" />
-            <span className="text-xs">Running...</span>
+          <div className="flex items-center gap-2 mt-3 text-[rgb(100 110 130)] text-xs">
+            <span className="spinner-square" />
+            <span className="font-medium">Still running — output will appear here.</span>
           </div>
         )}
+
         {search.error && (
-          <div className="mt-2 p-2 bg-red-950/50 border border-red-900 rounded-lg text-sm text-red-400">
+          <div className="mt-3 p-3 bg-[rgba(248,113,113,0.08)] border border-[rgb(248,113,113)] rounded-lg text-xs text-[#f87171]">
             {search.error}
           </div>
         )}
+
         <div ref={(el) => el?.scrollIntoView({ behavior: 'smooth' })} />
       </div>
     </div>
   );
+}
+
+function lineIncludes(line: string, token: string): boolean {
+  return line.indexOf(token) !== -1;
+}
+
+function lineIncludesAny(line: string, tokens: string[]): boolean {
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (line.indexOf(tokens[i]) !== -1) return true;
+  }
+  return false;
 }

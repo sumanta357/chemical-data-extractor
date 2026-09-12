@@ -6,6 +6,83 @@ import type { SearchState, ExportFile } from './types';
 // ── In-memory search state ──────────────────────────────────────────────
 const searches = new Map<string, SearchState>();
 
+// ── Persistence ─────────────────────────────────────────────────────────
+const PERSIST_FILE = path.join(process.cwd(), '.scigraph_searches.json');
+const MAX_SEARCH_AGE_MS = 30 * 60 * 1000; // 30 minutes
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Run cleanup every 5 minutes
+
+// Load persisted searches on module init
+loadPersistedSearches();
+
+// Start periodic cleanup
+let _cleanupTimer: ReturnType<typeof setInterval> | null = null;
+function startCleanupTimer() {
+  if (_cleanupTimer) return;
+  _cleanupTimer = setInterval(() => {
+    runCleanup();
+  }, CLEANUP_INTERVAL_MS);
+  // Allow the process to exit even if the timer is running
+  if (_cleanupTimer && typeof _cleanupTimer === 'object' && 'unref' in _cleanupTimer) {
+    (_cleanupTimer as any).unref();
+  }
+}
+startCleanupTimer();
+
+function loadPersistedSearches(): void {
+  try {
+    if (!fs.existsSync(PERSIST_FILE)) return;
+    const raw = fs.readFileSync(PERSIST_FILE, 'utf-8');
+    const data: SearchState[] = JSON.parse(raw);
+    for (const s of data) {
+      // Only restore completed/failed searches (active ones are gone)
+      if (s.status === 'completed' || s.status === 'failed') {
+        searches.set(s.search_id, s);
+      }
+    }
+  } catch {
+    // Corrupt file or read error — start fresh
+  }
+}
+
+function persistSearches(): void {
+  try {
+    const data = Array.from(searches.values()).filter(
+      (s) => s.status === 'completed' || s.status === 'failed'
+    );
+    // Keep only the most recent 50
+    const sorted = data
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+      .slice(0, 50);
+    fs.writeFileSync(PERSIST_FILE, JSON.stringify(sorted, null, 2), 'utf-8');
+  } catch {
+    // Read-only FS or write error — non-critical
+  }
+}
+
+function runCleanup(): void {
+  const now = Date.now();
+  let changed = false;
+  for (const [id, state] of Array.from(searches.entries())) {
+    const age = now - new Date(state.created_at).getTime();
+    if (age > MAX_SEARCH_AGE_MS && state.status !== 'running' && state.status !== 'queued') {
+      // Clean up the export directory if it exists
+      try {
+        if (state.export_dir && fs.existsSync(state.export_dir)) {
+          fs.rmSync(state.export_dir, { recursive: true, force: true });
+        }
+      } catch {
+        // non-critical
+      }
+      searches.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) persistSearches();
+}
+
 // ── Constants ───────────────────────────────────────────────────────────
 const BASE_DIR = process.cwd();
 const EXPORTS_DIR = path.join(BASE_DIR, 'exports');
@@ -74,12 +151,12 @@ function guessMime(filename: string): string {
 
 // ── Hosted engine helpers (production) ───────────────────────────────────
 
-function hostedEngineUrl(): string | null {
+export function hostedEngineUrl(): string | null {
   const url = process.env.SEARCH_ENGINE_URL;
   return url ? url.replace(/\/+$/, '') : null;
 }
 
-async function fetchJson(url: string, init?: RequestInit): Promise<any> {
+export async function fetchJson(url: string, init?: RequestInit): Promise<any> {
   const res = await fetch(url, init);
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -117,6 +194,11 @@ async function refreshRemoteState(state: SearchState): Promise<void> {
         // Always route downloads through this app so the UI keeps working
         url: `/api/exports/${encodeURIComponent(f.name)}?search_id=${state.search_id}`,
       }));
+    }
+
+    // Persist state changes
+    if (state.status === 'completed' || state.status === 'failed') {
+      persistSearches();
     }
   } catch {
     // Engine unreachable — keep last known state; the poller will retry.
@@ -163,6 +245,7 @@ async function startHostedSearch(
     state.error = err.message || 'Hosted engine unreachable';
     state.log.push(`❌ Hosted engine error: ${err.message}`);
     state.elapsed_seconds = (Date.now() - startTime) / 1000;
+    persistSearches();
   }
 }
 
@@ -196,6 +279,7 @@ function runSearch(
     state.status = 'failed';
     state.error = `Cannot create export directory: ${err.message}`;
     state.elapsed_seconds = 0;
+    persistSearches();
     return;
   }
 
@@ -269,6 +353,9 @@ function runSearch(
       state.error = `Process exited with code ${code}`;
       state.elapsed_seconds = (Date.now() - startTime) / 1000;
     }
+
+    // Persist after completion/failure
+    persistSearches();
   });
 
   proc.on('error', (err: any) => {
@@ -279,12 +366,14 @@ function runSearch(
         'Set SEARCH_ENGINE_URL (the hosted Python engine) to run searches in production.';
       state.log.push(`❌ python3 not found — set SEARCH_ENGINE_URL to use the hosted engine`);
       state.elapsed_seconds = (Date.now() - startTime) / 1000;
+      persistSearches();
       return;
     }
     state.status = 'failed';
     state.error = err.message;
     state.log.push(`❌ Spawn error: ${err.message}`);
     state.elapsed_seconds = (Date.now() - startTime) / 1000;
+    persistSearches();
   });
 }
 
@@ -373,7 +462,7 @@ export function createSearch(
 ): SearchState {
   const searchId = generateId(8);
   const cleanQ = query
-    .replace(/[^a-zA-Z0-9_\-]/g, '_')
+    .replace(/[^a-zA-Z0-9_\-.]/g, '_')
     .slice(0, 30);
   const exportDir = path.join(EXPORTS_DIR, `${searchId}_${cleanQ}`);
 

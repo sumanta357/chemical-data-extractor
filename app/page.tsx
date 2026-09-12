@@ -56,51 +56,68 @@ export default function HomePage() {
   );
 
   const startPolling = useCallback((searchId: string) => {
-    let offset = 0;
+    try { localStorage.setItem('scigraph_active_search', searchId); } catch {}
 
     pollingRef.current = setInterval(async () => {
       try {
-        const [statusRes, logRes] = await Promise.all([
-          fetch(`/api/search/${searchId}`),
-          fetch(`/api/search/${searchId}/log?offset=${offset}`),
-        ]);
+        const res = await fetch(`/api/search/${searchId}`);
 
-        if (!statusRes.ok) {
+        if (!res.ok) {
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
           setIsRunning(false);
           return;
         }
 
-        const status = await statusRes.json();
-        setSearch(status);
-        setLogLines(status.log || []);
+        const data = await res.json();
+        setSearch(data);
+        setLogLines(data.log || []);
 
-        if (logRes.ok) {
-          const logData = await logRes.json();
-          if (logData.new_lines?.length > 0) {
-            offset = logData.total_lines;
-          }
-        }
-
-        if (status.status === 'completed' || status.status === 'failed') {
+        if (data.status === 'completed' || data.status === 'failed') {
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
           setIsRunning(false);
+          try { localStorage.removeItem('scigraph_active_search'); } catch {}
         }
       } catch {
         if (pollingRef.current) clearInterval(pollingRef.current);
         pollingRef.current = null;
         setIsRunning(false);
       }
-    }, 1000);
+    }, 1500);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
+  useEffect(() => () => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
   }, []);
+
+  // Session restore: if a search was active before page refresh, resume it
+  useEffect(() => {
+    try {
+      const savedId = localStorage.getItem('scigraph_active_search');
+      if (savedId) {
+        fetch(`/api/search/${savedId}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && (data.status === 'running' || data.status === 'queued')) {
+              setSearch(data);
+              setLogLines(data.log || []);
+              setIsRunning(true);
+              startPolling(savedId);
+            } else if (data && data.status === 'completed' && data.export_files?.length > 0) {
+              setSearch(data);
+              setLogLines(data.log || []);
+              try { localStorage.removeItem('scigraph_active_search'); } catch {}
+            } else {
+              try { localStorage.removeItem('scigraph_active_search'); } catch {}
+            }
+          })
+          .catch(() => {
+            try { localStorage.removeItem('scigraph_active_search'); } catch {}
+          });
+      }
+    } catch {}
+  }, [startPolling]);
 
   const handleViewSearch = useCallback((searchId: string) => {
     fetch(`/api/search/${searchId}`)
@@ -114,102 +131,76 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col relative">
-      {/* Animated particles */}
-      <div className="particle-container" id="particles" />
-
-      {/* Grid overlay */}
+    <div className="min-h-screen flex flex-col relative bg-[rgb(15 17 23)] text-[rgb(225 229 234)]">
+      {/* Soft dot grid */}
       <div className="grid-overlay" />
 
       {/* Header */}
-      <header className="border-b border-gray-800/50 bg-[rgb(3,7,18)]/85 backdrop-blur-xl sticky top-0 z-50">
+      <header className="sticky top-0 z-50 border-b border-[rgb(42 45 53)] bg-[rgb(15 17 23)]/90">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl animate-pulse-glow">🔬</span>
+          <div className="flex items-center gap-2.5">
+            {/* Minimal brand mark — small square emblem, no emoji, no glow */}
+            <span
+              className="shrink-0 w-7 h-7 rounded flex items-center justify-center text-[10px] font-semibold tracking-widest"
+              style={{
+                background: 'rgb(63 185 80)',
+                color: '#0a0c12',
+              }}
+            >
+              CDE
+            </span>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-white">
+              <h1 className="text-sm font-semibold tracking-tight text-[rgb(225 229 234)]">
                 Chemical Data Extractor
               </h1>
-              <p className="text-xs text-cyan-400/70 -mt-0.5 font-medium">
+              <p className="text-[10px] text-[rgb(90 96 120)] -mt-0.5 font-medium">
                 Knowledge Graph Platform v3.2
               </p>
             </div>
           </div>
-          <nav className="flex gap-1">
-            <button
-              onClick={() => setActiveTab('search')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'search'
-                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
-              }`}
-            >
-              🔎 Search
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'history'
-                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
-              }`}
-            >
-              📋 History
-            </button>
+
+          <nav className="flex gap-1 bg-[rgb(28 30 38)] rounded-lg p-1 border border-[rgb(42 45 53)]">
+            {(['search', 'history'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  activeTab === t
+                    ? 'bg-[rgb(42 45 53)] text-[rgb(200 208 220)] shadow-sm'
+                    : 'text-[rgb(90 96 120)] hover:text-[rgb(200 208 220)]'
+                }`}
+              >
+                {t === 'search' ? 'Search' : 'History'}
+              </button>
+            ))}
           </nav>
         </div>
       </header>
 
-      {/* Hero */}
-      <div className="relative z-10 text-center py-12 px-4 overflow-hidden">
-        {/* Hero glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-radial from-cyan-500/5 via-purple-500/3 to-transparent pointer-events-none" />
-
-        {/* Floating molecules */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {['⚗️','🧬','💊','🔬','⚛️','🧪'].map((emoji, i) => (
-            <span
-              key={i}
-              className="absolute text-2xl opacity-10"
-              style={{
-                left: `${15 + i * 14}%`,
-                top: `${20 + (i % 3) * 25}%`,
-                animation: `molecule-drift ${20 + i * 2}s ease-in-out infinite`,
-                animationDelay: `${-i * 3}s`,
-              }}
-            >
-              {emoji}
+      {/* Top strip — compact, no oversized hero */}
+      <div className="relative z-10 border-b border-[rgb(42 45 53)] bg-[rgb(12 14 20)]">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between text-xs">
+          <div>
+            <span className="font-semibold text-[rgb(200 208 220)]">Multi-hop discovery engine</span>
+            <span className="text-[rgb(90 96 120)] ml-1">·</span>
+            <span className="text-[rgb(90 96 120)]">
+              Compounds, bioactivities, protein targets, 3D structures, pathways
             </span>
-          ))}
-        </div>
-
-        <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 relative">
-          <span className="gradient-text">Chemical Data Extractor</span>
-        </h2>
-        <p className="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed relative">
-          Multi-hop automated discovery engine. Extract chemical compounds,
-          bioactivities, protein targets, and biological pathways from 19+ scientific databases.
-        </p>
-
-        {/* Stats */}
-        <div className="flex gap-6 justify-center flex-wrap mt-8 relative">
-          {[
-            { num: '19+', label: 'Databases' },
-            { num: '4', label: 'Hop Depth' },
-            { num: '7+', label: 'Export Formats' },
-            { num: '15', label: 'Export Files' },
-          ].map((stat, i) => (
-            <div
-              key={stat.label}
-              className="glass-card px-6 py-4 text-center min-w-[100px] fade-in-up"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            >
-              <div className="text-2xl font-extrabold gradient-text">{stat.num}</div>
-              <div className="text-[0.65rem] text-gray-500 uppercase tracking-widest font-semibold mt-1">
-                {stat.label}
-              </div>
-            </div>
-          ))}
+          </div>
+          <div className="flex items-center gap-3 font-mono text-[10px] text-[rgb(90 96 120)]">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[rgb(63 185 80)]" />
+              19+ databases
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[rgb(95 178 201)]" />
+              4-hop depth
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[rgb(95 178 201)]" />
+              7+ export formats
+            </span>
+          </div>
         </div>
       </div>
 
@@ -217,8 +208,8 @@ export default function HomePage() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 relative z-10">
         {activeTab === 'search' && (
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Left: Search form */}
-            <div className="lg:col-span-2 space-y-6">
+            {/* Left column */}
+            <div className="lg:col-span-2 space-y-5">
               <SearchForm onSearch={handleSearch} isRunning={isRunning} />
 
               {search?.status === 'completed' &&
@@ -227,42 +218,23 @@ export default function HomePage() {
                 )}
             </div>
 
-            {/* Right: Progress / Log */}
+            {/* Right column */}
             <div className="lg:col-span-3">
               {search ? (
                 <ProgressView search={search} logLines={logLines} />
               ) : (
-                <>
-                  <div className="glass-card flex items-center justify-center text-gray-600 py-16">
-                    <div className="text-center">
-                      <div className="text-5xl mb-4 animate-float">🔬</div>
-                      <p className="text-lg font-semibold text-gray-300">
-                        Enter a query to start searching
-                      </p>
-                      <p className="text-sm mt-2 text-gray-500 leading-relaxed max-w-sm mx-auto">
-                        Extract chemical compounds, bioactivities, protein targets,
-                        3D structures, and biological pathways from 19+ scientific databases.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 mt-6">
-                    {[
-                      { icon: '🧬', title: 'Proteins', desc: 'UniProt, PDB, AlphaFold' },
-                      { icon: '💊', title: 'Compounds', desc: 'PubChem, ChEMBL, ChEBI' },
-                      { icon: '🔗', title: 'Pathways', desc: 'KEGG, Reactome, GO' },
-                    ].map((card, i) => (
-                      <div
-                        key={card.title}
-                        className="glass-card p-4 text-center fade-in-up"
-                        style={{ animationDelay: `${0.1 + i * 0.1}s` }}
-                      >
-                        <div className="text-2xl mb-2">{card.icon}</div>
-                        <div className="text-sm font-semibold text-gray-300">{card.title}</div>
-                        <div className="text-xs text-gray-500 mt-1">{card.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                </>
+                <div className="card flex flex-col items-center justify-center text-center py-14">
+                  <p className="text-[10px] font-semibold text-[rgb(95 178 201)] uppercase tracking-wider mb-2">
+                    Ready
+                  </p>
+                  <p className="text-sm font-medium text-[rgb(200 208 220)] mb-1">
+                    Enter a query to start a search
+                  </p>
+                  <p className="text-xs text-[rgb(90 96 120)] max-w-xs">
+                    Compounds, bioactivities, protein targets, 3D structures,
+                    and pathways from 19+ scientific databases.
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -273,14 +245,12 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800/50 py-5 text-center text-xs text-gray-600 relative z-10 bg-[rgb(3,7,18)]/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4">
-          <p className="font-semibold text-gray-400 text-sm">Chemical Data Extractor</p>
-          <p className="mt-1">19 database connectors · Multi-hop graph traversal · Enrichment pipeline</p>
-          <p className="mt-2 text-gray-500">
-            Developed with ❤️ by <span className="text-cyan-400 font-semibold">Sumanta</span>
-          </p>
+      {/* Footer — compact, honest */}
+      <footer className="border-t border-[rgb(42 45 53)] py-4 text-center text-[10px] text-[rgb(90 96 120)] relative z-10 bg-[rgb(12 14 20)]">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-1">
+          <span>Chemical Data Extractor · v3.2</span>
+          <span>19 database connectors · multi-hop graph traversal · enrichment pipeline</span>
+          <span>Sumanta</span>
         </div>
       </footer>
     </div>

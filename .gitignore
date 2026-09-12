@@ -25,3 +25,12 @@ isolate/
 .idea/
 .vscode/
 tsconfig.tsbuildinfo
+
+# Secrets & local env
+.env
+.env.local
+.env*.local
+.hermes_env.sh
+
+# Runtime state (search persistence)
+.scigraph_searches.json
