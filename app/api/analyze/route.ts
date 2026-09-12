@@ -41,13 +41,14 @@ interface ProviderConfig {
 function getProviders(): ProviderConfig[] {
   const providers: ProviderConfig[] = [];
 
-  // AgentRouter (OpenAI-compatible)
+  // AgentRouter (OpenAI-compatible). Model is overridable via env so you can
+  // swap models (e.g. claude-3-5-haiku, gpt-4.1-mini) without a code change.
   const arKey = process.env.AGENTROUTER_API_KEY;
   if (arKey) {
     providers.push({
       name: 'agentrouter',
       url: 'https://agentrouter.org/v1/chat/completions',
-      model: 'gpt-4o-mini',
+      model: process.env.AGENTROUTER_MODEL || 'gpt-4o-mini',
       apiKey: arKey,
     });
   }
@@ -58,7 +59,7 @@ function getProviders(): ProviderConfig[] {
     providers.push({
       name: 'gemini',
       url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-      model: 'gemini-2.0-flash',
+      model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
       apiKey: geminiKey,
     });
   }
@@ -119,7 +120,9 @@ export async function POST(request: NextRequest) {
               { role: 'system', content: systemMessage },
               { role: 'user', content: prompt },
             ],
-            max_tokens: 1024,
+            // Generous budget — newer Gemini models spend tokens on internal
+            // reasoning, so a small max_tokens yields empty completions.
+            max_tokens: 2048,
             temperature: 0.7,
           }),
           signal: AbortSignal.timeout(30_000),

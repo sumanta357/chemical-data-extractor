@@ -5,6 +5,7 @@ import SearchForm from '@/components/SearchForm';
 import ProgressView from '@/components/ProgressView';
 import ResultsView from '@/components/ResultsView';
 import HistoryPanel from '@/components/HistoryPanel';
+import AIAssistant from '@/components/AIAssistant';
 import type { SearchState } from '@/lib/types';
 
 export default function HomePage() {
@@ -211,6 +212,12 @@ export default function HomePage() {
             {/* Left column */}
             <div className="lg:col-span-2 space-y-5">
               <SearchForm onSearch={handleSearch} isRunning={isRunning} />
+
+              {/* AI analyst — distinct indigo panel below the form */}
+              <AIAssistant
+                searchId={search && search.search_id !== 'error' ? search.search_id : null}
+                query={search?.query ?? null}
+              />
 
               {search?.status === 'completed' &&
                 search.export_files.length > 0 && (
