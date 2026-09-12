@@ -1,49 +1,36 @@
-# Git
+# Keep secrets and junk out of the Docker build context / images
+.env
+.env.*
+.env.local
+.hermes_env.sh
+
+# Git & IDE
 .git
-.gitignore
-
-# Node.js (not needed in Python image)
-node_modules
-.next
-package.json
-package-lock.json
-bun.lock
-bun.lockb
-
-# Python cache
-__pycache__
-*.pyc
-*.pyo
-.pytest_cache
-
-# Build artifacts
-dist
-build
-*.egg-info
-
-# IDE
 .idea
 .vscode
-*.swp
-*.swo
 
-# Test files
-test_*.py
-isolate/
+# Node / Next build artifacts (rebuilt inside the image)
+node_modules
+.next
+package-lock.json.bak
 
-# Generated data
-exports/
-exports_*/
-scigraph_data/
-*.duckdb
+# Python caches
+__pycache__
+*.pyc
+.pytest_cache
+
+# Runtime state & exports (regenerated at runtime)
+exports
+exports_*
+scigraph_data
+.scigraph_searches.json
 *.sqlite
+*.duckdb
 
-# TypeScript
-tsconfig.tsbuildinfo
+# Isolated test copy & scratch
+isolate
+test_*
 
-# Render/Freebuff
-render.yaml
-runtime.txt
-
-# Logs
-*.log
+# Docs not needed in the image
+*.md
+LICENSE

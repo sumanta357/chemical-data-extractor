@@ -1,14 +1,25 @@
-# Render Blueprint — deploys the Python search engine as an always-on web service.
-# The Next.js app (deployed on Freebuff/Vercel) proxies search calls here via the
-# SEARCH_ENGINE_URL environment variable.
+# Render Blueprint — ONE service that runs BOTH the Next.js UI and the Python
+# search engine in a single container (see Dockerfile + start-render.sh).
 #
-# To deploy: connect this repo to Render, pick "Blueprint", and Render will create
-# the service automatically. The free plan works; it sleeps after ~15 min of idle
-# (first request wakes it in ~30-60s).
+# Inside the container:
+#   - uvicorn (FastAPI engine) listens on 127.0.0.1:8000 (internal)
+#   - next start (the full UI: search form, AI Analyst panel, results)
+#     listens on Render's injected $PORT and proxies /api/* to the engine
+#     via SEARCH_ENGINE_URL=http://127.0.0.1:8000
+#
+# To deploy: connect this repo to Render, pick "Blueprint", and Render creates
+# the service automatically. The free plan sleeps after ~15 min idle (first
+# request wakes it in ~30-60s).
+#
+# Env vars to set on the Render service (Dashboard → Environment):
+#   GEMINI_API_KEY   — enables the AI Analyst panel (AgentRouter is
+#                      datacenter-blocked, so Gemini is the reliable provider)
+#   GEMINI_MODEL     — optional model override (default: gemini-3.6-flash)
 services:
   - type: web
     name: chemical-data-extractor
     runtime: docker
+    dockerfilePath: ./Dockerfile
     plan: free
     healthCheckPath: /api/health
     autoDeploy: true
