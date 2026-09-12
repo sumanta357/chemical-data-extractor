@@ -29,8 +29,11 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+import requests as _requests
 
 # Engine files (scigraph.py, enrich_exports.py) live in ../api/
 ENGINE_DIR = Path(__file__).resolve().parent.parent / "api"
@@ -645,26 +648,285 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
     ]
 
 
-@app.get("/")
-async def root():
-    # If the server can serve this page, it IS healthy.
-    # No self-check needed — avoids Render port issues.
+@app.on_event("startup")
+async def _run_first_cleanup():
     global _cleanup_done
     if not _cleanup_done:
-        _run_storage_cleanup()
-        _cleanup_done = True
-        LOG.info("First-request cleanup complete")
+        try:
+            _run_storage_cleanup()
+            _cleanup_done = True
+            LOG.info("Startup cleanup complete")
+        except Exception:
+            LOG.warning("Startup cleanup failed", exc_info=True)
 
+
+# ── Static UI (Next.js static export) ──────────────────────────────────────────
+# The UI is built with `output: 'export'` and copied to ui-out/. FastAPI serves
+# it directly, so the container runs ONLY Python — the exact process layout
+# that ran fine on the 512MB free tier before the UI was combined in via Node.
+STATIC_DIR = Path(
+    os.environ.get("STATIC_DIR", str(Path(__file__).resolve().parent.parent / "ui-out"))
+)
+
+# ── AI Analyst (ported from app/api/analyze/route.ts) ────────────────────────
+
+# Built-in provider keys (user-supplied, committed by explicit request so the
+# deployed app works with zero environment configuration). Env vars override.
+# NOTE: keep the repository private; anyone who can read this file can use
+# these keys. If the repo ever goes public, rotate them in their consoles.
+DEFAULT_AGENTROUTER_KEY = "sk-W0U5Yo0MM3wbY3xB0ZpS1f19iyABhATRCBK7N3hyJYjbF6ez"
+DEFAULT_GEMINI_KEY = "AQ.Ab8RN6KLITc78xyz1ke-xlDGzavLpKWrka-gmVcHlkI8njvDJA"
+DEFAULT_OPENCODE_KEY = "sk-y2338SzSUvBqPKHmjQ75DbWY0D78CfTbzl6jcBqMnthziB0XaEmGI9QJ6a6IpOum"
+
+_COOLDOWN_S = 300.0  # 5 minutes
+_provider_cooldowns: dict[str, float] = {}
+
+
+def _cooling_down(name: str) -> bool:
+    until = _provider_cooldowns.get(name)
+    if not until:
+        return False
+    if time.monotonic() > until:
+        _provider_cooldowns.pop(name, None)
+        return False
+    return True
+
+
+def _trip_breaker(name: str) -> None:
+    _provider_cooldowns[name] = time.monotonic() + _COOLDOWN_S
+
+
+def _is_permanent_failure(status: int, body: str) -> bool:
+    if status in (401, 403):
+        return True
+    return bool(re.search(r"unauthorized client|invalid.{0,20}key|expired", body, re.I))
+
+
+def _is_transient_error(text: str) -> bool:
+    return bool(
+        re.search(
+            r"\b502\b|\b503\b|\b529\b|\b429\b|overloaded|temporarily|timeout|rate.?limit",
+            text,
+            re.I,
+        )
+    )
+
+
+def _extract_provider_error(data) -> Optional[str]:
+    """OpenCode Zen wraps errors inside HTTP 200 bodies — detect them."""
+    if not isinstance(data, dict):
+        return None
+    err = data.get("error") or (data if data.get("type") == "error" else None)
+    if not err:
+        return None
+    if isinstance(err, str):
+        return err
+    msg = err.get("message") or err.get("type") or "unknown provider error"
+    return str(msg)
+
+
+def _get_providers() -> list[dict]:
+    providers: list[dict] = []
+
+    # OpenCode Zen — primary. Free models sit behind different upstream pools;
+    # if one is overloaded the next often still works.
+    oc_key = os.environ.get("OPENCODE_API_KEY") or DEFAULT_OPENCODE_KEY
+    if oc_key:
+        oc_models = [
+            os.environ.get("OPENCODE_MODEL") or "nemotron-3-ultra-free",
+            "nemotron-3.5-lightning-free",
+            "deepseek-v4-flash-free",
+        ]
+        for model in oc_models:
+            providers.append(
+                {
+                    "name": f"opencode:{model}",
+                    "url": "https://opencode.ai/zen/v1/chat/completions",
+                    "model": model,
+                    "api_key": oc_key,
+                    "auth_styles": ["bearer"],
+                    # Free tier requires a session header; fresh id per request.
+                    "extra_headers": lambda: {
+                        "x-opencode-session": f"cde-{uuid.uuid4()}"
+                    },
+                    # Nemotron models leak chain-of-thought; ask for direct answers.
+                    "system_suffix": " Answer directly and concisely — do not show your reasoning steps.",
+                }
+            )
+
+    # AgentRouter (OpenAI-compatible). Datacenter IPs are usually rejected,
+    # so in production this trips the breaker and the next provider takes over.
+    ar_key = os.environ.get("AGENTROUTER_API_KEY") or DEFAULT_AGENTROUTER_KEY
+    if ar_key:
+        providers.append(
+            {
+                "name": "agentrouter",
+                "url": "https://agentrouter.org/v1/chat/completions",
+                "model": os.environ.get("AGENTROUTER_MODEL") or "gpt-4o-mini",
+                "api_key": ar_key,
+                "auth_styles": ["bearer"],
+            }
+        )
+
+    # Google Gemini — the reliable production provider (dual auth styles).
+    gemini_key = (
+        os.environ.get("GEMINI_API_KEY")
+        or os.environ.get("GOOGLE_AI_STUDIO_API_KEY")
+        or DEFAULT_GEMINI_KEY
+    )
+    if gemini_key:
+        providers.append(
+            {
+                "name": "gemini",
+                "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                "model": os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash",
+                "api_key": gemini_key,
+                "auth_styles": ["bearer", "x-goog-api-key"],
+            }
+        )
+
+    return providers
+
+
+class AnalyzeRequest(BaseModel):
+    prompt: str
+    context: Optional[str] = None
+
+
+@app.post("/api/analyze")
+def analyze(request: AnalyzeRequest):
+    """AI analysis with multi-provider fallback. Sync endpoint — FastAPI runs
+    it in a worker thread, so the blocking `requests` calls never stall the
+    event loop that serves search polling."""
+    if not request.prompt or not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="prompt is required")
+
+    providers = [p for p in _get_providers() if not _cooling_down(p["name"])]
+    if not providers:
+        return JSONResponse(
+            {"detail": "AI service is not configured. Please try again later.", "fallback": True},
+            status_code=503,
+        )
+
+    base_system = (
+        f"You are a scientific data analysis assistant. Context: {request.context}"
+        if request.context
+        else "You are a scientific data analysis assistant specializing in chemical knowledge graphs and drug discovery. Be concise and practical."
+    )
+
+    last_error = ""
+    for provider in providers:
+        system_message = base_system + provider.get("system_suffix", "")
+        headers_base = {"Content-Type": "application/json"}
+
+        for style in provider["auth_styles"]:
+            headers = dict(headers_base)
+            if style == "bearer":
+                headers["Authorization"] = f"Bearer {provider['api_key']}"
+            else:
+                headers["x-goog-api-key"] = provider["api_key"]
+            if provider.get("extra_headers"):
+                headers.update(provider["extra_headers"]())
+
+            payload = {
+                "model": provider["model"],
+                "messages": [
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": request.prompt},
+                ],
+                "max_tokens": 2048,
+                "temperature": 0.7,
+            }
+
+            for attempt in range(1, 4):
+                try:
+                    res = _requests.post(
+                        provider["url"],
+                        headers=headers,
+                        json=payload,
+                        timeout=45,
+                    )
+                    text = res.text[:2000]
+                    try:
+                        data = res.json()
+                    except ValueError:
+                        data = None
+
+                    embedded = _extract_provider_error(data) or (text[:200] if not data else None)
+
+                    if not res.ok or embedded:
+                        last_error = f"{provider['name']}: HTTP {res.status_code}" + (
+                            f" — {str(embedded)[:120]}" if embedded else ""
+                        )
+                        LOG.warning("AI fallback: %s (auth=%s, attempt=%s)", last_error, style, attempt)
+
+                        if _is_permanent_failure(res.status_code, text):
+                            if style == provider["auth_styles"][-1]:
+                                _trip_breaker(provider["name"])
+                            break
+                        if _is_transient_error(text) and attempt < 3:
+                            time.sleep(attempt * 0.8)
+                            continue
+                        break
+
+                    content = (
+                        (data or {}).get("choices", [{}])[0].get("message", {}).get("content")
+                        or "No analysis generated"
+                    )
+                    return {
+                        "analysis": content,
+                        "provider": provider["name"],
+                        "model": (data or {}).get("model") or provider["model"],
+                        "usage": (data or {}).get("usage"),
+                    }
+                except _requests.RequestException as exc:
+                    last_error = f"{provider['name']}: {exc}"
+                    LOG.warning("AI fallback: %s (auth=%s, attempt=%s)", last_error, style, attempt)
+                    if attempt < 3:
+                        time.sleep(attempt * 0.8)
+                        continue
+                    break
+
+    return JSONResponse(
+        {"detail": f"All AI providers failed. Last error: {last_error}", "fallback": True},
+        status_code=502,
+    )
+
+
+# ── Static UI serving (registered after all API routes) ─────────────────────
+
+if (STATIC_DIR / "_next").is_dir():
+    app.mount("/_next", StaticFiles(directory=str(STATIC_DIR / "_next")), name="next-assets")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa(full_path: str):
+    """Serve the exported UI: real files when they exist, index.html for
+    client-side routes. API routes above match first."""
+    if full_path:
+        candidate = (STATIC_DIR / full_path).resolve()
+        try:
+            candidate.relative_to(STATIC_DIR.resolve())
+        except ValueError:
+            candidate = None
+        if candidate and candidate.is_file():
+            return FileResponse(str(candidate))
+
+    index = STATIC_DIR / "index.html"
+    if index.is_file():
+        resp = FileResponse(str(index), media_type="text/html")
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+    # Fallback for engine-only deployments (no static UI present)
     html = (
         LANDING_PAGE_HTML
-        .replace('class="badge waking" id="health-badge"',
-                  'class="badge ok" id="health-badge"')
+        .replace('class="badge waking" id="health-badge"', 'class="badge ok" id="health-badge"')
         .replace('>Connecting…</span>', '>● Healthy</span>')
         .replace('>⏳ Connecting…</span>', '>● Healthy</span>')
     )
     resp = HTMLResponse(html)
-    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
-    resp.headers['Pragma'] = 'no-cache'
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     return resp
 
 

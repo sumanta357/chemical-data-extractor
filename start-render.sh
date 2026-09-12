@@ -1,20 +1,12 @@
 #!/bin/sh
-# Render container entrypoint — runs BOTH services in one container:
-#   1. uvicorn (FastAPI search engine)  on 127.0.0.1:8000   (internal only)
-#   2. next start (Next.js UI)          on $PORT            (Render public port)
+# LEGACY — no longer used by the Docker deployment.
 #
-# The Next.js /api/* routes proxy to the engine via SEARCH_ENGINE_URL, which
-# this script points at the in-container engine. If either process dies the
-# container exits and Render restarts both together.
+# The container now runs ONLY Python: the Next.js UI is statically exported
+# at build time and served by FastAPI (see Dockerfile + python-api/app.py).
+# This file is kept for reference/local runs that still want the old
+# two-process layout (uvicorn on 8000 + `next start` on $PORT).
 
 set -e
-
-# Memory notes — the free tier gives the container 512MB shared between Node
-# and Python plus each search subprocess. Render OOM-kills at the container
-# level, so Node's internal heap flag does not prevent that; a tight
-# --max-old-space-size actually starved the search subprocess of CPU (GC
-# churn) and froze jobs with zero output, so it stays unset.
-export MALLOC_ARENA_MAX=2
 
 PORT="${PORT:-10000}"
 export SEARCH_ENGINE_URL="http://127.0.0.1:8000"
