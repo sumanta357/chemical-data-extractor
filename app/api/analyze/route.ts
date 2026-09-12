@@ -3,6 +3,19 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Built-in provider keys (user-supplied, committed by explicit request so the
+ * deployed app works with zero environment configuration).
+ *
+ * Priority: env var → built-in default.
+ *   AGENTROUTER_API_KEY / GEMINI_API_KEY override these when set.
+ *
+ * NOTE: keep the repository private; anyone who can read this file can use
+ * these keys. If the repo ever goes public, rotate them in their consoles.
+ */
+const DEFAULT_AGENTROUTER_KEY = 'sk-W0U5Yo0MM3wbY3xB0ZpS1f19iyABhATRCBK7N3hyJYjbF6ez';
+const DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6KLITc78xyz1ke-xlDGzavLpKWrka-gmVcHlkI8njvDJA';
+
+/**
  * Circuit breaker: when a provider fails with a permanent-looking error
  * (401 "unauthorized client", IP blocks), skip it for a cooldown window
  * so each request doesn't waste a round-trip on a dead provider.
@@ -43,7 +56,9 @@ function getProviders(): ProviderConfig[] {
 
   // AgentRouter (OpenAI-compatible). Model is overridable via env so you can
   // swap models (e.g. claude-3-5-haiku, gpt-4.1-mini) without a code change.
-  const arKey = process.env.AGENTROUTER_API_KEY;
+  // Note: AgentRouter rejects datacenter IPs — from server hosts it always
+  // trips the breaker and Gemini takes over. It only works from local runs.
+  const arKey = process.env.AGENTROUTER_API_KEY || DEFAULT_AGENTROUTER_KEY;
   if (arKey) {
     providers.push({
       name: 'agentrouter',
@@ -53,8 +68,12 @@ function getProviders(): ProviderConfig[] {
     });
   }
 
-  // Google Gemini via AI Studio (OpenAI-compatible endpoint)
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY;
+  // Google Gemini via AI Studio (OpenAI-compatible endpoint) — the reliable
+  // provider in production; AgentRouter above falls through to this.
+  const geminiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_AI_STUDIO_API_KEY ||
+    DEFAULT_GEMINI_KEY;
   if (geminiKey) {
     providers.push({
       name: 'gemini',
@@ -93,7 +112,7 @@ export async function POST(request: NextRequest) {
     if (providers.length === 0) {
       return NextResponse.json(
         {
-          detail: 'No AI providers configured. Add GEMINI_API_KEY or AGENTROUTER_API_KEY in Settings → Environment.',
+          detail: 'AI service is not configured. Please try again later.',
           fallback: true,
         },
         { status: 503 }

@@ -64,7 +64,7 @@ export default function AIAssistant({ searchId, query }: Props) {
             role: 'assistant',
             text:
               data.detail ||
-              'AI analysis is unavailable — add GEMINI_API_KEY or AGENTROUTER_API_KEY in Settings → Environment.',
+              'AI analysis is temporarily unavailable — please try again shortly.',
             error: true,
           },
         ]);
