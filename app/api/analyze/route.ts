@@ -49,6 +49,15 @@ interface ProviderConfig {
   url: string;
   model: string;
   apiKey: string;
+  /** Auth header styles to try in order. Google accepts both Bearer and
+   *  x-goog-api-key; some token types only work with one of them. */
+  authStyles: ('bearer' | 'x-goog-api-key')[];
+}
+
+function authHeaders(style: 'bearer' | 'x-goog-api-key', apiKey: string): Record<string, string> {
+  return style === 'bearer'
+    ? { Authorization: `Bearer ${apiKey}` }
+    : { 'x-goog-api-key': apiKey };
 }
 
 function getProviders(): ProviderConfig[] {
@@ -65,6 +74,7 @@ function getProviders(): ProviderConfig[] {
       url: 'https://agentrouter.org/v1/chat/completions',
       model: process.env.AGENTROUTER_MODEL || 'gpt-4o-mini',
       apiKey: arKey,
+      authStyles: ['bearer'],
     });
   }
 
@@ -80,6 +90,7 @@ function getProviders(): ProviderConfig[] {
       url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
       model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
       apiKey: geminiKey,
+      authStyles: ['bearer', 'x-goog-api-key'],
     });
   }
 
@@ -126,50 +137,65 @@ export async function POST(request: NextRequest) {
     let lastError: string = '';
 
     for (const provider of providers) {
-      try {
-        const res = await fetch(provider.url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${provider.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: provider.model,
-            messages: [
-              { role: 'system', content: systemMessage },
-              { role: 'user', content: prompt },
-            ],
-            // Generous budget — newer Gemini models spend tokens on internal
-            // reasoning, so a small max_tokens yields empty completions.
-            max_tokens: 2048,
-            temperature: 0.7,
-          }),
-          signal: AbortSignal.timeout(30_000),
-        });
+      let providerSucceeded = false;
 
-        if (!res.ok) {
-          const text = await res.text().catch(() => '');
-          lastError = `${provider.name}: HTTP ${res.status}`;
-          console.warn(`AI fallback: ${lastError} — ${text.slice(0, 150)}`);
-          if (isPermanentFailure(res.status, text)) tripBreaker(provider.name);
-          continue; // try next provider
+      for (const style of provider.authStyles) {
+        try {
+          const res = await fetch(provider.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders(style, provider.apiKey),
+            },
+            body: JSON.stringify({
+              model: provider.model,
+              messages: [
+                { role: 'system', content: systemMessage },
+                { role: 'user', content: prompt },
+              ],
+              // Generous budget — newer Gemini models spend tokens on internal
+              // reasoning, so a small max_tokens yields empty completions.
+              max_tokens: 2048,
+              temperature: 0.7,
+            }),
+            signal: AbortSignal.timeout(30_000),
+          });
+
+          if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            lastError = `${provider.name}: HTTP ${res.status}`;
+            console.warn(
+              `AI fallback: ${lastError} (auth=${style}) — ${text.slice(0, 150)}`
+            );
+            if (isPermanentFailure(res.status, text)) {
+              // Try the next auth style before giving up on this provider;
+              // only trip the breaker after every style has failed.
+              if (style === provider.authStyles[provider.authStyles.length - 1]) {
+                tripBreaker(provider.name);
+              }
+            }
+            continue; // next auth style
+          }
+
+          const data = await res.json();
+          const content =
+            data?.choices?.[0]?.message?.content || 'No analysis generated';
+
+          providerSucceeded = true;
+          return NextResponse.json({
+            analysis: content,
+            provider: provider.name,
+            model: data?.model || provider.model,
+            usage: data?.usage || null,
+          });
+        } catch (err: any) {
+          lastError = `${provider.name}: ${err?.message || 'unknown'}`;
+          console.warn(`AI fallback: ${lastError} (auth=${style})`);
+          continue;
         }
-
-        const data = await res.json();
-        const content =
-          data?.choices?.[0]?.message?.content || 'No analysis generated';
-
-        return NextResponse.json({
-          analysis: content,
-          provider: provider.name,
-          model: data?.model || provider.model,
-          usage: data?.usage || null,
-        });
-      } catch (err: any) {
-        lastError = `${provider.name}: ${err?.message || 'unknown'}`;
-        console.warn(`AI fallback: ${lastError}`);
-        continue;
       }
+
+      if (providerSucceeded) break; // unreachable, kept for clarity
     }
 
     // All providers failed
