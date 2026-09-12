@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,7 @@ export const dynamic = 'force-dynamic';
  */
 const DEFAULT_AGENTROUTER_KEY = 'sk-W0U5Yo0MM3wbY3xB0ZpS1f19iyABhATRCBK7N3hyJYjbF6ez';
 const DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6KLITc78xyz1ke-xlDGzavLpKWrka-gmVcHlkI8njvDJA';
+const DEFAULT_OPENCODE_KEY = 'sk-y2338SzSUvBqPKHmjQ75DbWY0D78CfTbzl6jcBqMnthziB0XaEmGI9QJ6a6IpOum';
 
 /**
  * Circuit breaker: when a provider fails with a permanent-looking error
@@ -52,7 +54,11 @@ interface ProviderConfig {
   /** Auth header styles to try in order. Google accepts both Bearer and
    *  x-goog-api-key; some token types only work with one of them. */
   authStyles: ('bearer' | 'x-goog-api-key')[];
+  /** Extra headers, re-evaluated per request (e.g. a fresh OpenCode session id). */
+  extraHeaders?: () => Record<string, string>;
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function authHeaders(style: 'bearer' | 'x-goog-api-key', apiKey: string): Record<string, string> {
   return style === 'bearer'
@@ -62,6 +68,20 @@ function authHeaders(style: 'bearer' | 'x-goog-api-key', apiKey: string): Record
 
 function getProviders(): ProviderConfig[] {
   const providers: ProviderConfig[] = [];
+
+  // OpenCode Zen (OpenAI-compatible) — primary. Free-tier models require an
+  // x-opencode-session header; a per-request id satisfies it.
+  const ocKey = process.env.OPENCODE_API_KEY || DEFAULT_OPENCODE_KEY;
+  if (ocKey) {
+    providers.push({
+      name: 'opencode',
+      url: 'https://opencode.ai/zen/v1/chat/completions',
+      model: process.env.OPENCODE_MODEL || 'nemotron-3-ultra-free',
+      apiKey: ocKey,
+      authStyles: ['bearer'],
+      extraHeaders: () => ({ 'x-opencode-session': `cde-${randomUUID()}` }),
+    });
+  }
 
   // AgentRouter (OpenAI-compatible). Model is overridable via env so you can
   // swap models (e.g. claude-3-5-haiku, gpt-4.1-mini) without a code change.
@@ -98,8 +118,30 @@ function getProviders(): ProviderConfig[] {
 }
 
 /**
+ * Some providers (OpenCode Zen) return errors wrapped in HTTP 200 bodies:
+ * { "type": "error", "error": { "type": "server_error", "message": ... } }
+ */
+function extractProviderError(data: any): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const err = data.error ?? (data.type === 'error' ? data : null);
+  if (!err) return null;
+  const msg =
+    typeof err === 'string' ? err : err.message || err.type || 'unknown provider error';
+  return String(msg);
+}
+
+/** Transient failures that are worth retrying with backoff. */
+function isTransientError(text: string): boolean {
+  return /(\b502\b|\b503\b|\b529\b|\b429\b|overloaded|temporarily|timeout|rate.?limit)/i.test(
+    text
+  );
+}
+
+/**
  * AI Analysis endpoint — tries multiple OpenAI-compatible providers in order.
- * Returns structured analysis of search results, bugs, or suggestions.
+ * Each provider gets up to 3 attempts with backoff for transient errors
+ * (the free OpenCode models sit behind an Nvidia upstream that occasionally
+ * returns 502 "overloaded"). Returns structured analysis of search results.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -140,62 +182,88 @@ export async function POST(request: NextRequest) {
       let providerSucceeded = false;
 
       for (const style of provider.authStyles) {
-        try {
-          const res = await fetch(provider.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...authHeaders(style, provider.apiKey),
-            },
-            body: JSON.stringify({
-              model: provider.model,
-              messages: [
-                { role: 'system', content: systemMessage },
-                { role: 'user', content: prompt },
-              ],
-              // Generous budget — newer Gemini models spend tokens on internal
-              // reasoning, so a small max_tokens yields empty completions.
-              max_tokens: 2048,
-              temperature: 0.7,
-            }),
-            signal: AbortSignal.timeout(30_000),
-          });
+        // Up to 3 attempts with backoff for transient upstream errors.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await fetch(provider.url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...authHeaders(style, provider.apiKey),
+                ...(provider.extraHeaders ? provider.extraHeaders() : {}),
+              },
+              body: JSON.stringify({
+                model: provider.model,
+                messages: [
+                  { role: 'system', content: systemMessage },
+                  { role: 'user', content: prompt },
+                ],
+                // Generous budget — newer models spend tokens on internal
+                // reasoning, so a small max_tokens yields empty completions.
+                max_tokens: 2048,
+                temperature: 0.7,
+              }),
+              signal: AbortSignal.timeout(45_000),
+            });
 
-          if (!res.ok) {
             const text = await res.text().catch(() => '');
-            lastError = `${provider.name}: HTTP ${res.status}`;
-            console.warn(
-              `AI fallback: ${lastError} (auth=${style}) — ${text.slice(0, 150)}`
-            );
-            if (isPermanentFailure(res.status, text)) {
-              // Try the next auth style before giving up on this provider;
-              // only trip the breaker after every style has failed.
-              if (style === provider.authStyles[provider.authStyles.length - 1]) {
-                tripBreaker(provider.name);
-              }
+            let data: any = null;
+            try {
+              data = JSON.parse(text);
+            } catch {
+              // non-JSON body — handled below via embeddedError fallback
             }
-            continue; // next auth style
+
+            const embeddedError = data
+              ? extractProviderError(data)
+              : String(text).slice(0, 200) || null;
+
+            if (!res.ok || embeddedError) {
+              lastError = `${provider.name}: HTTP ${res.status}${embeddedError ? ` — ${embeddedError.slice(0, 120)}` : ''}`;
+              console.warn(
+                `AI fallback: ${lastError} (auth=${style}, attempt=${attempt})`
+              );
+
+              if (isPermanentFailure(res.status, text)) {
+                // Try the next auth style before giving up on this provider;
+                // only trip the breaker after every style has failed.
+                if (style === provider.authStyles[provider.authStyles.length - 1]) {
+                  tripBreaker(provider.name);
+                }
+                break; // permanent — stop retrying this provider
+              }
+
+              if (isTransientError(text) && attempt < 3) {
+                await sleep(attempt * 800); // 0.8s, then 1.6s
+                continue; // retry same provider
+              }
+              break; // exhausted — try next provider
+            }
+
+            const content =
+              data?.choices?.[0]?.message?.content || 'No analysis generated';
+
+            providerSucceeded = true;
+            return NextResponse.json({
+              analysis: content,
+              provider: provider.name,
+              model: data?.model || provider.model,
+              usage: data?.usage || null,
+            });
+          } catch (err: any) {
+            lastError = `${provider.name}: ${err?.message || 'unknown'}`;
+            console.warn(`AI fallback: ${lastError} (auth=${style}, attempt=${attempt})`);
+            if (attempt < 3) {
+              await sleep(attempt * 800);
+              continue;
+            }
+            break;
           }
-
-          const data = await res.json();
-          const content =
-            data?.choices?.[0]?.message?.content || 'No analysis generated';
-
-          providerSucceeded = true;
-          return NextResponse.json({
-            analysis: content,
-            provider: provider.name,
-            model: data?.model || provider.model,
-            usage: data?.usage || null,
-          });
-        } catch (err: any) {
-          lastError = `${provider.name}: ${err?.message || 'unknown'}`;
-          console.warn(`AI fallback: ${lastError} (auth=${style})`);
-          continue;
         }
+        if (providerSucceeded) break;
       }
 
-      if (providerSucceeded) break; // unreachable, kept for clarity
+      if (providerSucceeded) break; // kept for clarity
     }
 
     // All providers failed
