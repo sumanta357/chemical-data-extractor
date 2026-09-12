@@ -56,6 +56,8 @@ interface ProviderConfig {
   authStyles: ('bearer' | 'x-goog-api-key')[];
   /** Extra headers, re-evaluated per request (e.g. a fresh OpenCode session id). */
   extraHeaders?: () => Record<string, string>;
+  /** Appended to the system message for this provider only. */
+  systemSuffix?: string;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -70,17 +72,30 @@ function getProviders(): ProviderConfig[] {
   const providers: ProviderConfig[] = [];
 
   // OpenCode Zen (OpenAI-compatible) — primary. Free-tier models require an
-  // x-opencode-session header; a per-request id satisfies it.
+  // x-opencode-session header; a per-request id satisfies it. Several free
+  // models sit behind DIFFERENT upstream pools, so if one is overloaded
+  // (Nvidia 502s) the next one often still works.
   const ocKey = process.env.OPENCODE_API_KEY || DEFAULT_OPENCODE_KEY;
   if (ocKey) {
-    providers.push({
-      name: 'opencode',
-      url: 'https://opencode.ai/zen/v1/chat/completions',
-      model: process.env.OPENCODE_MODEL || 'nemotron-3-ultra-free',
-      apiKey: ocKey,
-      authStyles: ['bearer'],
-      extraHeaders: () => ({ 'x-opencode-session': `cde-${randomUUID()}` }),
-    });
+    const ocModels = [
+      process.env.OPENCODE_MODEL || 'nemotron-3-ultra-free',
+      'nemotron-3.5-lightning-free',
+      'deepseek-v4-flash-free',
+    ];
+    for (const model of ocModels) {
+      providers.push({
+        name: `opencode:${model}`,
+        url: 'https://opencode.ai/zen/v1/chat/completions',
+        model,
+        apiKey: ocKey,
+        authStyles: ['bearer'],
+        extraHeaders: () => ({ 'x-opencode-session': `cde-${randomUUID()}` }),
+        // Nemotron-family models leak chain-of-thought into the content;
+        // ask for a direct answer instead.
+        systemSuffix:
+          ' Answer directly and concisely — do not show your reasoning steps.',
+      });
+    }
   }
 
   // AgentRouter (OpenAI-compatible). Model is overridable via env so you can
@@ -172,13 +187,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemMessage = context
+    const baseSystemMessage = context
       ? `You are a scientific data analysis assistant. Context: ${context}`
       : 'You are a scientific data analysis assistant specializing in chemical knowledge graphs and drug discovery. Be concise and practical.';
 
     let lastError: string = '';
 
     for (const provider of providers) {
+      const systemMessage = baseSystemMessage + (provider.systemSuffix || '');
       let providerSucceeded = false;
 
       for (const style of provider.authStyles) {

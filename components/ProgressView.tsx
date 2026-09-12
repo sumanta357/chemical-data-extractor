@@ -123,6 +123,14 @@ export default function ProgressView({ search, logLines }: Props) {
       {search.progress && (
         <div className="px-5 py-2 bg-gray-950/50 border-b border-gray-800">
           <p className="text-sm text-cyan-300 font-mono">{search.progress}</p>
+          {(search.status === 'queued' ||
+            (search.status === 'running' &&
+              /queued|starting|contacting/i.test(search.progress))) && (
+            <p className="text-xs text-gray-400 mt-1">
+              The search engine wakes from idle on the first request — this can
+              take up to a minute. Subsequent searches start instantly.
+            </p>
+          )}
         </div>
       )}
 
