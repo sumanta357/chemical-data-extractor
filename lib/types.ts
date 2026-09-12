@@ -27,6 +27,12 @@ export interface SearchState {
   remote_engine_url?: string;
   /** Search id on the hosted Python engine */
   remote_search_id?: string;
+  /** Consecutive failed refreshes against the hosted engine */
+  remote_failures?: number;
+  /** Epoch ms of the last observed change in remote status/progress/log size */
+  remote_last_change_ms?: number;
+  /** Fingerprint of the last remote snapshot, for stall detection */
+  remote_last_fingerprint?: string;
   created_at: string;
   elapsed_seconds: number | null;
   error: string | null;

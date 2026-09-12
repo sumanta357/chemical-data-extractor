@@ -178,8 +178,39 @@ async function refreshRemoteState(state: SearchState): Promise<void> {
       {      signal: AbortSignal.timeout(60_000) }
     );
 
+    state.remote_failures = 0;
     state.status = data.status || state.status;
     state.progress = data.progress ?? state.progress;
+
+    // Stall watchdog: if the engine keeps answering 200 but nothing changes
+    // (status, progress, log size, elapsed) for 5 minutes on an active job,
+    // the engine subprocess is orphaned — fail honestly instead of showing
+    // "Queued..." forever.
+    if (state.status === 'running' || state.status === 'queued') {
+      const fingerprint = JSON.stringify([
+        state.status,
+        state.progress,
+        Array.isArray(state.log) ? state.log.length : 0,
+        state.elapsed_seconds,
+      ]);
+      const now = Date.now();
+      if (fingerprint !== state.remote_last_fingerprint) {
+        state.remote_last_fingerprint = fingerprint;
+        state.remote_last_change_ms = now;
+      } else if (
+        state.remote_last_change_ms &&
+        now - state.remote_last_change_ms > 5 * 60 * 1000
+      ) {
+        state.status = 'failed';
+        state.error =
+          'The search stalled with no activity for over 5 minutes (the free-tier engine can run out of memory on larger queries). Please run the search again.';
+        state.log.push('Search stalled — no activity from the engine for 5 minutes.');
+        state.elapsed_seconds = (now - Date.parse(state.created_at)) / 1000;
+        persistSearches();
+        return;
+      }
+    }
+
     if (Array.isArray(data.log)) state.log = data.log;
     if (typeof data.elapsed_seconds === 'number') {
       state.elapsed_seconds = data.elapsed_seconds;
@@ -200,8 +231,34 @@ async function refreshRemoteState(state: SearchState): Promise<void> {
     if (state.status === 'completed' || state.status === 'failed') {
       persistSearches();
     }
-  } catch {
-    // Engine unreachable — keep last known state; the poller will retry.
+  } catch (err: any) {
+    // Distinguish "engine says this job is gone" from "engine unreachable".
+    // fetchJson throws Error('Engine HTTP 404: ...') for a lost job.
+    const msg = String(err?.message || '');
+    const lost = msg.includes('HTTP 404');
+
+    if (lost) {
+      // The engine no longer knows this search (restart / OOM / recycle).
+      // Mark failed honestly instead of serving a stale running state forever.
+      state.status = 'failed';
+      state.error =
+        'The search engine restarted while this search was running. Please run the search again.';
+      state.log.push('The search engine restarted before this search finished. Run the search again.');
+      state.elapsed_seconds = (Date.now() - Date.parse(state.created_at)) / 1000;
+      persistSearches();
+      return;
+    }
+
+    // Transient error: tolerate a few in a row, then fail honestly.
+    state.remote_failures = (state.remote_failures ?? 0) + 1;
+    if (state.remote_failures >= 8) {
+      state.status = 'failed';
+      state.error = 'Lost contact with the search engine while running. Check the engine status and try again.';
+      state.log.push('Lost contact with the search engine while running.');
+      state.elapsed_seconds = (Date.now() - Date.parse(state.created_at)) / 1000;
+      persistSearches();
+    }
+    // otherwise: keep last known state; the next poll will retry.
   }
 }
 
@@ -226,7 +283,7 @@ async function startHostedSearch(
     state.remote_engine_url = engineUrl;
     state.remote_search_id = data.search_id;
     state.status = data.status || 'running';
-    state.progress = data.progress || '🌐 Hosted engine running...';
+    state.progress = data.progress || 'Hosted engine running...';
     state.log.push(`  Hosted search started: ${data.search_id}`);
     if (Array.isArray(data.log)) {
       for (const line of data.log) {
