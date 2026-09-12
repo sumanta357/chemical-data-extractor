@@ -249,13 +249,55 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             cwd=str(ENGINE_DIR),
             env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
+        LOG.info("search subprocess started pid=%s search_id=%s", process.pid, search_id)
+        state["log"].append(
+            f"[engine] subprocess started (pid {process.pid}) — waiting for engine banner..."
+        )
 
         assert process.stdout is not None
-        async for raw_line in process.stdout:
-            line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
-            state["log"].append(line)
-            _update_progress(state, line)
 
+        # Watchdog: if the subprocess produces no output for 3 minutes, it is
+        # almost certainly starved or dead (free-tier CPU / OOM). Kill it and
+        # fail the job honestly instead of hanging forever at "Queued...".
+        STALL_TIMEOUT = 180.0
+        stall_detected = False
+
+        async def _read_output():
+            async for raw_line in process.stdout:
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
+                state["log"].append(line)
+                _update_progress(state, line)
+
+        read_task = asyncio.ensure_future(_read_output())
+        while not read_task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(read_task), timeout=STALL_TIMEOUT)
+            except asyncio.TimeoutError:
+                stall_detected = True
+                break
+
+        if stall_detected:
+            LOG.error("search subprocess stalled (no output for %.0fs) — killing pid=%s", STALL_TIMEOUT, process.pid)
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            read_task.cancel()
+            state["status"] = "failed"
+            state["error"] = (
+                "The search engine stalled with no activity for 3 minutes "
+                "(free-tier CPU/memory limits). Try a smaller query or fewer hops, or try again in a minute."
+            )
+            state["progress"] = "Failed: engine stalled"
+            state["log"].append(
+                f"[engine] no output for {STALL_TIMEOUT:.0f}s — subprocess killed. "
+                "The free tier may be too small for this query; try again or reduce hops."
+            )
+            state["elapsed_seconds"] = time.time() - start_time
+            _save_search(state)
+            return
+
+        await read_task
         await process.wait()
         rc = process.returncode
 
