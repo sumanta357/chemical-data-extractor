@@ -58,6 +58,7 @@ export default function HomePage() {
 
   const startPolling = useCallback((searchId: string) => {
     let offset = 0;
+    let consecutiveErrors = 0;
 
     pollingRef.current = setInterval(async () => {
       try {
@@ -66,13 +67,31 @@ export default function HomePage() {
           fetch(`/api/search/${searchId}/log?offset=${offset}`),
         ]);
 
-        if (!statusRes.ok) {
+        if (statusRes.status === 404) {
+          // The engine lost this job (restart / OOM / free-tier recycle).
+          // Fail honestly instead of freezing at "Queued..." forever.
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
+          setSearch((prev) =>
+            prev && prev.search_id === searchId
+              ? {
+                  ...prev,
+                  status: 'failed',
+                  error:
+                    'The search engine restarted while this search was running (it sleeps when idle and can be recycled under memory pressure). Please run the search again.',
+                  progress: 'Search lost — engine restarted',
+                }
+              : prev
+          );
           setIsRunning(false);
           return;
         }
 
+        if (!statusRes.ok) {
+          throw new Error(`HTTP ${statusRes.status}`);
+        }
+
+        consecutiveErrors = 0;
         const status = await statusRes.json();
         setSearch(status);
         setLogLines(status.log || []);
@@ -90,9 +109,25 @@ export default function HomePage() {
           setIsRunning(false);
         }
       } catch {
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        pollingRef.current = null;
-        setIsRunning(false);
+        // One failed poll (network blip, brief proxy hiccup) should not kill
+        // the run — only give up after several consecutive failures.
+        consecutiveErrors += 1;
+        if (consecutiveErrors >= 6) {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setSearch((prev) =>
+            prev && prev.search_id === searchId
+              ? {
+                  ...prev,
+                  status: 'failed',
+                  error:
+                    'Lost contact with the search engine while running. Check your connection and run the search again.',
+                  progress: 'Connection lost',
+                }
+              : prev
+          );
+          setIsRunning(false);
+        }
       }
     }, 1000);
   }, []);

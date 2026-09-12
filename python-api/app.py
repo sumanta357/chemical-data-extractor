@@ -134,6 +134,37 @@ _cleanup_done: bool = False
 # Shutdown event for the periodic cleanup coroutine
 _shutdown = asyncio.Event()
 
+# One search at a time on small containers: each search spawns a Python
+# subprocess that fans out to 100+ database connectors; running two at once
+# OOM-kills the container (Render free tier = 512MB shared with Node).
+_search_slots = asyncio.Semaphore(int(os.environ.get("MAX_CONCURRENT_SEARCHES", "1")))
+
+
+def _mark_interrupted(reason: str):
+    """Fail any job stuck in queued/running.
+
+    Called on startup and shutdown. If the container was OOM-killed or
+    restarted, the in-memory `searches` dict is fresh, so this mostly covers
+    jobs that died with the previous process — those are wiped here too via
+    the DB, but the primary purpose is honest state on graceful restarts.
+    """
+    for state in searches.values():
+        if state.get("status") in ("queued", "running"):
+            state["status"] = "failed"
+            state["error"] = reason
+            state["progress"] = f"Interrupted: {reason}"
+            _save_search(state)
+
+
+@app.on_event("startup")
+async def _on_startup():
+    _mark_interrupted("server restarted while the search was running")
+
+
+@app.on_event("shutdown")
+async def _on_shutdown():
+    _mark_interrupted("server is shutting down")
+
 
 # ── Models ───────────────────────────────────────────────────────────────────
 
@@ -176,6 +207,19 @@ class SearchStatus(BaseModel):
 
 async def run_search_in_background(search_id: str, query: str, query_type: str, hops: int, export_dir: str):
     """Run api/scigraph.py as a subprocess, then enrich, capturing output."""
+    state = searches.get(search_id)
+    if state is None:
+        LOG.error("Background runner: no in-memory state for search_id=%s", search_id)
+        return
+
+    # Serialize searches on small containers (see _search_slots).
+    if _search_slots.locked():
+        state["progress"] = "Waiting for another search to finish..."
+    async with _search_slots:
+        await _run_search_locked(search_id, query, query_type, hops, export_dir)
+
+
+async def _run_search_locked(search_id: str, query: str, query_type: str, hops: int, export_dir: str):
     state = searches.get(search_id)
     if state is None:
         LOG.error("Background runner: no in-memory state for search_id=%s", search_id)

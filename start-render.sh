@@ -9,6 +9,13 @@
 
 set -e
 
+# Memory caps — the free tier gives the container 512MB shared between Node
+# and Python plus each search subprocess. Cap Node's old-space heap so the
+# search subprocess has headroom instead of the container getting OOM-killed
+# mid-search (which is what made jobs freeze at "Queued...").
+export NODE_OPTIONS="--max-old-space-size=192"
+export MALLOC_ARENA_MAX=2
+
 PORT="${PORT:-10000}"
 export SEARCH_ENGINE_URL="http://127.0.0.1:8000"
 export PYTHONUNBUFFERED=1
