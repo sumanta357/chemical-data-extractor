@@ -96,17 +96,8 @@ export default function AIAssistant({ searchId, query }: Props) {
       {/* Header */}
       <div className="ai-panel__head">
         <div className="flex items-center gap-2 min-w-0">
-          {/* Small hex badge — AI mark, matches uiverse.io geometric motif */}
-          <span className="ai-panel__badge" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 2.5l7.5 4.3v10.4L12 21.5l-7.5-4.3V6.8L12 2.5z"
-              />
-              <path strokeLinecap="round" d="M12 8v8M8.5 10.5l7 3M15.5 10.5l-7 3" />
-            </svg>
-          </span>
+          {/* Compact AI mark — text, not decoration */}
+          <span className="ai-panel__badge" aria-hidden="true">AI</span>
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-white">
               AI Analyst
@@ -161,7 +152,7 @@ export default function AIAssistant({ searchId, query }: Props) {
               type="button"
               onClick={() => ask(q)}
               disabled={busy}
-              className="ai-chip"
+              className="ai-chip shrink-0"
             >
               {q}
             </button>

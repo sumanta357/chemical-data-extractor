@@ -139,23 +139,30 @@ export default function HomePage() {
           <nav className="flex gap-1">
             <button
               onClick={() => setActiveTab('search')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'search'
                   ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
                   : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
               }`}
             >
-              🔎 Search
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="7" strokeLinecap="round" />
+                <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
+              </svg>
+              Search
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'history'
                   ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
                   : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
               }`}
             >
-              📋 History
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              History
             </button>
           </nav>
         </div>
@@ -166,15 +173,17 @@ export default function HomePage() {
         {/* Hero glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-radial from-cyan-500/5 via-purple-500/3 to-transparent pointer-events-none" />
 
-        {/* Floating molecules */}
+        {/* Floating molecules — ambient, decorative only */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {['⚗️','🧬','💊','🔬','⚛️','🧪'].map((emoji, i) => (
             <span
               key={i}
-              className="absolute text-2xl opacity-10"
+              aria-hidden="true"
+              className="absolute text-2xl"
               style={{
                 left: `${15 + i * 14}%`,
                 top: `${20 + (i % 3) * 25}%`,
+                opacity: 0.12,
                 animation: `molecule-drift ${20 + i * 2}s ease-in-out infinite`,
                 animationDelay: `${-i * 3}s`,
               }}
@@ -205,8 +214,8 @@ export default function HomePage() {
               className="glass-card px-6 py-4 text-center min-w-[100px] fade-in-up"
               style={{ animationDelay: `${i * 0.1}s` }}
             >
-              <div className="text-2xl font-extrabold gradient-text">{stat.num}</div>
-              <div className="text-[0.65rem] text-gray-500 uppercase tracking-widest font-semibold mt-1">
+              <div className="text-2xl font-extrabold gradient-text tabular-nums">{stat.num}</div>
+              <div className="text-[10px] text-gray-500 uppercase tracking-[0.08em] font-semibold mt-1">
                 {stat.label}
               </div>
             </div>
