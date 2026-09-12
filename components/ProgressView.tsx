@@ -9,10 +9,10 @@ interface Props {
 }
 
 const statusConfig = {
-  queued: { color: 'text-yellow-400', icon: '⏳' },
-  running: { color: 'text-cyan-400', icon: '🔄' },
-  completed: { color: 'text-green-400', icon: '✅' },
-  failed: { color: 'text-red-400', icon: '❌' },
+  queued: { color: 'text-yellow-400', label: 'Queued' },
+  running: { color: 'text-cyan-400', label: 'Running' },
+  completed: { color: 'text-green-400', label: 'Completed' },
+  failed: { color: 'text-red-400', label: 'Failed' },
 } as const;
 
 /*
@@ -75,11 +75,8 @@ export default function ProgressView({ search, logLines }: Props) {
       <div className="px-5 py-4 border-b border-gray-800">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <span className={`text-lg ${search.status === 'queued' ? 'opacity-60' : ''}`}>
-              {cfg.icon}
-            </span>
-            <span className={`font-semibold ${cfg.color}`}>
-              {search.status.charAt(0).toUpperCase() + search.status.slice(1)}
+            <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${cfg.color} border-current bg-current/5`}>
+              {cfg.label}
             </span>
           </div>
           <span className="text-xs text-gray-500 font-mono">{search.search_id}</span>
@@ -160,9 +157,8 @@ export default function ProgressView({ search, logLines }: Props) {
           </div>
         ))}
         {search.status === 'running' && (
-          <div className="flex items-center gap-1.5 mt-2">
-            <span className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse" />
-            <span className="text-xs text-gray-400">Running...</span>
+          <div className="mt-2">
+            <span className="text-xs text-gray-400">Working — output streams below as it arrives</span>
           </div>
         )}
       </div>

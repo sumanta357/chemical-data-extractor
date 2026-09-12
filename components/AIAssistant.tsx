@@ -176,13 +176,7 @@ export default function AIAssistant({ searchId, query }: Props) {
           className="ai-panel__send"
           aria-label="Send"
         >
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 12h14M13 6l6 6-6 6"
-            />
-          </svg>
+          Ask
         </button>
       </form>
     </section>

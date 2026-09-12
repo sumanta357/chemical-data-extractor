@@ -7,11 +7,11 @@ interface Props {
   onViewSearch: (searchId: string) => void;
 }
 
-const statusStyles: Record<string, { color: string; icon: string }> = {
-  completed: { color: 'text-green-400', icon: '✅' },
-  running: { color: 'text-cyan-400', icon: '🔄' },
-  failed: { color: 'text-red-400', icon: '❌' },
-  queued: { color: 'text-yellow-400', icon: '⏳' },
+const statusStyles: Record<string, { color: string; label: string }> = {
+  completed: { color: 'text-green-400', label: 'Completed' },
+  running: { color: 'text-cyan-400', label: 'Running' },
+  failed: { color: 'text-red-400', label: 'Failed' },
+  queued: { color: 'text-yellow-400', label: 'Queued' },
 };
 
 export default function HistoryPanel({ onViewSearch }: Props) {
@@ -37,7 +37,6 @@ export default function HistoryPanel({ onViewSearch }: Props) {
   if (searches.length === 0) {
     return (
       <div className="text-center py-20 text-gray-600">
-        <div className="text-4xl mb-3">📋</div>
         <p className="text-lg">No searches yet</p>
         <p className="text-sm mt-1">Run a search to see it here</p>
       </div>
@@ -58,9 +57,11 @@ export default function HistoryPanel({ onViewSearch }: Props) {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span>{st.icon}</span>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider shrink-0 ${st.color}`}>
+                    {st.label}
+                  </span>
                   <div className="min-w-0">
-                    <p className={`font-medium text-sm truncate ${st.color}`}>
+                    <p className="font-medium text-sm truncate text-gray-200">
                       {s.query}
                     </p>
                     <p className="text-xs text-gray-600 mt-0.5">
@@ -71,7 +72,7 @@ export default function HistoryPanel({ onViewSearch }: Props) {
                     </p>
                   </div>
                 </div>
-                <span className="text-xs text-gray-600 shrink-0 ml-4">
+                <span className="text-xs text-gray-600 shrink-0 ml-4 tabular-nums">
                   {new Date(s.created_at).toLocaleTimeString()}
                 </span>
               </div>

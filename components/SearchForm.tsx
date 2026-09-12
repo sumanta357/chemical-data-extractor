@@ -34,15 +34,15 @@ export default function SearchForm({ onSearch, isRunning }: Props) {
           <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
             How it works & what are hops?
           </h3>
-          <svg
-            viewBox="0 0 24 24"
-            className="w-4 h-4 text-gray-500 group-open:rotate-180 transition-transform"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
+          <span
+            className="text-xs text-gray-500 group-open:hidden"
+            aria-hidden="true"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
+            +
+          </span>
+          <span className="text-xs text-gray-500 hidden group-open:inline" aria-hidden="true">
+            −
+          </span>
         </summary>
         <div className="px-4 pb-4 space-y-4">
           <ol className="text-xs text-gray-400 space-y-2">

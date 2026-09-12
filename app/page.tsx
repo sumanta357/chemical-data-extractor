@@ -116,9 +116,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col relative">
-      {/* Animated particles */}
-      <div className="particle-container" id="particles" />
-
       {/* Grid overlay */}
       <div className="grid-overlay" />
 
@@ -126,7 +123,7 @@ export default function HomePage() {
       <header className="border-b border-gray-800/50 bg-[rgb(3,7,18)]/85 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl animate-pulse-glow">🔬</span>
+            {/* Text wordmark — no logo mark */}
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white">
                 Chemical Data Extractor
@@ -136,32 +133,25 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-          <nav className="flex gap-1">
+          <nav className="flex gap-2">
             <button
               onClick={() => setActiveTab('search')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'search'
-                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
+                  ? 'text-cyan-400 border-cyan-500'
+                  : 'text-gray-400 border-transparent hover:text-gray-200'
               }`}
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="7" strokeLinecap="round" />
-                <path d="M21 21l-4.35-4.35" strokeLinecap="round" />
-              </svg>
               Search
             </button>
             <button
               onClick={() => setActiveTab('history')}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'history'
-                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700/50 shadow-lg shadow-cyan-500/10'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent'
+                  ? 'text-cyan-400 border-cyan-500'
+                  : 'text-gray-400 border-transparent hover:text-gray-200'
               }`}
             >
-              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
               History
             </button>
           </nav>
@@ -169,34 +159,11 @@ export default function HomePage() {
       </header>
 
       {/* Hero */}
-      <div className="relative z-10 text-center py-12 px-4 overflow-hidden">
-        {/* Hero glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-radial from-cyan-500/5 via-purple-500/3 to-transparent pointer-events-none" />
-
-        {/* Floating molecules — ambient, decorative only */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {['⚗️','🧬','💊','🔬','⚛️','🧪'].map((emoji, i) => (
-            <span
-              key={i}
-              aria-hidden="true"
-              className="absolute text-2xl"
-              style={{
-                left: `${15 + i * 14}%`,
-                top: `${20 + (i % 3) * 25}%`,
-                opacity: 0.12,
-                animation: `molecule-drift ${20 + i * 2}s ease-in-out infinite`,
-                animationDelay: `${-i * 3}s`,
-              }}
-            >
-              {emoji}
-            </span>
-          ))}
-        </div>
-
-        <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 relative">
-          <span className="gradient-text">Chemical Data Extractor</span>
+      <div className="relative z-10 text-center py-12 px-4">
+        <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-gray-100">
+          Chemical Data Extractor
         </h2>
-        <p className="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed relative">
+        <p className="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed">
           Multi-hop automated discovery engine. Extract chemical compounds,
           bioactivities, protein targets, and biological pathways from 19+ scientific databases.
         </p>
@@ -214,7 +181,7 @@ export default function HomePage() {
               className="glass-card px-6 py-4 text-center min-w-[100px] fade-in-up"
               style={{ animationDelay: `${i * 0.1}s` }}
             >
-              <div className="text-2xl font-extrabold gradient-text tabular-nums">{stat.num}</div>
+              <div className="text-2xl font-extrabold text-cyan-400 tabular-nums">{stat.num}</div>
               <div className="text-[10px] text-gray-500 uppercase tracking-[0.08em] font-semibold mt-1">
                 {stat.label}
               </div>
@@ -249,9 +216,8 @@ export default function HomePage() {
                 <ProgressView search={search} logLines={logLines} />
               ) : (
                 <>
-                  <div className="glass-card flex items-center justify-center text-gray-600 py-16">
+                  <div className="glass-card flex items-center justify-center py-16">
                     <div className="text-center">
-                      <div className="text-5xl mb-4 animate-float">🔬</div>
                       <p className="text-lg font-semibold text-gray-300">
                         Enter a query to start searching
                       </p>
@@ -263,17 +229,15 @@ export default function HomePage() {
                   </div>
                   <div className="grid grid-cols-3 gap-4 mt-6">
                     {[
-                      { icon: '🧬', title: 'Proteins', desc: 'UniProt, PDB, AlphaFold' },
-                      { icon: '💊', title: 'Compounds', desc: 'PubChem, ChEMBL, ChEBI' },
-                      { icon: '🔗', title: 'Pathways', desc: 'KEGG, Reactome, GO' },
-                    ].map((card, i) => (
+                      { title: 'Proteins', desc: 'UniProt, PDB, AlphaFold' },
+                      { title: 'Compounds', desc: 'PubChem, ChEMBL, ChEBI' },
+                      { title: 'Pathways', desc: 'KEGG, Reactome, GO' },
+                    ].map((card) => (
                       <div
                         key={card.title}
-                        className="glass-card p-4 text-center fade-in-up"
-                        style={{ animationDelay: `${0.1 + i * 0.1}s` }}
+                        className="glass-card p-4 text-center"
                       >
-                        <div className="text-2xl mb-2">{card.icon}</div>
-                        <div className="text-sm font-semibold text-gray-300">{card.title}</div>
+                        <div className="text-sm font-semibold text-cyan-400 uppercase tracking-wider">{card.title}</div>
                         <div className="text-xs text-gray-500 mt-1">{card.desc}</div>
                       </div>
                     ))}
@@ -295,7 +259,7 @@ export default function HomePage() {
           <p className="font-semibold text-gray-400 text-sm">Chemical Data Extractor</p>
           <p className="mt-1">19 database connectors · Multi-hop graph traversal · Enrichment pipeline</p>
           <p className="mt-2 text-gray-500">
-            Developed with ❤️ by <span className="text-cyan-400 font-semibold">Sumanta</span>
+            Built by <span className="text-cyan-400 font-semibold">Sumanta</span>
           </p>
         </div>
       </footer>
