@@ -1,24 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { SearchSummary } from '@/lib/types';
+import type { SearchState, SearchSummary } from '@/lib/types';
 
 interface Props {
   onViewSearch: (searchId: string) => void;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  queued: 'queued',
-  running: 'running',
-  completed: 'completed',
-  failed: 'failed',
-};
-
-const STATUS_COL: Record<string, string> = {
-  queued: 'text-[#f0c63a]',
-  running: 'text-[#5fb2c9]',
-  completed: 'text-[#3fb950]',
-  failed: 'text-[#f87171]',
+const statusStyles: Record<string, { color: string; icon: string }> = {
+  completed: { color: 'text-green-400', icon: '✅' },
+  running: { color: 'text-cyan-400', icon: '🔄' },
+  failed: { color: 'text-red-400', icon: '❌' },
+  queued: { color: 'text-yellow-400', icon: '⏳' },
 };
 
 export default function HistoryPanel({ onViewSearch }: Props) {
@@ -36,68 +29,50 @@ export default function HistoryPanel({ onViewSearch }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <span className="spinner-square" />
+        <div className="animate-spin h-6 w-6 border-2 border-cyan-500 border-t-transparent rounded-full" />
       </div>
     );
   }
 
   if (searches.length === 0) {
     return (
-      <div className="card text-center py-14">
-        <p className="text-[10px] font-semibold text-[rgb(95 178 201)] uppercase tracking-wider">
-          No searches yet
-        </p>
-        <p className="text-sm text-[rgb(90 96 120)] mt-2">
-          Run a search to see it appear here.
-        </p>
+      <div className="text-center py-20 text-gray-600">
+        <div className="text-4xl mb-3">📋</div>
+        <p className="text-lg">No searches yet</p>
+        <p className="text-sm mt-1">Run a search to see it here</p>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[10px] font-semibold text-[rgb(95 178 201)] uppercase tracking-wider">
-          Search History
-        </h2>
-        <span className="text-[10px] text-[rgb(90 96 120)] font-mono">
-          {searches.length} session{searches.length === 1 ? '' : 's'}
-        </span>
-      </div>
-
+      <h2 className="text-lg font-semibold text-gray-200 mb-4">Search History</h2>
       <div className="space-y-2">
         {searches.map((s) => {
-          const col = STATUS_COL[s.status] ?? STATUS_COL.queued;
+          const st = statusStyles[s.status] || statusStyles.queued;
           return (
             <button
               key={s.search_id}
               onClick={() => onViewSearch(s.search_id)}
-              className="card w-full text-left px-4 py-3 hover:border-[rgb(63 185 80)] hover:shadow-sm transition-all group"
+              className="w-full text-left bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors group"
             >
-              <div className="flex items-center justify-between min-w-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {/* Status tag */}
-                  <span
-                    className={`shrink-0 text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${col} border-current`}
-                  >
-                    {STATUS_LABEL[s.status] ?? s.status}
-                  </span>
-
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span>{st.icon}</span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-[rgb(200 208 220)] group-hover:text-[rgb(95 178 201)] truncate transition-colors">
+                    <p className={`font-medium text-sm truncate ${st.color}`}>
                       {s.query}
                     </p>
-                    <p className="text-[10px] text-[rgb(90 96 120)] mt-0.5 font-mono">
-                      {s.search_id}
-                      {' · '}
-                      {s.file_count} file{s.file_count === 1 ? '' : 's'}
-                      {s.elapsed_seconds != null ? ` · ${s.elapsed_seconds.toFixed(1)}s` : ''}
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {s.search_id} · {s.file_count} files
+                      {s.elapsed_seconds
+                        ? ` · ${s.elapsed_seconds.toFixed(1)}s`
+                        : ''}
                     </p>
                   </div>
                 </div>
-
-                <span className="shrink-0 text-[10px] text-[rgb(90 96 120)] ml-3 font-mono">
-                  {new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <span className="text-xs text-gray-600 shrink-0 ml-4">
+                  {new Date(s.created_at).toLocaleTimeString()}
                 </span>
               </div>
             </button>

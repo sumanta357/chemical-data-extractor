@@ -10,7 +10,6 @@ interface Props {
 interface Turn {
   role: 'user' | 'assistant';
   text: string;
-  provider?: string;
   error?: boolean;
 }
 
@@ -56,7 +55,7 @@ export default function AIAssistant({ searchId, query }: Props) {
       if (res.ok && data.analysis) {
         setTurns([
           ...nextTurns,
-          { role: 'assistant', text: data.analysis, provider: data.provider },
+          { role: 'assistant', text: data.analysis },
         ]);
       } else {
         setTurns([
@@ -109,10 +108,10 @@ export default function AIAssistant({ searchId, query }: Props) {
             </svg>
           </span>
           <div className="min-w-0">
-            <h2 className="text-[10px] font-semibold uppercase tracking-wider text-[rgb(150 160 190)]">
+            <h2 className="text-sm font-semibold text-white">
               AI Analyst
             </h2>
-            <p className="text-[9px] text-[rgb(90 100 130)] truncate">
+            <p className="text-xs text-[rgb(120 130 160)] -mt-0.5 truncate">
               {query ? `Context: ${query}` : 'Ask about chemistry, targets, or your results'}
             </p>
           </div>
@@ -141,9 +140,6 @@ export default function AIAssistant({ searchId, query }: Props) {
             }
           >
             <p className="whitespace-pre-wrap leading-relaxed">{turn.text}</p>
-            {turn.role === 'assistant' && turn.provider && (
-              <span className="ai-msg__meta">via {turn.provider}</span>
-            )}
           </div>
         ))}
 
