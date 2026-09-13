@@ -78,12 +78,22 @@ try:
 except ImportError:
     import json as orjson
 
-try:
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-    HAS_PARQUET = True
-except ImportError:
-    HAS_PARQUET = False
+# pyarrow (+numpy) is imported lazily inside export_to_parquet: it costs ~0.5s
+# and significant RAM at startup on memory-limited hosts, and is only needed if
+# Parquet export actually runs.
+HAS_PARQUET = None  # resolved on first use
+
+
+def _ensure_pyarrow():
+    global pa, pq, HAS_PARQUET
+    if HAS_PARQUET is None:
+        try:
+            import pyarrow as _pa
+            import pyarrow.parquet as _pq
+            pa, pq, HAS_PARQUET = _pa, _pq, True
+        except ImportError:
+            HAS_PARQUET = False
+    return HAS_PARQUET
 
 
 # ==============================================================================
@@ -149,16 +159,17 @@ class ProgressTracker:
         self.total_steps = total_steps
         self.label = label
         self._start_time = time.time()
+        self._last_tick_time = time.time()
         self._step_times: Dict[str, float] = {}
         self._current_step = 0
 
     def tick(self, step_name: str) -> float:
-        """Mark a step as complete. Returns elapsed time for this step."""
+        """Mark a step as complete. Returns elapsed time since pipeline start."""
         now = time.time()
         self._current_step += 1
-        elapsed = now - self._start_time
-        self._step_times[step_name] = elapsed
-        return elapsed
+        self._step_times[step_name] = now - self._last_tick_time
+        self._last_tick_time = now
+        return now - self._start_time
 
     def step_start(self, step_num: int, total_steps: int, description: str) -> None:
         """Print a clear step header with overall progress percentage."""
@@ -174,7 +185,8 @@ class ProgressTracker:
         """Mark the current step as complete with timing info."""
         now = time.time()
         elapsed = now - self._start_time
-        step_time = now - (list(self._step_times.values())[-1] if self._step_times else self._start_time)
+        durations = list(self._step_times.values())
+        step_time = durations[-1] if durations else elapsed
         remaining_steps = self.total_steps - self._current_step
         avg_per_step = elapsed / max(self._current_step, 1)
         eta = avg_per_step * remaining_steps if remaining_steps > 0 else 0
@@ -1103,7 +1115,7 @@ def export_to_turtle(entities: List[Entity], relations: List[Relation], filepath
 
 
 def export_to_parquet(entities: List[Entity], relations: List[Relation], entity_filepath: str, relation_filepath: str) -> None:
-    if not HAS_PARQUET:
+    if not _ensure_pyarrow():
         logger.warning("PyArrow not installed. Skipping Parquet export.")
         return
     e_dicts = [{"uid": e.uid, "name": e.preferred_name, "type": str(e.entity_type), "canonical_id": e.canonical_id, "smiles": str(e.attributes.get("smiles", ""))} for e in entities]
@@ -3472,96 +3484,109 @@ class RecursiveGraphExpander:
             else:
                 current_queries = [initial_query]
                 self.original_query = initial_query
-            
+
             hop_start = time.time()
             for hop in range(self.max_hops):
                 if not current_queries: break
                 hop_elapsed = time.time() - hop_start
                 n_connectors = len(self.connectors)
                 n_queries = len(current_queries)
-                print(f"\n  ╔══ Hop {hop+1}/{self.max_hops} ═══════════════════════════════════════╗")
-                print(f"  ║  Queries: {n_queries}  |  Active Connectors: {n_connectors}  |  ⏱ {hop_elapsed:.0f}s elapsed  ║")
-                print(f"  ╚═════════════════════════════════════════════════════════════╝")
+                print(f"\n  \u2554\u2550\u2550 Hop {hop+1}/{self.max_hops} \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557")
+                print(f"  \u2551  Queries: {n_queries}  |  Active Connectors: {n_connectors}  |  \u23f1 {hop_elapsed:.0f}s elapsed  \u2551")
+                print(f"  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d")
                 logger.info(f"[GraphExpander] Executing Hop {hop+1}/{self.max_hops} for queries: {current_queries[:5]}")
-                
+
                 next_queries = set()
-                for qidx, q in enumerate(current_queries):
-                    q_start = time.time()
-                    target_names = QueryRouter.route(q)
-                    active = [self.connectors[n] for n in target_names if n in self.connectors]
-                    if not active: active = list(self.connectors.values())[:3]
-                    print(f"    Searching '{q}' via {len(active)} connectors... ", end="", flush=True)
+                # Process queries in small batches so concurrent connector fan-out
+                # (and its memory footprint) stays bounded on small containers,
+                # and so log lines stream steadily instead of going silent.
+                queue = list(current_queries)
+                batch_size = 4
+                while queue:
+                    batch = queue[:batch_size]
+                    queue = queue[batch_size:]
+                    for q in batch:
+                        found = await self._expand_query(q, session, qt, hop, next_queries)
+                    print(f"    Batch progress: {len(next_queries)} follow-up candidates so far (hop {hop+1})")
 
-                    async def _search_with_connector_timeout(c, sess, q, qt, timeout=25):
-                        try:
-                            return await asyncio.wait_for(c.search(sess, q, qt), timeout=timeout)
-                        except asyncio.TimeoutError:
-                            return [], []
-                        except Exception:
-                            return [], []
-                    tasks = [_search_with_connector_timeout(c, session, q, qt) for c in active]
-                    try:
-                        results = await asyncio.wait_for(
-                            asyncio.gather(*tasks, return_exceptions=True), timeout=60
-                        )
-                    except asyncio.TimeoutError:
-                        logger.warning(f"[GraphExpander] Hop {hop+1} timed out globally for '{q}'")
-                        print(f"⏱ {time.time()-q_start:.1f}s ⚠️ timed out")
-                        continue
-                    
-                    q_elapsed = time.time() - q_start
-                    # Count succeeded/results
-                    n_ents = sum(len(r[0]) for r in results if isinstance(r, tuple)) if isinstance(results, list) else 0
-                    n_rels = sum(len(r[1]) for r in results if isinstance(r, tuple)) if isinstance(results, list) else 0
-                    print(f"⏱ {q_elapsed:.1f}s (found {n_ents} entities, {n_rels} relations)")
-
-
-                    for res in results:
-                        if isinstance(res, tuple):
-                            ents, rels = res
-                            for e in ents:
-                                if e.uid not in self.visited_uids:
-                                    self.visited_uids.add(e.uid)
-                                    self.resolver.resolve(e)
-                                    if e.entity_type in (EntityType.COMPOUND, EntityType.DRUG, EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME, EntityType.STRUCTURE):
-                                        for xr in e.cross_references:
-                                            next_queries.add(xr.accession)
-                                        # For protein/target/enzyme entities, also add the preferred name and canonical_id
-                                        # so PDBe-KB can search RCSB PDB by human-readable protein/gene name
-                                        if e.entity_type in (EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME):
-                                            name = e.preferred_name.strip()
-                                            cid = e.canonical_id.strip()
-                                            
-                                            # ---- NAME CONFIDENCE FILTER ----
-                                            # Only expand from entities with reasonable name similarity to original query
-                                            # This prevents graph pollution from loosely-related targets
-                                            can_expand = True
-                                            if self.original_query and hop > 0:
-                                                q_lower = self.original_query.lower().strip()
-                                                e_lower = name.lower().strip()
-                                                # Calculate simple name overlap score
-                                                q_words = set(q_lower.split())
-                                                e_words = set(e_lower.split())
-                                                overlap = len(q_words & e_words)
-                                                max_len = max(len(q_words), len(e_words))
-                                                if max_len > 0:
-                                                    sim = overlap / max_len
-                                                else:
-                                                    sim = 1.0 if q_lower == e_lower else 0.0
-                                                # Also check if one is substring of the other
-                                                if q_lower in e_lower or e_lower in q_lower:
-                                                    sim = max(sim, 0.7)
-                                                can_expand = sim >= 0.3  # At least 30% word overlap
-                                            
-                                            if can_expand:
-                                                if name and len(name) > 1 and not re.match(r"^CHEMBL\d+$", name, re.I):
-                                                    next_queries.add(name)
-                                                if cid and len(cid) > 1 and cid != name and not re.match(r"^CHEMBL\d+$", cid, re.I):
-                                                    next_queries.add(cid)
-                            for r in rels:
-                                self.resolver.add_relation(r)
-
+                # Bound concurrent load for the next hop.
                 current_queries = list(next_queries)[:self.max_entities_per_hop]
+
+    async def _expand_query(self, q: str, session: "aiohttp.ClientSession", qt: str, hop: int, next_queries: set) -> bool:
+        """Run one query through its routed connectors. Adds follow-up queries to next_queries."""
+        q_start = time.time()
+        target_names = QueryRouter.route(q)
+        q_active = [self.connectors[n] for n in target_names if n in self.connectors]
+        if not q_active: q_active = list(self.connectors.values())[:3]
+        print(f"    Searching '{q}' via {len(q_active)} connectors... ", end="", flush=True)
+
+        async def _search_with_connector_timeout(c, sess, q, qt, timeout=25):
+            try:
+                return await asyncio.wait_for(c.search(sess, q, qt), timeout=timeout)
+            except asyncio.TimeoutError:
+                return [], []
+            except Exception:
+                return [], []
+
+        tasks = [_search_with_connector_timeout(c, session, q, qt) for c in q_active]
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True), timeout=60
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"[GraphExpander] Hop {hop+1} timed out globally for '{q}'")
+            print(f"\u23f1 {time.time()-q_start:.1f}s \u26a0\ufe0f timed out")
+            return False
+
+        q_elapsed = time.time() - q_start
+        n_ents = sum(len(r[0]) for r in results if isinstance(r, tuple)) if isinstance(results, list) else 0
+        n_rels = sum(len(r[1]) for r in results if isinstance(r, tuple)) if isinstance(results, list) else 0
+        print(f"\u23f1 {q_elapsed:.1f}s (found {n_ents} entities, {n_rels} relations)")
+
+        for res in results:
+            if isinstance(res, tuple):
+                ents, rels = res
+                for e in ents:
+                    if e.uid not in self.visited_uids:
+                        self.visited_uids.add(e.uid)
+                        self.resolver.resolve(e)
+                        if e.entity_type in (EntityType.COMPOUND, EntityType.DRUG, EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME, EntityType.STRUCTURE):
+                            for xr in e.cross_references:
+                                next_queries.add(xr.accession)
+                            # For protein/target/enzyme entities, also add the preferred name and canonical_id
+                            # so PDBe-KB can search RCSB PDB by human-readable protein/gene name
+                            if e.entity_type in (EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME):
+                                name = e.preferred_name.strip()
+                                cid = e.canonical_id.strip()
+
+                                # ---- NAME CONFIDENCE FILTER ----
+                                # Only expand from entities with reasonable name similarity to original query
+                                # This prevents graph pollution from loosely-related targets
+                                can_expand = True
+                                if self.original_query and hop > 0:
+                                    q_lower = self.original_query.lower().strip()
+                                    e_lower = name.lower().strip()
+                                    q_words = set(q_lower.split())
+                                    e_words = set(e_lower.split())
+                                    overlap = len(q_words & e_words)
+                                    max_len = max(len(q_words), len(e_words))
+                                    if max_len > 0:
+                                        sim = overlap / max_len
+                                    else:
+                                        sim = 1.0 if q_lower == e_lower else 0.0
+                                    if q_lower in e_lower or e_lower in q_lower:
+                                        sim = max(sim, 0.7)
+                                    can_expand = sim >= 0.3
+
+                                if can_expand:
+                                    if name and len(name) > 1 and not re.match(r"^CHEMBL\d+$", name, re.I):
+                                        next_queries.add(name)
+                                    if cid and len(cid) > 1 and cid != name and not re.match(r"^CHEMBL\d+$", cid, re.I):
+                                        next_queries.add(cid)
+                for r in rels:
+                    self.resolver.add_relation(r)
+
+        return True
 
 
 # ==============================================================================

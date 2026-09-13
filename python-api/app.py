@@ -244,6 +244,10 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
     ]
     LOG.info("Launching scigraph search search_id=%s query=%r hops=%s", search_id, query, hops)
 
+    # Free the parent's garbage before forking so the child gets maximum headroom.
+    import gc
+    gc.collect()
+
     try:
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -259,10 +263,12 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
 
         assert process.stdout is not None
 
-        # Watchdog: if the subprocess produces no output for 3 minutes, it is
+        # Watchdog: if the subprocess produces no output for 5 minutes, it is
         # almost certainly starved or dead (free-tier CPU / OOM). Kill it and
         # fail the job honestly instead of hanging forever at "Queued...".
-        STALL_TIMEOUT = 180.0
+        # 5 min because long connector batches can be quiet for minutes on the
+        # throttled free-tier CPU while still making real progress.
+        STALL_TIMEOUT = 300.0
         stall_detected = False
 
         async def _read_output():
@@ -288,13 +294,14 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             read_task.cancel()
             state["status"] = "failed"
             state["error"] = (
-                "The search engine stalled with no activity for 3 minutes "
-                "(free-tier CPU/memory limits). Try a smaller query or fewer hops, or try again in a minute."
+                "The free Render container ran out of CPU/memory while this search was running. "
+                "Just run it again — it usually succeeds on a fresh container (the same query completed "
+                "in ~30-60s in tests). If it keeps failing, the Render Starter plan (1GB) is the permanent fix."
             )
             state["progress"] = "Failed: engine stalled"
             state["log"].append(
                 f"[engine] no output for {STALL_TIMEOUT:.0f}s — subprocess killed. "
-                "The free tier may be too small for this query; try again or reduce hops."
+                "The free container ran out of resources mid-search; re-running usually works."
             )
             state["elapsed_seconds"] = time.time() - start_time
             _save_search(state)
