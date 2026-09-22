@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
-ENTERPRISE SCIENTIFIC KNOWLEDGE GRAPH PLATFORM v3.1 ULTRA
+ENTERPRISE SCIENTIFIC KNOWLEDGE GRAPH PLATFORM v3.2 ULTRA
 ================================================================================
 An automated scientific knowledge integration & discovery engine for 
 computational biology, chemistry, drug discovery, biotechnology, environmental 
@@ -54,6 +54,7 @@ import os
 import random
 import re
 import sqlite3
+import subprocess
 import sys
 import time
 import zlib
@@ -615,7 +616,7 @@ class Evidence(BaseModel):
     citation: Optional[str] = None
     license: Optional[str] = None
     retrieval_method: Optional[str] = None
-    workflow_version: Optional[str] = "3.1.0"
+    workflow_version: Optional[str] = "3.2.0"
     confidence_method: Optional[str] = None
     notes: Optional[str] = None
 
@@ -1031,7 +1032,7 @@ def import_from_networkx(G: Any) -> Tuple[List[Entity], List[Relation]]:
 
 
 def export_to_neo4j_cypher(entities: List[Entity], relations: List[Relation]) -> str:
-    statements = ["// --- Scientific Knowledge Graph Cypher Script (v3.1) ---"]
+    statements = ["// --- Scientific Knowledge Graph Cypher Script (v3.2) ---"]
     for e in entities:
         labels_str = ":" + ":".join(e.node_labels())
         props = {"uid": e.uid, "preferred_name": e.preferred_name, "canonical_id": e.canonical_id, "entity_type": str(e.entity_type), **e.attributes}
@@ -1600,7 +1601,7 @@ class BaseConnector(abc.ABC):
                     if parsed and parsed != {} and parsed != []: return parsed
                 except Exception: pass
 
-        headers = {"User-Agent": "SciGraphEnterprise/3.1"}
+        headers = {"User-Agent": "SciGraphEnterprise/3.2"}
         if etag: headers["If-None-Match"] = etag
         if last_mod: headers["If-Modified-Since"] = last_mod
 
@@ -1634,7 +1635,7 @@ class BaseConnector(abc.ABC):
                     if parsed and parsed != {} and parsed != []: return parsed
                 except Exception: pass
 
-        headers = {"User-Agent": "SciGraphEnterprise/3.1", "Content-Type": "application/json"}
+        headers = {"User-Agent": "SciGraphEnterprise/3.2", "Content-Type": "application/json"}
         for attempt in range(2):
             await self.rate_limiter.acquire()
             try:
@@ -3157,7 +3158,7 @@ class KEGGConnector(BaseConnector):
         cached, etag, last_mod = self.cache.get(url)
         if cached:
             return cached
-        headers = {"User-Agent": "SciGraphEnterprise/3.1"}
+        headers = {"User-Agent": "SciGraphEnterprise/3.2"}
         for attempt in range(2):
             await self.rate_limiter.acquire()
             try:
@@ -3809,9 +3810,31 @@ def clean_query_terms(query_str: str) -> List[str]:
     return result
 
 
-def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", export_dir: str = "./exports", max_hops: int = 4, answers: Dict[str, Any] = None, query_type: str = "auto"):
+def _run_cli_enrichment(export_dir: str) -> None:
+    """Run the enrichment pipeline (enrich_exports.py) on the export directory.
+
+    Produces enriched_data.xlsx (multi-sheet Excel with SMILES, properties,
+    publications, inhibitors) and structure_images/ — the same post-processing
+    the Docker/web deployment runs, so CLI output matches the web UI output.
+    """
+    enrich_script = Path(__file__).resolve().parent / "enrich_exports.py"
+    if not enrich_script.exists():
+        print("  [!] enrich_exports.py not found next to scigraph.py — skipping enrichment")
+        return
+    print()
+    print("═" * 60)
+    print("  Starting Enrichment Pipeline (PubChem SMILES / CrossRef metadata)")
+    print("═" * 60)
+    try:
+        # Inherit stdio so enrichment output streams live in the terminal.
+        subprocess.run([sys.executable, str(enrich_script), "--export-dir", str(export_dir)], check=False)
+    except Exception as err:
+        print(f"  [!] Enrichment step error: {err}")
+
+
+def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", export_dir: str = "./exports", max_hops: int = 4, answers: Dict[str, Any] = None, query_type: str = "auto", enrich: bool = True):
     print("================================================================================")
-    print(f"  ENTERPRISE AUTOMATED DISCOVERY ENGINE v3.1: '{query}'")
+    print(f"  ENTERPRISE AUTOMATED DISCOVERY ENGINE v3.2: '{query}'")
     print("================================================================================")
 
     workspace = Path(workspace_dir)
@@ -3950,11 +3973,14 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
     print(f"  * {progress.summary()}")
     print("================================================================================\n")
 
+    if enrich:
+        _run_cli_enrichment(str(out_dir))
+
 
 def interactive_mode():
     print("""
 ================================================================================
-  ENTERPRISE SCIENTIFIC KNOWLEDGE GRAPH PLATFORM v3.1 ULTRA
+  ENTERPRISE SCIENTIFIC KNOWLEDGE GRAPH PLATFORM v3.2 ULTRA
 ================================================================================
 """)
     while True:
@@ -3967,7 +3993,7 @@ def interactive_mode():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Enterprise Scientific Knowledge Graph Discovery Engine CLI v3.1")
+    parser = argparse.ArgumentParser(description="Enterprise Scientific Knowledge Graph Discovery Engine CLI v3.2")
     parser.add_argument("query", nargs="?", default=None, help="Search query (e.g. 'Ammonia Monooxygenase', 'Aspirin', 'P23219')")
     parser.add_argument("--batch", default=None, help="Path to batch input queries file (CSV, TXT)")
     parser.add_argument("--workspace", default="./scigraph_data", help="Data directory")
@@ -3977,6 +4003,9 @@ def main():
     parser.add_argument("--build-library", action="store_true", help="Generate Search Library without full graph search")
     parser.add_argument("--query-type", default="auto", choices=["ligand", "protein", "auto"],
                         help="Query type: 1=ligand/compound, 2=protein/target, auto=auto-detect (default: auto)")
+    parser.add_argument("--no-enrich", action="store_true",
+                        help="Skip the enrichment pipeline (enriched_data.xlsx + structure images). "
+                             "Enrichment runs by default so CLI output matches the Docker/web deployment.")
 
     args = parser.parse_args()
 
@@ -3988,12 +4017,16 @@ def main():
         queries = BatchProcessor.read_queries(args.batch)
         print(f"Processing batch of {len(queries)} queries...")
         for q in queries:
-            run_automated_search(q, args.workspace, args.export_dir, max_hops=args.hops)
+            # Enrich once after the whole batch — each query overwrites the
+            # shared export files, so enriching per-query would redo the same work.
+            run_automated_search(q, args.workspace, args.export_dir, max_hops=args.hops, enrich=False)
+        if not args.no_enrich and queries:
+            _run_cli_enrichment(args.export_dir)
     elif args.query:
         answers = None
         if args.assistant:
             answers = QueryAssistant.run_interactive_assistant(args.query)
-        run_automated_search(args.query, args.workspace, args.export_dir, max_hops=args.hops, answers=answers, query_type=args.query_type)
+        run_automated_search(args.query, args.workspace, args.export_dir, max_hops=args.hops, answers=answers, query_type=args.query_type, enrich=not args.no_enrich)
     else:
         interactive_mode()
 

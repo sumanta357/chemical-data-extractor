@@ -1,6 +1,6 @@
-# Enterprise Scientific Knowledge Graph Platform (v3.1) - User Guide
+# Enterprise Scientific Knowledge Graph Platform (v3.2) - User Guide
 
-Welcome to the **Enterprise Automated Scientific Knowledge Graph Integration Platform v3.1**.
+Welcome to the **Enterprise Automated Scientific Knowledge Graph Integration Platform v3.2**.
 
 ---
 

@@ -6,6 +6,6 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     service: 'scigraph-next',
-    version: '3.1.0',
+    version: '3.2.0',
   });
 }

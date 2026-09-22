@@ -16,11 +16,14 @@ An enterprise-grade, multi-hop automated scientific discovery engine that extrac
 ```bash
 pip install -r requirements.txt
 
-# Find inhibitors for a protein target
+# Find inhibitors for a protein target (produces enriched_data.xlsx + structure images, like the web app)
 python3 api/scigraph.py "tubulin" --query-type protein --hops 1
 
 # Find targets for a compound
 python3 api/scigraph.py "Aspirin" --query-type ligand --hops 1
+
+# Skip the enrichment step (faster; no enriched_data.xlsx)
+python3 api/scigraph.py "Aspirin" --query-type ligand --hops 1 --no-enrich
 ```
 
 ## 🌐 Run the Web UI

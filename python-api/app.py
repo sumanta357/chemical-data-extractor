@@ -241,6 +241,9 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
         "--hops", str(hops),
         "--workspace", str(WORKSPACE_DIR),
         "--export-dir", export_dir,
+        # CLI enrichment is ON by default now; the web layer runs enrich_exports.py
+        # itself after the engine so it can parse progress lines — skip it here.
+        "--no-enrich",
     ]
     LOG.info("Launching scigraph search search_id=%s query=%r hops=%s", search_id, query, hops)
 
