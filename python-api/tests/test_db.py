@@ -170,5 +170,26 @@ class UnavailableTests(unittest.TestCase):
             dbmod.db = original
 
 
+class StatusAndScrubbingTests(unittest.TestCase):
+    def test_scrub_removes_the_password(self):
+        original = dbmod.DATABASE_URL
+        dbmod.DATABASE_URL = "postgresql://neondb_owner:SuperSecret123@ep-x.neon.tech/neondb"
+        try:
+            scrubbed = dbmod._scrub("FATAL: password authentication failed for user "
+                                    "(password SuperSecret123)")
+            self.assertNotIn("SuperSecret123", scrubbed)
+            self.assertIn("***", scrubbed)
+        finally:
+            dbmod.DATABASE_URL = original
+
+    def test_status_shape(self):
+        status = dbmod.status()
+        self.assertIn(status["driver"], ("sqlite", "postgres"))
+        self.assertIn("reachable", status)
+        self.assertIn("error", status)
+        if status["reachable"]:
+            self.assertIsNone(status["error"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

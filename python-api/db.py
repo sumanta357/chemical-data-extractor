@@ -50,6 +50,17 @@ def _translate(sql: str) -> str:
     return sql.replace("?", "%s") if USE_POSTGRES else sql
 
 
+def _scrub(message: str) -> str:
+    """Remove the password from a connection error before it reaches a log."""
+    if "://" in DATABASE_URL and "@" in DATABASE_URL:
+        creds = DATABASE_URL.split("://", 1)[1].split("@", 1)[0]
+        if ":" in creds:
+            password = creds.split(":", 1)[1]
+            if password:
+                message = message.replace(password, "***")
+    return message
+
+
 class DatabaseUnavailable(RuntimeError):
     """The store could not be reached. Callers decide whether to degrade."""
 
@@ -89,11 +100,13 @@ class Database:
             self.init_schema(self._sqlite_ddl, self._postgres_ddl)
             self._schema_ready = True
             self._retry_after = 0.0
-        except DatabaseUnavailable:
+        except DatabaseUnavailable as exc:
             self._retry_after = time.time() + 20
+            self._last_error = str(exc)
             raise
         except Exception as exc:
             self._retry_after = time.time() + 20
+            self._last_error = _scrub(str(exc))[:300]
             raise DatabaseUnavailable(f"could not initialise the accounts store: {exc}")
 
     # ── connection handling ───────────────────────────────────────────────
@@ -119,9 +132,10 @@ class Database:
                 options="-c statement_timeout=15000",
             )
         except Exception as exc:
-            # Never echo the connection string (it holds the password).
+            # Report enough to diagnose (host, port, TLS) but never the password.
+            detail = _scrub(str(exc)).strip().replace("\n", " ")[:300]
             raise DatabaseUnavailable(
-                f"could not reach the configured database ({exc.__class__.__name__})"
+                f"could not reach the configured database: {detail or exc.__class__.__name__}"
             )
 
     def _connection(self):
@@ -261,6 +275,20 @@ def ping() -> bool:
         return True
     except Exception:
         return False
+
+
+def status() -> dict:
+    """Safe-to-expose health of the store (no credentials, no host details)."""
+    reachable = ping()
+    return {
+        "driver": DRIVER_NAME,
+        "reachable": reachable,
+        "error": None if reachable else (_last_error() or "unavailable"),
+    }
+
+
+def _last_error() -> Optional[str]:
+    return getattr(db, "_last_error", None)
 
 
 def initialize() -> bool:

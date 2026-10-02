@@ -17,6 +17,7 @@ from pydantic import BaseModel
 import auth
 import billing
 import billing_store
+import db as _db
 
 LOG = logging.getLogger("scigraph.billing.api")
 
@@ -51,13 +52,19 @@ class VerifyPaymentRequest(BaseModel):
 @router.get("/api/billing/config")
 async def billing_config():
     """Everything the browser needs to run checkout. Only the publishable key
-    id is exposed; the key secret never leaves the server."""
+    id is exposed; the key secret never leaves the server.
+
+    Also reports whether the accounts store is actually reachable, so a
+    misconfigured DATABASE_URL is visible without digging through logs.
+    """
+    store = _db.status()
     return {
         "billing_enabled": billing.BILLING_ENABLED,
         "key_id": billing.KEY_ID if billing.BILLING_ENABLED else None,
         "currency": "INR",
         "auth_required": billing.REQUIRE_AUTH,
         "checkout_script": "https://checkout.razorpay.com/v1/checkout.js",
+        "accounts_store": store,
     }
 
 
