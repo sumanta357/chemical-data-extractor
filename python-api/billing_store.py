@@ -237,7 +237,7 @@ def create_session(user_id: int, user_agent: Optional[str] = None,
     import secrets
     token = secrets.token_urlsafe(48)
     now = _now()
-    db.execute(
+    db.run(
         """INSERT INTO sessions (token_hash, user_id, created_at, expires_at, user_agent)
            VALUES (?, ?, ?, ?, ?)""",
         (hash_token(token), user_id, _iso(now),
@@ -358,7 +358,7 @@ def reset_period_if_due(user: dict) -> dict:
 # ── Search ownership ─────────────────────────────────────────────────────────
 
 def set_search_owner(search_id: str, user_id: int) -> None:
-    db.execute(
+    db.run(
         """INSERT INTO search_owners (search_id, user_id, created_at)
            VALUES (?, ?, ?) ON CONFLICT(search_id) DO NOTHING""",
         (search_id, user_id, _iso()),
@@ -390,7 +390,7 @@ def delete_expired_search_owners(days: int = 7) -> None:
 def claim_webhook_event(event_id: str, event_type: Optional[str] = None) -> bool:
     """True the first time an event id is seen; False on replay."""
     try:
-        db.execute(
+        db.run(
             "INSERT INTO webhook_events (event_id, event_type, received_at) VALUES (?, ?, ?)",
             (event_id, event_type, _iso()),
         )

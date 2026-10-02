@@ -236,6 +236,18 @@ class Database:
         wants_id = statement.upper().startswith("INSERT") and "RETURNING" not in statement.upper()
         if USE_POSTGRES and wants_id:
             statement += " RETURNING id"
+        return self._write(statement, params, wants_id)
+
+    def run(self, sql: str, params: tuple = ()) -> int:
+        """Run a write that has no surrogate id to return (rowcount only).
+
+        Tables keyed by a natural key (sessions.token_hash, search_owners.
+        search_id, webhook_events.event_id) have no `id` column, so asking
+        Postgres for `RETURNING id` on them fails outright. Use this instead.
+        """
+        return self._write(sql.strip(), params, False)
+
+    def _write(self, statement: str, params: tuple, wants_id: bool) -> int:
 
         with self._lock:
             self._ensure_ready()

@@ -220,5 +220,59 @@ class ConnectVariantTests(unittest.TestCase):
             os.environ.pop("DATABASE_HOSTADDR", None)
 
 
+class NaturalKeyInsertTests(unittest.TestCase):
+    """Tables keyed by a natural key have no `id`, so `RETURNING id` must not
+    be appended to their inserts (Postgres rejects it outright)."""
+
+    def _statement_for(self, method_name, *args):
+        captured = {}
+
+        def fake_write(statement, params, wants_id):
+            captured["statement"] = statement
+            captured["wants_id"] = wants_id
+            return 1
+
+        original_write = dbmod.Database._write
+        original_pg = dbmod.USE_POSTGRES
+        dbmod.Database._write = staticmethod(fake_write)
+        dbmod.USE_POSTGRES = True
+        try:
+            getattr(billing_store.db, method_name)(*args)
+        finally:
+            dbmod.Database._write = original_write
+            dbmod.USE_POSTGRES = original_pg
+        return captured
+
+    def test_session_insert_does_not_ask_for_an_id(self):
+        captured = self._statement_for(
+            "run",
+            "INSERT INTO sessions (token_hash) VALUES (?)", ("t",),
+        )
+        self.assertNotIn("RETURNING", captured["statement"])
+        self.assertFalse(captured["wants_id"])
+
+    def test_search_owner_insert_does_not_ask_for_an_id(self):
+        captured = self._statement_for(
+            "run",
+            "INSERT INTO search_owners (search_id) VALUES (?)", ("s",),
+        )
+        self.assertNotIn("RETURNING", captured["statement"])
+
+    def test_webhook_event_insert_does_not_ask_for_an_id(self):
+        captured = self._statement_for(
+            "run",
+            "INSERT INTO webhook_events (event_id) VALUES (?)", ("e",),
+        )
+        self.assertNotIn("RETURNING", captured["statement"])
+
+    def test_user_insert_still_asks_for_an_id(self):
+        captured = self._statement_for(
+            "execute",
+            "INSERT INTO users (email) VALUES (?)", ("a@b.c",),
+        )
+        self.assertIn("RETURNING id", captured["statement"])
+        self.assertTrue(captured["wants_id"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
