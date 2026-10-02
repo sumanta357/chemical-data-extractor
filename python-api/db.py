@@ -157,8 +157,11 @@ class Database:
                 "row_factory": dict_row,
                 "connect_timeout": 10,
                 "application_name": "scigraph-api",
-                "options": "-c statement_timeout=15000",
             }
+            # No `options="-c statement_timeout=..."`: pooled endpoints such as
+            # Neon's sit behind PgBouncer in transaction mode, which rejects
+            # session-level parameters ("Please use unpooled connection or
+            # remove this parameter") and would refuse the connection outright.
         except Exception as exc:  # pragma: no cover - defensive
             raise DatabaseUnavailable(f"psycopg is not usable: {exc}")
 
