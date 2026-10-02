@@ -390,6 +390,12 @@ export default function AccountPanel({
   const signedIn = entitlement?.signed_in ?? false;
   const used = entitlement?.searches_used ?? 0;
   const limit = entitlement?.searches_limit ?? 0;
+  // Any in-flight checkout phase locks every plan card, so a second click can
+  // never open a duplicate Razorpay modal.
+  const checkoutBusy =
+    checkout.phase === 'preparing' ||
+    checkout.phase === 'awaiting' ||
+    checkout.phase === 'verifying';
 
   const trigger = hideTrigger ? null : (
     <button
@@ -450,28 +456,33 @@ export default function AccountPanel({
                 {plans
                   .filter((p) => p.price_inr > 0)
                   .map((plan) => (
-                    <div key={plan.id} className="border border-gray-800 rounded p-4 flex flex-col">
-                      <div className="flex items-baseline justify-between">
+                    /* The whole card is the button: people click the price or the
+                       feature list, not just the small label at the bottom. */
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => startCheckout(plan)}
+                      disabled={checkoutBusy}
+                      aria-busy={checkout.phase === 'preparing'}
+                      className="text-left border border-gray-800 rounded p-4 flex flex-col hover:border-cyan-700 hover:bg-cyan-500/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-800 disabled:hover:bg-transparent focus:outline-none focus-visible:border-cyan-600"
+                    >
+                      <span className="flex items-baseline justify-between">
                         <span className="text-sm font-semibold text-gray-100">{plan.name}</span>
                         <span className="text-sm tabular-nums text-cyan-400">
                           ₹{plan.price_inr.toLocaleString('en-IN')}
                           <span className="text-gray-500 text-xs">/mo</span>
                         </span>
-                      </div>
-                      {plan.tag && <p className="text-xs text-gray-500 mt-1">{plan.tag}</p>}
-                      <ul className="mt-3 space-y-1 text-xs text-gray-400 flex-1">
+                      </span>
+                      {plan.tag && <span className="block text-xs text-gray-500 mt-1">{plan.tag}</span>}
+                      <span className="mt-3 space-y-1 text-xs text-gray-400 flex-1 block">
                         {plan.features.map((f) => (
-                          <li key={f}>{f}</li>
+                          <span key={f} className="block">{f}</span>
                         ))}
-                      </ul>
-                      <button
-                        onClick={() => startCheckout(plan)}
-                        disabled={checkout.phase === 'awaiting' || checkout.phase === 'verifying'}
-                        className="mt-4 w-full text-sm font-medium py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
-                      >
-                        Pay ₹{plan.price_inr.toLocaleString('en-IN')}
-                      </button>
-                    </div>
+                      </span>
+                      <span className="mt-4 w-full block text-center text-sm font-medium py-2 border border-cyan-600 text-cyan-400">
+                        {checkoutBusy ? 'Opening checkout…' : `Pay ₹${plan.price_inr.toLocaleString('en-IN')}`}
+                      </span>
+                    </button>
                   ))}
               </div>
 
