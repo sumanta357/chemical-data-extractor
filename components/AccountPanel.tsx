@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AcademicProfile,
@@ -8,25 +8,19 @@ import {
   Entitlement,
   Plan,
   createOrder,
-  forgotPassword,
   getConfig,
   getMe,
   getPlans,
   getProfile,
-  googleSignIn,
   loadCheckoutScript,
-  login,
-  logout,
   paymentStatus,
-  register,
-  resendVerification,
-  resetPassword,
   updateProfile,
   verifyPayment,
 } from '@/lib/billing';
+import { authErrorMessage, getSupabase } from '@/lib/supabase';
 
 type View = 'account' | 'plans';
-type AuthView = 'form' | 'forgot' | 'reset';
+type AuthView = 'form' | 'forgot';
 
 const ACADEMICIAN_TYPES = [
   'Professor',
@@ -47,6 +41,17 @@ const EMPTY_PROFILE: AcademicProfile = {
   phone: '',
   academician_type: '',
 };
+function GoogleMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
+      <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
+      <path fill="#EA4335" d="M12 4.75c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.46 14.97.5 12 .5A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 6.68 9.14 4.75 12 4.75Z" />
+    </svg>
+  );
+}
+
 type CheckoutState =
   | { phase: 'idle' }
   | { phase: 'preparing' }
@@ -61,8 +66,8 @@ interface Props {
   onOpen: () => void;
   onClose: () => void;
   onChange?: (entitlement: Entitlement) => void;
-  /** Render the panel as soon as it mounts — used by the emailed
-   *  /reset-password and /verify-email links. */
+  /** Render the panel as soon as it mounts — used by the standalone
+   *  /reset-password page. */
   initiallyOpen?: boolean;
   /** Hide the header trigger; only for those standalone pages. */
   hideTrigger?: boolean;
@@ -81,6 +86,7 @@ export default function AccountPanel({
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [view, setView] = useState<View>('account');
   const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [opened, setOpened] = useState(false);
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -88,92 +94,37 @@ export default function AccountPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [authView, setAuthView] = useState<AuthView>('form');
-  const [resetToken, setResetToken] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [profile, setProfile] = useState<AcademicProfile>(EMPTY_PROFILE);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<CheckoutState>({ phase: 'idle' });
   const [mounted, setMounted] = useState(false);
-  const googleButtonRef = useRef<HTMLDivElement | null>(null);
   // The host page owns `open`; the emailed-link pages own `opened`.
   const isPanelOpen = hideTrigger ? opened : open;
 
-  // ── "Sign in with Google" ───────────────────────────────────────────────
-  // Google Identity Services renders the button into our own div. The
-  // credential it returns is a JWT the server verifies; nothing is trusted
-  // from the browser.
-  const handleGoogleCredential = useCallback(
-    async (response: { credential?: string }) => {
-      if (!response?.credential) return;
-      setBusy(true);
-      setError(null);
-      try {
-        const result = await googleSignIn(response.credential);
-        setEntitlement(result.entitlement);
-        onChange?.(result.entitlement);
-        setNotice(`Signed in as ${result.user.email}.`);
-        setView('account');
-      } catch (err: any) {
-        setError(err.message || 'Google sign-in was not accepted');
-      } finally {
-        setBusy(false);
-      }
-    },
-    [onChange],
+  // ── Supabase session ─────────────────────────────────────────────────────
+  // The client is created from the server config, and we follow Supabase's
+  // session: sign-in, OAuth redirect and token refresh all happen there. The
+  // server independently verifies the access token we send.
+  const supabase = useMemo(
+    () => getSupabase(config?.supabase?.url, config?.supabase?.anon_key),
+    [config?.supabase?.url, config?.supabase?.anon_key],
   );
 
-  const clientId = config?.google_client_id;
-  useEffect(() => {
-    if (!clientId || !googleButtonRef.current) return;
-    let cancelled = false;
-    const render = () => {
-      const target = googleButtonRef.current;
-      const google = (window as any).google;
-      if (cancelled || !target || !google?.accounts?.id) return;
-      target.innerHTML = ''; // renderButton appends; clear to avoid duplicates
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredential,
-      });
-      google.accounts.id.renderButton(target, {
-        theme: 'filled_black',
-        size: 'medium',
-        width: 280,
-        text: 'continue_with',
-      });
-    };
-    if ((window as any).google?.accounts?.id) {
-      render();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = render;
-      script.onerror = () =>
-        setError('Could not load Google sign-in. Check your connection and try again.');
-      document.body.appendChild(script);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId, handleGoogleCredential, isPanelOpen]);
-
-  useEffect(() => setMounted(true), []);
-
   const loadProfile = useCallback(async () => {
-    if (typeof window === 'undefined') return;
     try {
       const { profile: p } = await getProfile();
       setProfile({ ...EMPTY_PROFILE, ...p });
     } catch {
-      /* profile is optional; ignore */
+      /* the profile is optional; ignore */
     }
   }, []);
 
   const refresh = useCallback(async () => {
     try {
-      const [me, cfg] = await Promise.all([getMe(), config ? Promise.resolve(config) : getConfig()]);
+      const [me, cfg] = await Promise.all([
+        getMe(),
+        config ? Promise.resolve(config) : getConfig(),
+      ]);
       setEntitlement(me.entitlement);
       setConfig(cfg);
       onChange?.(me.entitlement);
@@ -183,16 +134,27 @@ export default function AccountPanel({
     }
   }, [config, onChange, loadProfile]);
 
-  // The reset link in the password email lands on /reset-password?token=… —
-  // keep the token and show the new-password form. Email confirmation has its
-  // own page (/verify-email) and is handled there.
+  // Supabase owns sign-out; there is no server session to destroy.
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (!active) return;
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
+        void refresh();
+      }
+    });
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, [supabase, refresh]);
+
+  // The password-reset link from Supabase lands here with a recovery session;
+  // just open the panel so the user can choose a new password.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const token = new URLSearchParams(window.location.search).get('token');
-    if (!token) return;
     if (!window.location.pathname.replace(/\/$/, '').endsWith('/reset-password')) return;
-    setResetToken(token);
-    setAuthView('reset');
     setView('account');
     onOpen();
   }, [onOpen]);
@@ -221,16 +183,60 @@ export default function AccountPanel({
 
   async function submitAuth(event: React.FormEvent) {
     event.preventDefault();
+    if (!supabase) {
+      setError('Sign-in is not configured on this server yet.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const result = mode === 'signin' ? await login(email, password) : await register(email, password);
-      setEntitlement(result.entitlement);
-      onChange?.(result.entitlement);
-      setPassword('');
+      if (mode === 'signin') {
+        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) throw authError;
+        setPassword('');
+      } else {
+        const { data, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: { full_name: displayName || undefined },
+          },
+        });
+        if (authError) throw authError;
+        // With "Confirm email" on, Supabase returns a user but no session and
+        // sends the confirmation mail instead.
+        setNotice(
+          data.session
+            ? 'Account created. Welcome aboard.'
+            : 'Check your inbox to confirm your email address, then sign in.',
+        );
+        setMode('signin');
+      }
       setView('account');
     } catch (err: any) {
-      setError(err.message || 'Could not sign in');
+      setError(authErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    if (!supabase) {
+      setError('Sign-in is not configured on this server yet.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/` },
+      });
+      // No error means the browser is being redirected to Google.
+      if (authError) throw authError;
+    } catch (err: any) {
+      setError(authErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -238,30 +244,24 @@ export default function AccountPanel({
 
   async function submitForgot(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await forgotPassword(email);
-      setNotice(res.dev_link ? `${res.message} (dev: ${res.dev_link})` : res.message);
-    } catch (err: any) {
-      setError(err.message || 'Could not send the reset link');
-    } finally {
-      setBusy(false);
+    if (!supabase) {
+      setError('Sign-in is not configured on this server yet.');
+      return;
     }
-  }
-
-  async function submitReset(event: React.FormEvent) {
-    event.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await resetPassword(resetToken, newPassword);
-      setNotice(res.message);
-      setNewPassword('');
-      setAuthView('form');
-      setMode('signin');
-    } catch (err: any) {
-      setError(err.message || 'Could not reset your password');
+      const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
+        // Supabase sends the link here; the recovery session is picked up by
+        // the client automatically when the user returns.
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      // Always the same answer, so this cannot be used to discover accounts.
+      setNotice(
+        authError
+          ? 'If that address has an account, a reset link is on its way.'
+          : 'If that address has an account, a reset link is on its way.',
+      );
     } finally {
       setBusy(false);
     }
@@ -283,7 +283,7 @@ export default function AccountPanel({
   }
 
   async function signOut() {
-    await logout().catch(() => {});
+    await supabase?.auth.signOut().catch(() => {});
     setEntitlement(null);
     onChange?.({
       signed_in: false,
@@ -479,31 +479,6 @@ export default function AccountPanel({
             </div>
           )}
 
-          {view === 'account' && !signedIn && authView === 'reset' && (
-            <form onSubmit={submitReset} className="space-y-3 max-w-sm">
-              <p className="text-xs text-gray-400">Choose a new password for your account.</p>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">New password</label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
-                />
-              </div>
-              {error && <p className="text-xs text-amber-400">{error}</p>}
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full text-sm font-medium py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
-              >
-                {busy ? 'Saving…' : 'Set new password'}
-              </button>
-            </form>
-          )}
-
           {view === 'account' && !signedIn && authView === 'forgot' && (
             <form onSubmit={submitForgot} className="space-y-3 max-w-sm">
               <p className="text-xs text-gray-400">
@@ -542,9 +517,17 @@ export default function AccountPanel({
 
           {view === 'account' && !signedIn && authView === 'form' && (
             <form onSubmit={submitAuth} className="space-y-3 max-w-sm">
-              {clientId && (
+              {mode === 'signin' && supabase && (
                 <div className="pb-1">
-                  <div ref={googleButtonRef} className="flex justify-center min-h-[44px]" />
+                  <button
+                    type="button"
+                    onClick={signInWithGoogle}
+                    disabled={busy}
+                    className="w-full flex items-center justify-center gap-3 border border-gray-700 hover:border-gray-500 text-gray-200 text-sm py-2 transition-colors disabled:opacity-50"
+                  >
+                    <GoogleMark />
+                    Continue with Google
+                  </button>
                   <div className="flex items-center gap-3 my-4">
                     <span className="h-px flex-1 bg-gray-800" />
                     <span className="text-[10px] uppercase tracking-widest text-gray-600">
@@ -552,6 +535,17 @@ export default function AccountPanel({
                     </span>
                     <span className="h-px flex-1 bg-gray-800" />
                   </div>
+                </div>
+              )}
+              {mode === 'signup' && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                  />
                 </div>
               )}
               <div>
@@ -638,21 +632,9 @@ export default function AccountPanel({
               </div>
 
               {entitlement?.email_verified === false && (
-                <div className="border border-amber-900/70 text-amber-300/90 text-xs rounded px-3 py-2 flex items-center justify-between gap-3">
-                  <span>Your email address is not confirmed yet.</span>
-                  <button
-                    onClick={async () => {
-                      try {
-                        const res = await resendVerification(entitlement.email || '');
-                        setNotice(res.message);
-                      } catch (err: any) {
-                        setError(err.message || 'Could not send the confirmation link');
-                      }
-                    }}
-                    className="shrink-0 underline hover:text-amber-200"
-                  >
-                    Resend link
-                  </button>
+                <div className="border border-amber-900/70 text-amber-300/90 text-xs rounded px-3 py-2">
+                  Your email address has not been confirmed yet. Check your inbox, or sign out
+                  and in again after confirming.
                 </div>
               )}
 

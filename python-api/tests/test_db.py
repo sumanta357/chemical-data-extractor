@@ -49,9 +49,16 @@ class SchemaTests(unittest.TestCase):
         self.assertIn("BIGSERIAL PRIMARY KEY", billing_store.POSTGRES_SCHEMA)
 
     def test_postgres_schema_keeps_every_table(self):
-        for table in ("users", "sessions", "subscriptions", "orders", "payments",
+        for table in ("users", "subscriptions", "orders", "payments",
                       "usage_events", "search_owners", "webhook_events"):
             self.assertIn(f"CREATE TABLE IF NOT EXISTS {table}", billing_store.POSTGRES_SCHEMA)
+
+    def test_schema_has_no_tables_of_its_own_auth(self):
+        # Sign-in lives in Supabase; this store must never grow session or
+        # credential tables again.
+        for table in ("sessions", "auth_tokens"):
+            self.assertNotIn(f"CREATE TABLE IF NOT EXISTS {table}",
+                             billing_store.POSTGRES_SCHEMA)
 
 
 class QueryTests(unittest.TestCase):

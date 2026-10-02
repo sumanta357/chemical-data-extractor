@@ -19,6 +19,7 @@ import sys
 import tempfile
 import time
 import unittest
+import uuid
 from pathlib import Path
 
 # Test credentials + an isolated database, set before the modules are imported.
@@ -30,7 +31,6 @@ os.environ["WORKSPACE_DIR"] = str(Path(_TEST_DIR) / "workspace")
 os.environ["RAZORPAY_KEY_ID"] = "rzp_test_key_id"
 os.environ["RAZORPAY_KEY_SECRET"] = "rzp_test_key_secret"
 os.environ["RAZORPAY_WEBHOOK_SECRET"] = "rzp_test_webhook_secret"
-os.environ["COOKIE_SECURE"] = "0"   # TestClient speaks http://testserver
 os.environ.pop("REQUIRE_AUTH", None)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -39,6 +39,7 @@ import auth  # noqa: E402
 import billing  # noqa: E402
 import billing_store  # noqa: E402
 import routes_billing  # noqa: E402
+from support import AUTH_HEADERS, SupabaseStub  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import app as engine_app  # noqa: E402
@@ -73,55 +74,40 @@ def route_paths(app_obj) -> list[str]:
 
 
 def make_user(email: str, plan: str = "free") -> dict:
-    user = billing_store.create_user(email, auth.hash_password("correct-horse-battery"))
+    """A billing account the way the app creates them now: linked to a Supabase
+    user, with no password of its own."""
+    user = billing_store.create_supabase_user(str(uuid.uuid4()), email, None, True)
     if plan != "free":
         user = billing_store.set_plan(user["id"], plan)
     return user
 
 
-# ── Passwords & sessions ─────────────────────────────────────────────────────
+# ── Account identity ─────────────────────────────────────────────────────────
 
-class PasswordTests(unittest.TestCase):
-    def test_hash_and_verify(self):
-        stored = auth.hash_password("correct-horse-battery")
-        self.assertTrue(stored.startswith("pbkdf2_sha256$"))
-        self.assertTrue(auth.verify_password("correct-horse-battery", stored))
-        self.assertFalse(auth.verify_password("wrong-password", stored))
+class AccountIdentityTests(unittest.TestCase):
+    """Identity is Supabase's; this store only owns the billing side."""
 
-    def test_salts_are_unique(self):
-        self.assertNotEqual(auth.hash_password("same-password"),
-                            auth.hash_password("same-password"))
+    def test_accounts_are_created_without_a_password(self):
+        account = make_user("no-password@example.com")
+        self.assertEqual(account["password_hash"], billing_store.SUPABASE_PASSWORD_PLACEHOLDER)
+        self.assertTrue(account["supabase_user_id"])
 
-    def test_malformed_hash_is_rejected_safely(self):
-        self.assertFalse(auth.verify_password("x", "garbage"))
-        self.assertFalse(auth.verify_password("x", ""))
+    def test_an_account_is_found_by_its_supabase_id(self):
+        account = make_user("by-sub@example.com")
+        self.assertEqual(
+            billing_store.get_user_by_supabase_id(account["supabase_user_id"])["id"],
+            account["id"])
+        self.assertIsNone(billing_store.get_user_by_supabase_id("no-such-sub"))
 
-    def test_password_validation(self):
-        with self.assertRaises(Exception):
-            auth.validate_password("short")
-        self.assertEqual(auth.validate_password("longenough1"), "longenough1")
+    def test_a_confirmed_email_is_recorded(self):
+        account = billing_store.create_supabase_user(str(uuid.uuid4()),
+                                                      "confirmed@example.com", None, True)
+        self.assertIsNotNone(account["email_verified_at"])
 
     def test_email_normalisation_and_validation(self):
         self.assertEqual(auth.validate_email("  User@Example.COM "), "user@example.com")
         with self.assertRaises(Exception):
             auth.validate_email("not-an-email")
-
-
-class SessionTests(unittest.TestCase):
-    def test_session_round_trip_and_revocation(self):
-        user = make_user("sessions@example.com")
-        token = billing_store.create_session(user["id"], "pytest")
-        self.assertEqual(billing_store.get_session_user(token)["id"], user["id"])
-        billing_store.delete_session(token)
-        self.assertIsNone(billing_store.get_session_user(token))
-
-    def test_expired_session_is_rejected(self):
-        user = make_user("expired@example.com")
-        token = billing_store.create_session(user["id"], "pytest", ttl_days=-1)
-        self.assertIsNone(billing_store.get_session_user(token))
-
-    def test_unknown_token(self):
-        self.assertIsNone(billing_store.get_session_user("nope-not-a-token"))
 
 
 # ── Plan catalog ─────────────────────────────────────────────────────────────
@@ -443,7 +429,11 @@ class UsageTests(unittest.TestCase):
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(engine_app.app)
+        # The client always presents a Supabase access token; `self.anon` is
+        # the unauthenticated one.
+        self.stub = SupabaseStub().install(self)
+        self.client = TestClient(engine_app.app, headers=AUTH_HEADERS)
+        self.anon = TestClient(engine_app.app)
         self._rzp = billing.rzp_request
         self._fetch = billing.fetch_payment
 
@@ -452,11 +442,12 @@ class ApiTests(unittest.TestCase):
         billing.fetch_payment = self._fetch
         billing.REQUIRE_AUTH = False
 
-    def _register(self, email):
-        res = self.client.post("/api/account/register",
-                               json={"email": email, "password": "correct-horse-battery"})
-        self.assertEqual(res.status_code, 200, res.text)
-        return res.json()
+    def _sign_in_as(self, email):
+        """Present a Supabase session for `email`; the client is already
+        carrying the bearer token."""
+        self.stub = SupabaseStub(email=email).install(self)
+        self.stub.account()
+        return email
 
     def test_config_exposes_only_the_publishable_key(self):
         res = self.client.get("/api/billing/config")
@@ -473,32 +464,15 @@ class ApiTests(unittest.TestCase):
         ids = [p["id"] for p in res.json()["plans"]]
         self.assertEqual(ids, ["free", "academic", "starter", "pro", "team"])
 
-    def test_register_login_logout_cycle(self):
-        data = self._register("api-cycle@example.com")
-        self.assertEqual(data["entitlement"]["plan"], "free")
-        self.assertTrue(data["entitlement"]["signed_in"])
-
+    def test_a_session_resolves_to_its_account(self):
+        email = self._sign_in_as("api-cycle@example.com")
         me = self.client.get("/api/account/me").json()
-        self.assertEqual(me["user"]["email"], "api-cycle@example.com")
-
-        self.assertEqual(self.client.post("/api/account/logout").status_code, 200)
-        self.assertIsNone(self.client.get("/api/account/me").json()["user"])
-
-    def test_login_rejects_wrong_password(self):
-        self._register("api-login@example.com")
-        self.client.post("/api/account/logout")
-        res = self.client.post("/api/account/login",
-                               json={"email": "api-login@example.com", "password": "wrong-one"})
-        self.assertEqual(res.status_code, 401)
-
-    def test_duplicate_email_is_rejected(self):
-        self._register("api-dup@example.com")
-        res = self.client.post("/api/account/register",
-                               json={"email": "api-dup@example.com", "password": "correct-horse-battery"})
-        self.assertEqual(res.status_code, 409)
+        self.assertEqual(me["user"]["email"], email)
+        self.assertEqual(me["entitlement"]["plan"], "free")
+        self.assertTrue(me["entitlement"]["signed_in"])
 
     def test_create_order_then_verify_payment(self):
-        self._register("api-pay@example.com")
+        self._sign_in_as("api-pay@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
             "id": "order_api_1", "amount": payload["amount"], "currency": "INR"}
 
@@ -522,7 +496,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(res.json()["entitlement"]["plan"], "starter")
 
     def test_verify_payment_rejects_bad_signature(self):
-        self._register("api-badsig@example.com")
+        self._sign_in_as("api-badsig@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
             "id": "order_api_2", "amount": 49900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
@@ -535,11 +509,11 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
 
     def test_create_order_requires_a_signed_in_user(self):
-        self.assertEqual(self.client.post("/api/billing/create-order",
-                                         json={"plan": "starter"}).status_code, 401)
+        self.assertEqual(self.anon.post("/api/billing/create-order",
+                                        json={"plan": "starter"}).status_code, 401)
 
     def test_payment_status_endpoint(self):
-        self._register("api-status@example.com")
+        self._sign_in_as("api-status@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
             "id": "order_api_3", "amount": 49900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
@@ -552,7 +526,7 @@ class ApiTests(unittest.TestCase):
 
     def test_payment_status_credits_a_captured_payment(self):
         """A payment captured upstream but never verified must still land."""
-        self._register("api-reconcile@example.com")
+        self._sign_in_as("api-reconcile@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
             "id": "order_rec_http", "amount": 49900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
@@ -572,7 +546,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
 
     def test_webhook_capture_activates_and_is_idempotent(self):
-        self._register("api-hook@example.com")
+        self._sign_in_as("api-hook@example.com")
         user = billing_store.get_user_by_email("api-hook@example.com")
         billing_store.create_order("order_api_4", user["id"], "pro", 199900, "rcpt")
 
@@ -592,7 +566,7 @@ class ApiTests(unittest.TestCase):
                          "duplicate webhook must not reset usage")
 
     def test_webhook_failure_is_recorded_without_granting(self):
-        self._register("api-hookfail@example.com")
+        self._sign_in_as("api-hookfail@example.com")
         user = billing_store.get_user_by_email("api-hookfail@example.com")
         event = {"event": "payment.failed", "payload": {"payment": {"entity": {
             "id": "pay_hook_fail", "order_id": "order_api_5", "amount": 49900,
@@ -675,17 +649,16 @@ class RegressionTests(unittest.TestCase):
         async def noop(*args, **kwargs):
             return None
 
+        stub = SupabaseStub(email="regress-quota@example.com").install(self)
+        signed_in = TestClient(engine_app.app, headers=AUTH_HEADERS)
         original = engine_app.run_search_in_background
         engine_app.run_search_in_background = noop
         try:
-            self.client.post("/api/account/register",
-                             json={"email": "regress-quota@example.com",
-                                   "password": "correct-horse-battery"})
-            me = self.client.get("/api/account/me").json()
+            me = signed_in.get("/api/account/me").json()
             user_id = me["user"]["id"]
             billing_store.increment_counters(user_id, searches=3)
 
-            res = self.client.post("/api/search", json={"query": "aspirin"})
+            res = signed_in.post("/api/search", json={"query": "aspirin"})
             self.assertEqual(res.status_code, 402)
             self.assertEqual(res.json()["detail"]["code"], "quota_reached")
         finally:

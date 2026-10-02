@@ -12,21 +12,21 @@ interpolation of user input.
 
 Tables
 ------
-users            account + plan + current usage counters
-sessions         opaque session tokens (hashed at rest)
+users            billing account + plan + usage counters, linked to Supabase
 subscriptions    activation history (audit trail for refunds / plan changes)
 orders           Razorpay orders we created
 payments         captured / failed payments (idempotent on payment_id)
 usage_events     per-unit usage ledger (searches, analyst messages)
 search_owners    search_id -> user_id, so completed jobs can be attributed
 webhook_events   processed webhook event ids (idempotent replay protection)
-auth_tokens      one-time email-verification and password-reset tokens
+
+Identity (sign-up, sign-in, password reset, email confirmation) belongs to
+Supabase Auth; this store only mirrors the account and owns billing.
 
 Academic customers also carry a profile (institute, academician type, phone)
 so the Academic directory can be filtered and sorted without a second store.
 """
 
-import hashlib
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -39,6 +39,10 @@ LOG = logging.getLogger("scigraph.billing")
 
 BILLING_DB = Path(os.environ.get("BILLING_DB", "/tmp/scigraph_billing.db"))
 
+# Supabase owns the credentials; this placeholder keeps the NOT NULL column
+# satisfied. It is not a hash, so nothing can be authenticated against it.
+SUPABASE_PASSWORD_PLACEHOLDER = "supabase"
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -46,11 +50,6 @@ def _now() -> datetime:
 
 def _iso(dt: Optional[datetime] = None) -> str:
     return (dt or _now()).isoformat()
-
-
-def hash_token(token: str) -> str:
-    """Session tokens are stored as SHA-256 digests, never in plaintext."""
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 SQLITE_SCHEMA = """
@@ -69,20 +68,12 @@ CREATE TABLE IF NOT EXISTS users (
     analyst_used        INTEGER NOT NULL DEFAULT 0,
     razorpay_customer_id TEXT,
     email_verified_at   TEXT,
-    google_sub          TEXT,
+    supabase_user_id    TEXT,
     academic_email      TEXT,
     institute_name      TEXT,
     institute_id        TEXT,
     phone               TEXT,
     academician_type    TEXT
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-    token_hash TEXT PRIMARY KEY,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL,
-    user_agent TEXT
 );
 
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -147,16 +138,6 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     received_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS auth_tokens (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kind       TEXT NOT NULL,
-    token_hash TEXT UNIQUE NOT NULL,
-    expires_at TEXT NOT NULL,
-    used_at    TEXT,
-    created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id, kind, created_at);
 """
 
 # Indexes are applied *after* the column migration, never with the tables: an
@@ -171,7 +152,7 @@ CREATE INDEX IF NOT EXISTS idx_users_institute_id ON users(institute_id);
 CREATE INDEX IF NOT EXISTS idx_users_academician_type ON users(academician_type);
 CREATE INDEX IF NOT EXISTS idx_users_academic_email ON users(academic_email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
-CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);
+CREATE INDEX IF NOT EXISTS idx_users_supabase ON users(supabase_user_id);
 """
 
 # Identical shape; Postgres needs a sequence-backed identity instead of
@@ -185,7 +166,7 @@ POSTGRES_INDEX_DDL = INDEX_DDL
 # already has a `users` table these are applied as idempotent ALTERs.
 PROFILE_COLUMNS = {
     "email_verified_at": "TEXT",
-    "google_sub": "TEXT",
+    "supabase_user_id": "TEXT",
     "academic_email": "TEXT",
     "institute_name": "TEXT",
     "institute_id": "TEXT",
@@ -246,16 +227,12 @@ def storage_info() -> dict:
 
 # ── Users ────────────────────────────────────────────────────────────────────
 
-def create_user(email: str, password_hash: str, name: Optional[str] = None) -> dict:
-    now = _now()
-    period_end = now + timedelta(days=30)
-    user_id = db.execute(
-        """INSERT INTO users (email, password_hash, name, created_at, plan,
-               plan_status, period_start, period_end)
-           VALUES (?, ?, ?, ?, 'free', 'active', ?, ?)""",
-        (email.lower(), password_hash, name, _iso(now), _iso(now), _iso(period_end)),
+def mark_email_verified(user_id: int) -> None:
+    """Record that Supabase confirmed the address for this account."""
+    db.execute(
+        "UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?",
+        (_iso(), user_id),
     )
-    return get_user_by_id(user_id)
 
 
 def get_user_by_email(email: str) -> Optional[dict]:
@@ -270,42 +247,42 @@ def touch_last_login(user_id: int) -> None:
     db.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_iso(), user_id))
 
 
-# ── Google accounts ──────────────────────────────────────────────────────────
+# ── Supabase-linked accounts ─────────────────────────────────────────────────
 
-# An account created through Google has no password. The placeholder is not a
-# valid hash (verify_password splits on '$' and fails), so a password sign-in
-# can never be forged against it, while the column stays NOT NULL.
-OAUTH_PASSWORD_PREFIX = "oauth:"
-
-
-def is_oauth_account(user: dict) -> bool:
-    return str(user.get("password_hash") or "").startswith(OAUTH_PASSWORD_PREFIX)
-
-
-def get_user_by_google_sub(sub: str) -> Optional[dict]:
+def get_user_by_supabase_id(sub: str) -> Optional[dict]:
     if not sub:
         return None
-    return db.query_one("SELECT * FROM users WHERE google_sub = ?", (sub,))
+    return db.query_one("SELECT * FROM users WHERE supabase_user_id = ?", (sub,))
 
 
-def create_oauth_user(email: str, name: Optional[str], sub: str) -> dict:
-    """Create an account for a verified Google identity. The address is
-    confirmed by Google, so it is marked verified immediately."""
+def create_supabase_user(sub: str, email: str, name: Optional[str] = None,
+                         email_verified: bool = False) -> dict:
+    """Create the billing account for a Supabase user on first sight.
+
+    There is no password: authentication lives in Supabase, so the column
+    keeps a placeholder that is not a valid hash."""
     now = _now()
     user_id = db.execute(
         """INSERT INTO users (email, password_hash, name, created_at, plan,
-               plan_status, period_start, period_end, google_sub, email_verified_at)
+               plan_status, period_start, period_end, supabase_user_id,
+               email_verified_at)
            VALUES (?, ?, ?, ?, 'free', 'active', ?, ?, ?, ?)""",
-        (email.lower(), f"{OAUTH_PASSWORD_PREFIX}{sub}", name, _iso(now),
-         _iso(now), _iso(now + timedelta(days=30)), sub, _iso(now)),
+        (email.lower(), SUPABASE_PASSWORD_PLACEHOLDER, name, _iso(now),
+         _iso(now), _iso(now + timedelta(days=30)), sub,
+         _iso(now) if email_verified else None),
     )
     return get_user_by_id(user_id)
 
 
-def link_google_sub(user_id: int, sub: str) -> dict:
-    db.execute("UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL",
-               (sub, user_id))
-    return get_user_by_id(user_id) or {}
+def update_identity(user_id: int, changes: dict) -> None:
+    """Mirror the details Supabase owns (name, email)."""
+    allowed = ("name", "email")
+    updates = {k: v for k, v in changes.items() if k in allowed}
+    if not updates:
+        return
+    assignments = ", ".join(f"{column} = ?" for column in updates)
+    db.execute(f"UPDATE users SET {assignments} WHERE id = ?",
+               tuple(updates.values()) + (user_id,))
 
 
 # ── Academic profile ─────────────────────────────────────────────────────────
@@ -435,117 +412,6 @@ def record_subscription(user_id: int, plan: str, status: str,
         (user_id, plan, status, payment_id, amount_paise,
          _iso(now), _iso(now + timedelta(days=period_days)), _iso(now)),
     )
-
-
-# ── Sessions ─────────────────────────────────────────────────────────────────
-
-def create_session(user_id: int, user_agent: Optional[str] = None,
-                   ttl_days: int = 30) -> str:
-    """Create a session and return the raw token (only time it is seen)."""
-    import secrets
-    token = secrets.token_urlsafe(48)
-    now = _now()
-    db.run(
-        """INSERT INTO sessions (token_hash, user_id, created_at, expires_at, user_agent)
-           VALUES (?, ?, ?, ?, ?)""",
-        (hash_token(token), user_id, _iso(now),
-         _iso(now + timedelta(days=ttl_days)), (user_agent or "")[:200]),
-    )
-    return token
-
-
-def get_session_user(token: str) -> Optional[dict]:
-    if not token:
-        return None
-    return db.query_one(
-        """SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
-            WHERE s.token_hash = ? AND s.expires_at > ?""",
-        (hash_token(token), _iso()),
-    )
-
-
-def delete_session(token: str) -> None:
-    db.execute("DELETE FROM sessions WHERE token_hash = ?", (hash_token(token),))
-
-
-def purge_expired_sessions() -> int:
-    return db.execute("DELETE FROM sessions WHERE expires_at <= ?", (_iso(),))
-
-
-def delete_all_sessions(user_id: int, keep_token: Optional[str] = None) -> int:
-    """Sign every device out. Used after a password change/reset so a stolen
-    session cannot outlive the credential it was created with."""
-    if keep_token:
-        return db.execute(
-            "DELETE FROM sessions WHERE user_id = ? AND token_hash != ?",
-            (user_id, keep_token),
-        )
-    return db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-
-
-# ── One-time tokens (email verification, password reset) ─────────────────────
-
-def create_auth_token(user_id: int, kind: str, ttl_minutes: int) -> str:
-    """Issue a single-use token and return it in the clear (only time it is
-    seen). Any earlier unused token of the same kind is invalidated first, so a
-    forwarded older email can never be replayed."""
-    import secrets
-    token = secrets.token_urlsafe(32)
-    now = _now()
-    db.execute(
-        "UPDATE auth_tokens SET used_at = ? WHERE user_id = ? AND kind = ? AND used_at IS NULL",
-        (_iso(now), user_id, kind),
-    )
-    db.execute(
-        """INSERT INTO auth_tokens (user_id, kind, token_hash, expires_at, created_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        (user_id, kind, hash_token(token),
-         _iso(now + timedelta(minutes=ttl_minutes)), _iso(now)),
-    )
-    return token
-
-
-def consume_auth_token(token: str, kind: str) -> Optional[int]:
-    """Return the owning user_id exactly once, or None when the token is
-    unknown, expired, of another kind, or already used. The conditional
-    UPDATE makes the claim atomic under the adapter lock."""
-    if not token or not kind:
-        return None
-    row = db.query_one(
-        "SELECT id, user_id, expires_at FROM auth_tokens WHERE token_hash = ? AND kind = ?",
-        (hash_token(token), kind),
-    )
-    if not row or str(row.get("expires_at") or "") <= _iso():
-        return None
-    claimed = db.execute(
-        "UPDATE auth_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL",
-        (_iso(), row["id"]),
-    )
-    if not claimed:
-        return None
-    return int(row["user_id"])
-
-
-def count_recent_tokens(user_id: int, kind: str, minutes: int) -> int:
-    """Throttle password-reset spam per account (emails are rate limited by
-    the provider too, but not for free tiers)."""
-    since = _iso(_now() - timedelta(minutes=minutes))
-    row = db.query_one(
-        "SELECT COUNT(*) AS n FROM auth_tokens WHERE user_id = ? AND kind = ? AND created_at > ?",
-        (user_id, kind, since),
-    )
-    return int(row["n"]) if row else 0
-
-
-def mark_email_verified(user_id: int) -> None:
-    db.execute(
-        "UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?",
-        (_iso(), user_id),
-    )
-
-
-def set_password(user_id: int, password_hash: str) -> None:
-    db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
 
 
 # ── Orders & payments ────────────────────────────────────────────────────────

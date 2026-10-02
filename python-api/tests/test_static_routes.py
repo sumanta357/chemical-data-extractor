@@ -17,7 +17,6 @@ from pathlib import Path
 _TEST_DIR = tempfile.mkdtemp(prefix="scigraph_static_test_")
 os.environ.setdefault("BILLING_DB", str(Path(_TEST_DIR) / "billing.db"))
 os.environ.setdefault("SEARCH_DB", str(Path(_TEST_DIR) / "search.db"))
-os.environ["COOKIE_SECURE"] = "0"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

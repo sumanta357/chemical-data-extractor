@@ -1,8 +1,9 @@
 /**
  * Accounts, plans and payments (Razorpay) — browser client.
  *
- * The publishable key id is fetched from the server (never bundled), and the
- * key secret never exists in the browser at all.
+ * Sign-in is Supabase's; this module only attaches its access token to the
+ * calls below. The publishable key id is fetched from the server (never
+ * bundled), and the key secret never exists in the browser at all.
  */
 
 export interface Plan {
@@ -14,6 +15,8 @@ export interface Plan {
   tag?: string | null;
   features: string[];
 }
+
+import { getAccessToken, getSupabase as getSupabaseClient } from './supabase';
 
 export interface Entitlement {
   signed_in: boolean;
@@ -42,13 +45,24 @@ export interface BillingConfig {
   currency: string;
   auth_required: boolean;
   checkout_script: string;
-  google_client_id?: string | null;
+  supabase?: {
+    url: string | null;
+    anon_key: string | null;
+    configured: boolean;
+  } | null;
+  admin_directory?: boolean;
 }
 
 async function api(path: string, init?: RequestInit): Promise<any> {
+  // Supabase owns the session: attach its access token when we have one.
+  const token = await getAccessToken(getSupabaseClient());
   const res = await fetch(path, {
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {}),
+    },
     ...init,
   });
   const text = await res.text();
@@ -76,37 +90,6 @@ export const getConfig = () => api('/api/billing/config') as Promise<BillingConf
 export const getPlans = () => api('/api/billing/plans') as Promise<{ plans: Plan[] }>;
 export const getMe = () =>
   api('/api/account/me') as Promise<{ user: any | null; entitlement: Entitlement }>;
-
-export const register = (email: string, password: string, name?: string, profile?: AcademicProfile) =>
-  api('/api/account/register', {
-    method: 'POST',
-    body: JSON.stringify({ email, password, name: name || null, profile: profile || null }),
-  }) as Promise<{ user: any; entitlement: Entitlement; verification_required: boolean }>;
-
-export const forgotPassword = (email: string) =>
-  api('/api/account/forgot-password', {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  }) as Promise<{ status: string; message: string; dev_link?: string }>;
-
-export const resetPassword = (token: string, password: string) =>
-  api('/api/account/reset-password', {
-    method: 'POST',
-    body: JSON.stringify({ token, password }),
-  }) as Promise<{ status: string; message: string }>;
-
-export const verifyEmail = (token: string) =>
-  api(`/api/account/verify-email?token=${encodeURIComponent(token)}`) as Promise<{
-    status: string;
-    email: string;
-    message: string;
-  }>;
-
-export const resendVerification = (email: string) =>
-  api('/api/account/resend-verification', {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  }) as Promise<{ status: string; message: string }>;
 
 export const getProfile = () => api('/api/account/profile') as Promise<{ profile: AcademicProfile }>;
 
@@ -159,21 +142,6 @@ export const listAcademics = (params: Record<string, string>, adminToken: string
     academician_types: string[];
   }>;
 };
-
-export const login = (email: string, password: string) =>
-  api('/api/account/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  }) as Promise<{ user: any; entitlement: Entitlement }>;
-
-export const logout = () => api('/api/account/logout', { method: 'POST' });
-
-/** Exchange a Google Identity Services credential for a session. */
-export const googleSignIn = (credential: string) =>
-  api('/api/account/google', {
-    method: 'POST',
-    body: JSON.stringify({ credential }),
-  }) as Promise<{ user: any; entitlement: Entitlement }>;
 
 export const createOrder = (plan: string) =>
   api('/api/billing/create-order', {

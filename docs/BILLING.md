@@ -9,8 +9,8 @@ product behaves **exactly** as before: anonymous searches, no accounts, no limit
 
 | Area | Files |
 |---|---|
-| Persistence | `python-api/billing_store.py` — its own SQLite file (`BILLING_DB`), the search database is untouched |
-| Auth | `python-api/auth.py` — PBKDF2-HMAC-SHA256 passwords, opaque sessions, HttpOnly cookies |
+| Persistence | `python-api/billing_store.py` — its own SQLite file (`BILLING_DB`) or Postgres, the search database is untouched |
+| Auth | `python-api/supabase_auth.py` + `python-api/auth.py` — Supabase owns sign-in; this app maps the verified token onto its billing account |
 | Payments | `python-api/billing.py` — plan catalog, Razorpay client, signature verification, quotas |
 | HTTP routes | `python-api/routes_billing.py` — `/api/account/*`, `/api/billing/*` |
 | UI | `components/AccountPanel.tsx`, `lib/billing.ts`, header entry point in `app/page.tsx` |
@@ -50,8 +50,9 @@ truth — the browser can never send an amount.
 | `RAZORPAY_WEBHOOK_SECRET` | recommended | Secret configured in the Razorpay dashboard for webhook signature checks |
 | `BILLING_DB` | no | Path to the accounts database (default `/tmp/scigraph_billing.db`) |
 | `REQUIRE_AUTH` | no | `1` = anonymous visitors must sign in before searching. Default `0` keeps the site open |
-| `SESSION_TTL_DAYS` | no | Session lifetime (default 30) |
-| `COOKIE_SECURE` | no | `0` only for local http testing |
+| `SUPABASE_URL` | for accounts | Supabase project URL (identity — see below) |
+| `SUPABASE_ANON_KEY` | for accounts | Supabase **anon / publishable** key, never `service_role` |
+| `ADMIN_TOKEN` | no | Shared secret for the academic directory. Unset ⇒ the endpoint 404s |
 
 Use **Razorpay test keys** first (`rzp_test_…`), switch to live keys when you go live.
 
@@ -131,93 +132,97 @@ Failure, cancellation and pending states are all surfaced in the UI
 cd python-api && python3 -m pytest tests/test_billing.py -q
 ```
 
-Covers: password hashing, session lifecycle, plan catalog integrity, checkout and
-webhook signature accept/reject, order payload correctness, capture → activation →
-usage → quota exhaustion, duplicate webhook replays, refunds, account flows over HTTP,
-and a regression suite proving the existing search API is unchanged (including that
-anonymous search still works and that the billing routes are mounted before the SPA
-catch-all).
+Covers: the plan catalog, checkout and webhook signature accept/reject, order
+payload correctness, capture → activation → usage → quota exhaustion, duplicate
+webhook replays, refunds, Supabase session resolution over HTTP, the academic
+directory filters and sorting, and a regression suite proving the existing search
+API is unchanged (including that anonymous search still works and that the
+billing routes are mounted before the SPA catch-all).
 
 For a real end-to-end run with Razorpay's sandbox, set test keys locally and use
 Razorpay's test card `4111 1111 1111 1111` (any future expiry/CVV).
 
+
 ---
 
-# Accounts security, academic directory
+# Authentication (Supabase) and the academic directory
 
-Three additions on top of the layer above. All of them are **off by default**
-except the profile fields, so an unconfigured deployment behaves exactly as
-before.
+## Authentication — Supabase owns identity
 
-## 1. Email verification & forgotten passwords (Resend)
+Sign-up, sign-in, "Sign in with Google", password reset and email confirmation
+are **Supabase Auth**. This app never sees a password, never issues a session,
+and has no session table. The flow is:
 
-Existing accounts, sessions and PBKDF2 hashing are unchanged — this only adds
-one-time tokens and the email that carries them.
+1. The browser signs in with `@supabase/supabase-js` (created at runtime from
+   `/api/billing/config`, so rotating the key is an env change, not a rebuild).
+2. Supabase returns an access token, which the browser sends as
+   `Authorization: Bearer <token>`.
+3. The server exchanges that token for the user at Supabase's
+   `GET /auth/v1/user` and maps the returned **Supabase user id** onto a row in
+   our own `users` table — created on first sight. Plans, quota, orders and the
+   academic profile all live there, so nothing about billing moved.
 
-| Route | Purpose |
-|---|---|
-| `POST /api/account/forgot-password` | always answers `{"status":"sent"}`, whether or not the address exists (no user enumeration) |
-| `POST /api/account/reset-password` | `{token, password}` — sets the password and **deletes every session** |
-| `GET /api/account/verify-email?token=` | confirms the address, marks `email_verified_at` |
-| `POST /api/account/resend-verification` | issues a fresh link (generic response) |
+A bad, expired or absent token is treated as *anonymous*, never as an error:
+browsing the tool without an account behaves exactly as it always has.
 
-* Tokens live in `auth_tokens`, are SHA-256 hashed, **single use**, and a reissued
-  link invalidates the previous one.
-* Throttled to `RESET_REQUESTS_PER_HOUR` per account.
-* Delivery is one HTTPS call to Resend (`python-api/emailer.py`). It fails soft:
-  a missing key or a provider outage logs the link and never fails signup, so the
-  account is still created and the token still works.
-* `REQUIRE_VERIFIED_EMAIL=1` blocks sign-in until the address is confirmed
-  (off by default — existing accounts are unaffected).
+```bash
+GET /api/account/me          # always 200: the signed-in account + entitlement, or anonymous
+GET|PUT /api/account/profile # the academic profile
+GET /api/account/usage       # quota, payments, recent searches
+```
 
-### New environment variables
+### Environment variables
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `RESEND_API_KEY` | — | Resend API token. Unset ⇒ emails are not delivered, links are logged |
-| `EMAIL_FROM` | `SciGraph <onboarding@resend.dev>` | verified sender |
-| `APP_URL` | `http://localhost:8000` | public origin used to build links |
-| `EMAIL_EXPOSE_LINKS` | `0` | **local development only** — returns the link in the API response |
-| `REQUIRE_VERIFIED_EMAIL` | `0` | require a confirmed address before sign-in |
-| `VERIFY_TOKEN_TTL_MINUTES` | `1440` | confirmation link lifetime |
-| `RESET_TOKEN_TTL_MINUTES` | `60` | reset link lifetime |
-| `RESET_REQUESTS_PER_HOUR` | `5` | per-account reset throttle |
+| `SUPABASE_URL` | — | project URL, e.g. `https://xxxx.supabase.co` |
+| `SUPABASE_ANON_KEY` | — | the **anon / publishable** key (public by design). Never the `service_role` key |
 
-Two new static routes back the emails: `/reset-password` and `/verify-email`
-(`app/reset-password`, `app/verify-email`).
+Unset ⇒ `/api/account/me` reports anonymous and the panel shows "sign-in is not
+configured". Supabase dashboard: **Authentication → Sign In / Providers** —
+enable **Google** (and Email if you want passwords), and set
+**Authentication → URL Configuration → Site URL** plus a redirect to
+`https://chemical-data-extractor.onrender.com/`.
 
-## 2. Academic profile & customer directory
+### Accounts started fresh
+
+Previous accounts, sessions and one-time tokens are gone: `sessions` and
+`auth_tokens` are no longer in the schema, and accounts are matched on
+`supabase_user_id`. To clear the old rows, run this once against Neon:
+
+```sql
+DELETE FROM users;   -- everything predating Supabase
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS auth_tokens;
+```
+
+## Academic profile & customer directory
 
 Signed-in users fill in their academic details from the account panel
-(**Academic profile**); registration accepts the same block as `profile`.
-
-Fields on `users`: `academic_email`, `institute_name`, `institute_id`, `phone`,
-`academician_type`, plus `email_verified_at`. Added as idempotent `ALTER`s by
-`db.add_missing_columns()`, so a database created before this release is
+(**Academic profile**). Fields on `users`: `academic_email`, `institute_name`,
+`institute_id`, `phone`, `academician_type`, `email_verified_at`. Added as
+idempotent `ALTER`s by `db.add_missing_columns()`, so an existing database is
 migrated in place.
 
-`GET /api/admin/academics` — the directory. Filters: `q` (free text across every
-field), `academic_email`, `institute_name`, `institute_id`, `phone`,
-`academician_type`, `verified`, `plan`. Sorting: any of the filter columns plus
-`email`, `name`, `created_at`, `searches_used`, `order=asc|desc`, paginated with
-`limit`/`offset` and a `total`.
+`GET /api/admin/academics` — filters: `q` (free text across every field),
+`academic_email`, `institute_name`, `institute_id`, `phone`,
+`academician_type`, `verified`, `plan`. Sorting on any of those plus `email`,
+`name`, `created_at`, `searches_used`; paginated with `limit`/`offset` + `total`.
 
-* The sort column is whitelisted in the store; it can never reach SQL as free text.
-* Every filter is a bound parameter, and each sortable column is indexed.
-* UI: `/admin/academics` — token unlock, live filters, click-to-sort headers,
-  pagination. The token is kept in `localStorage` and sent as `X-Admin-Token`.
+* The sort column is whitelisted in the store — it can never reach SQL as free text.
+* Every filter is a bound parameter, and every sortable column is indexed.
+* UI: `/admin/academics`. The token is kept in `localStorage` and sent as
+  `X-Admin-Token`.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ADMIN_TOKEN` | — | shared secret for the directory. **Unset ⇒ the endpoint answers 404** and no customer data is exposed |
+| `ADMIN_TOKEN` | — | shared secret for the directory. **Unset ⇒ the endpoint answers 404** |
 
-## 3. Search counting
+## Search counting
 
-No change was made — the metering path is plan-agnostic by design
-(`attach_search_owner` → `claim_search_owner` → `increment_counters`), and two
-searches accumulate to two on Academic, Professional and Team alike, across
-sessions. `python-api/tests/test_accounts.py` now pins that behaviour so a
-regression cannot creep in.
+Unchanged and plan-agnostic by design (`attach_search_owner` →
+`claim_search_owner` → `increment_counters`). Two searches accumulate to two on
+Academic, Professional and Team alike, across sessions and sign-outs.
 
 ## Tests
 
@@ -225,42 +230,5 @@ regression cannot creep in.
 cd python-api && python3 -m pytest tests/ -q
 ```
 
-128 tests: the original billing suite, the new accounts suite (directory
-filters/sorting, admin token, verification, reset, throttle, token single-use,
-per-plan quota accumulation) and static-route resolution for the new pages.
-
----
-
-# "Sign in with Google"
-
-Google Identity Services on top of the same accounts, sessions and quotas. The
-browser receives a JWT credential and posts it to `POST /api/account/google`;
-**nothing is trusted from the browser** — the server verifies the RS256
-signature against Google's published keys and requires our client id as the
-audience, a Google issuer, an unexpired `exp`, and `email_verified`.
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `GOOGLE_CLIENT_ID` | — | OAuth 2.0 **Web application** client id. Unset ⇒ the endpoint answers 503 and the button is hidden |
-
-Set it up in Google Cloud Console → *APIs & Services* → *Credentials* →
-*Create credentials* → *OAuth client ID* → **Web application**, with
-`https://chemical-data-extractor.onrender.com` as an authorised JavaScript
-origin (and `http://localhost:8000` for local testing). Add
-`http://localhost:8000/api/account/google` as a redirect URI only if you later
-switch from the GIS button to the redirect flow.
-
-### Account rules
-
-* First sign-in creates an account with **no password** — the password column
-  holds an `oauth:<sub>` placeholder that can never pass verification, so a
-  Google-only account cannot be signed into with a guessed password.
-* Google already verified the address, so the account is marked verified at once.
-  Email verification and password reset therefore apply to password accounts.
-* If that address already belongs to an account that **uses a password**, Google
-  sign-in is refused with `password_account_exists` rather than silently handing
-  the account over. The user signs in with their password, or resets it.
-* Accounts are matched on Google's `sub` first, then on the verified email.
-
-`PyJWT[crypto]` was added to `python-api/requirements.txt` for the signature
-check; Google's signing keys are cached for an hour.
+133 tests, no network: Supabase is stubbed at the HTTP boundary, Razorpay at
+the request layer.

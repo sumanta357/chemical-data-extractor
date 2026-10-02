@@ -20,8 +20,7 @@ import auth
 import billing
 import billing_store
 import db as _db
-import emailer
-import google_auth
+import supabase_auth
 
 LOG = logging.getLogger("scigraph.billing.api")
 
@@ -43,22 +42,6 @@ router = APIRouter(tags=["accounts", "billing"])
 
 # ── Request models ───────────────────────────────────────────────────────────
 
-class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    name: Optional[str] = None
-    profile: Optional[dict] = None
-
-
-class ForgotPasswordRequest(BaseModel):
-    email: str
-
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    password: str
-
-
 class ProfileRequest(BaseModel):
     name: Optional[str] = None
     academic_email: Optional[str] = None
@@ -66,15 +49,6 @@ class ProfileRequest(BaseModel):
     institute_id: Optional[str] = None
     phone: Optional[str] = None
     academician_type: Optional[str] = None
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class GoogleSignInRequest(BaseModel):
-    credential: str
 
 
 class CreateOrderRequest(BaseModel):
@@ -105,17 +79,16 @@ async def billing_config():
         "auth_required": billing.REQUIRE_AUTH,
         "checkout_script": "https://checkout.razorpay.com/v1/checkout.js",
         "accounts_store": store,
-        # Whether verification/reset email can actually be sent. Booleans
-        # only — the key itself never leaves the server.
-        "email": {
-            "configured": emailer.EMAIL_ENABLED,
-            "app_url_configured": bool(emailer.APP_URL),
-            "sender": emailer.EMAIL_FROM,
-            "require_verified_email": auth.REQUIRE_VERIFIED_EMAIL,
-        },
         "admin_directory": bool(ADMIN_TOKEN),
-        # Public OAuth client id — the browser needs it to render the button.
-        "google_client_id": google_auth.GOOGLE_CLIENT_ID or None,
+        # Supabase Auth: the browser signs in with the project URL and the
+        # anon/publishable key. Both are public by design — the server uses the
+        # same anon key to verify the access token it is handed. The
+        # service_role key is never exposed, and is not needed.
+        "supabase": {
+            "url": supabase_auth.SUPABASE_URL or None,
+            "anon_key": supabase_auth.SUPABASE_ANON_KEY or None,
+            "configured": supabase_auth.SUPABASE_ENABLED,
+        },
     }
 
 
@@ -125,39 +98,6 @@ async def list_plans():
 
 
 # ── Accounts ─────────────────────────────────────────────────────────────────
-
-@router.post("/api/account/register")
-async def register(payload: RegisterRequest, request: Request, response: Response):
-    user = auth.register(request, response, payload.email, payload.password,
-                         payload.name, payload.profile)
-    return {
-        "user": _public_user(user),
-        "entitlement": billing.entitlement_for(user),
-        "verification_required": not bool(user.get("email_verified_at")),
-    }
-
-
-@router.post("/api/account/login")
-async def login(payload: LoginRequest, request: Request, response: Response):
-    user = auth.login(request, response, payload.email, payload.password)
-    return {"user": _public_user(user), "entitlement": billing.entitlement_for(user)}
-
-
-@router.post("/api/account/google")
-async def google_sign_in(payload: GoogleSignInRequest, request: Request, response: Response):
-    """Verify a Google credential server-side and start a normal session."""
-    try:
-        user = auth.login_with_google(payload.credential, request, response)
-    except google_auth.GoogleAuthError as exc:
-        raise HTTPException(status_code=exc.status, detail=str(exc))
-    return {"user": _public_user(user), "entitlement": billing.entitlement_for(user)}
-
-
-@router.post("/api/account/logout")
-async def logout(request: Request, response: Response):
-    auth.logout(request, response)
-    return {"status": "signed_out"}
-
 
 @router.get("/api/account/me")
 async def me(request: Request):
@@ -201,45 +141,6 @@ def _public_user(user: dict) -> dict:
         "created_at": user["created_at"],
         "email_verified": bool(user.get("email_verified_at")),
     }
-
-
-# ── Email verification, forgot & reset password ─────────────────────────────
-
-@router.post("/api/account/forgot-password")
-async def forgot_password(payload: ForgotPasswordRequest):
-    """Always the same answer, whether or not the address has an account, so
-    this endpoint cannot be used to enumerate users."""
-    link = auth.request_password_reset(payload.email)
-    body = {"status": "sent",
-            "message": "If that address has an account, a reset link is on its way."}
-    if link:  # only when EMAIL_EXPOSE_LINKS is enabled for local development
-        body["dev_link"] = link
-    return body
-
-
-@router.post("/api/account/reset-password")
-async def reset_password(payload: ResetPasswordRequest, response: Response):
-    auth.reset_password(payload.token, payload.password)
-    # reset_password already killed every session server-side; clear this
-    # browser's cookie too so the stale one is not sent again.
-    auth.clear_session_cookie(response)
-    return {"status": "reset", "message": "Your password has been updated. Sign in with it now."}
-
-
-@router.get("/api/account/verify-email")
-async def verify_email(token: str):
-    user = auth.verify_email(token)
-    return {"status": "verified", "email": user.get("email"),
-            "message": "Your email address is confirmed."}
-
-
-@router.post("/api/account/resend-verification")
-async def resend_verification(payload: ForgotPasswordRequest):
-    user = billing_store.get_user_by_email((payload.email or "").strip().lower())
-    if user and not user.get("email_verified_at"):
-        auth.send_verification(user)
-    return {"status": "sent",
-            "message": "If that address needs confirming, a new link is on its way."}
 
 
 # ── Academic profile & directory ─────────────────────────────────────────────

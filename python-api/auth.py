@@ -1,76 +1,45 @@
 #!/usr/bin/env python3
 """
-Accounts, sessions and password security.
+Identity is Supabase's job; this module turns a verified Supabase identity
+into the billing account that owns plans, quota and orders.
 
-Uses only the standard library (hashlib/hmac/secrets) so no new dependency is
-added to the container. Passwords are stored as PBKDF2-HMAC-SHA256 with a
-per-user random salt and a high iteration count; session tokens are opaque
-random strings stored as SHA-256 digests.
+There are no passwords and no session cookies here any more. A request arrives
+with `Authorization: Bearer <supabase access token>`; `supabase_auth` checks it
+with Supabase and we map the returned user id onto a row in our own `users`
+table — created on first sight, matched by Supabase id on every later request.
+
+Sign-up, sign-in, password reset and email confirmation all happen inside
+Supabase and never reach this server.
 """
 
-import hashlib
-import hmac
 import logging
 import os
 import re
-import secrets
 import sys
 from pathlib import Path
 from typing import Optional
 
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Request
 
 _HERE = Path(__file__).resolve().parent
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 import billing_store  # noqa: E402
-import emailer  # noqa: E402
-import google_auth  # noqa: E402
+import supabase_auth  # noqa: E402
 
-# Opt-in: when 1, an account must confirm its email address before it can sign
-# in. Off by default so existing accounts keep working untouched.
-REQUIRE_VERIFIED_EMAIL = os.environ.get(
-    "REQUIRE_VERIFIED_EMAIL", "0"
-).strip().lower() in ("1", "true", "yes", "on")
-
-VERIFY_TOKEN_TTL_MINUTES = int(os.environ.get("VERIFY_TOKEN_TTL_MINUTES", "1440"))
-RESET_TOKEN_TTL_MINUTES = int(os.environ.get("RESET_TOKEN_TTL_MINUTES", "60"))
-RESET_REQUESTS_PER_HOUR = int(os.environ.get("RESET_REQUESTS_PER_HOUR", "5"))
-
-COOKIE_NAME = "scigraph_session"
 LOG = logging.getLogger("scigraph.auth")
-PBKDF2_ITERATIONS = 210_000
-SESSION_TTL_DAYS = int(os.environ.get("SESSION_TTL_DAYS", "30"))
-# Secure cookies are on by default (HTTPS). Set COOKIE_SECURE=0 for local http testing.
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "1") not in ("0", "false", "False")
+
+# Accounts created through Supabase have no password here. The placeholder is
+# deliberately not a valid hash, so nothing can ever be signed in against it.
+SUPABASE_PASSWORD_PLACEHOLDER = "supabase"
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$")
 PHONE_RE = re.compile(r"^\+?[0-9][0-9 ()-]{5,24}$")
 MAX_FIELD_LEN = 200
 
 
-# ── Passwords ────────────────────────────────────────────────────────────────
-
-def hash_password(password: str) -> str:
-    salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITERATIONS)
-    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt.hex()}${digest.hex()}"
-
-
-def verify_password(password: str, stored: str) -> bool:
-    try:
-        algo, iterations, salt_hex, digest_hex = stored.split("$")
-        if algo != "pbkdf2_sha256":
-            return False
-        expected = bytes.fromhex(digest_hex)
-        actual = hashlib.pbkdf2_hmac(
-            "sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), int(iterations)
-        )
-        return hmac.compare_digest(expected, actual)
-    except (ValueError, AttributeError, TypeError):
-        return False
-
+# ── Validation ───────────────────────────────────────────────────────────────
 
 def validate_email(email: str) -> str:
     email = (email or "").strip().lower()
@@ -78,16 +47,6 @@ def validate_email(email: str) -> str:
         raise HTTPException(status_code=400, detail="Enter a valid email address")
     return email
 
-
-def validate_password(password: str) -> str:
-    if not password or len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
-    if len(password) > 200:
-        raise HTTPException(status_code=400, detail="Password is too long")
-    return password
-
-
-# ── Academic profile validation ──────────────────────────────────────────────
 
 def _clean(value: Optional[str], limit: int = MAX_FIELD_LEN) -> str:
     return (value or "").strip()[:limit]
@@ -122,215 +81,82 @@ def validate_profile(fields: dict) -> dict:
 
     academician_type = _clean(fields.get("academician_type"), 60)
     if academician_type:
-        allowed = billing_store.ACADEMICIAN_TYPES
-        if academician_type not in allowed:
+        if academician_type not in billing_store.ACADEMICIAN_TYPES:
             raise HTTPException(
                 status_code=400,
                 detail={"message": "Choose a valid academician type",
-                        "allowed": allowed},
+                        "allowed": billing_store.ACADEMICIAN_TYPES},
             )
         clean["academician_type"] = academician_type
 
     return clean
 
 
-# ── Session cookie ───────────────────────────────────────────────────────────
+# ── Identity → billing account ───────────────────────────────────────────────
 
-def _token_from_request(request: Request) -> Optional[str]:
-    token = request.cookies.get(COOKIE_NAME)
-    if token:
-        return token
-    # Fallback for API clients that cannot hold cookies (curl, server-to-server).
-    header = request.headers.get("authorization", "")
-    if header.lower().startswith("bearer "):
-        return header[7:].strip()
-    return None
+def resolve_account(identity: dict) -> dict:
+    """Find (or create) the billing account behind a verified Supabase user.
 
-
-def set_session_cookie(response: Response, token: str) -> None:
-    response.set_cookie(
-        COOKIE_NAME,
-        token,
-        max_age=SESSION_TTL_DAYS * 24 * 3600,
-        httponly=True,
-        samesite="lax",
-        secure=COOKIE_SECURE,
-        path="/",
-    )
-
-
-def clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(COOKIE_NAME, path="/")
-
-
-def login(request: Request, response: Response, email: str, password: str) -> dict:
-    user = billing_store.get_user_by_email(email)
-    if not user or not verify_password(password, user["password_hash"]):
-        # Same message for unknown account and wrong password — no user enumeration.
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-    if REQUIRE_VERIFIED_EMAIL and not user.get("email_verified_at"):
-        raise HTTPException(
-            status_code=403,
-            detail={"message": "Confirm your email address before signing in.",
-                    "code": "email_unverified"},
-        )
-    token = billing_store.create_session(
-        user["id"], request.headers.get("user-agent"), SESSION_TTL_DAYS
-    )
-    billing_store.touch_last_login(user["id"])
-    set_session_cookie(response, token)
-    return billing_store.get_user_by_id(user["id"])
-
-
-def register(request: Request, response: Response, email: str,
-             password: str, name: Optional[str] = None,
-             profile: Optional[dict] = None) -> dict:
-    email = validate_email(email)
-    validate_password(password)
-    if billing_store.get_user_by_email(email):
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
-    user = billing_store.create_user(email, hash_password(password), name)
-    if profile:
-        billing_store.update_profile(user["id"], validate_profile(profile))
-    token = billing_store.create_session(
-        user["id"], request.headers.get("user-agent"), SESSION_TTL_DAYS
-    )
-    set_session_cookie(response, token)
-    user = billing_store.get_user_by_id(user["id"])
-    send_verification(user)
-    return user
-
-
-# ── Email verification ───────────────────────────────────────────────────────
-
-def send_verification(user: dict) -> Optional[str]:
-    """Issue a verification token and email it. Returns the link only when
-    EMAIL_EXPOSE_LINKS is on (local development); never raises."""
-    if not user or user.get("email_verified_at"):
-        return None
-    try:
-        token = billing_store.create_auth_token(
-            user["id"], "verify_email", VERIFY_TOKEN_TTL_MINUTES
-        )
-        emailer.send_verification(user["email"], token)
-        if emailer.EXPOSE_LINKS:
-            return f"/verify-email?token={token}"
-    except Exception as exc:  # a mail outage must not block signup
-        LOG.warning("Could not send verification email: %s", exc.__class__.__name__)
-    return None
-
-
-def verify_email(token: str) -> dict:
-    user_id = billing_store.consume_auth_token(token, "verify_email")
-    if not user_id:
-        raise HTTPException(
-            status_code=400,
-            detail={"message": "This confirmation link is invalid or has expired.",
-                    "code": "invalid_token"},
-        )
-    billing_store.mark_email_verified(user_id)
-    return billing_store.get_user_by_id(user_id) or {}
-
-
-# ── Forgot / reset password ──────────────────────────────────────────────────
-
-def request_password_reset(email: str) -> Optional[str]:
-    """Always succeeds from the caller's point of view: an unknown address gets
-    the same answer as a known one, so the endpoint cannot be used to discover
-    which addresses have accounts."""
-    try:
-        user = billing_store.get_user_by_email(validate_email(email))
-    except HTTPException:
-        return None
-    if not user:
-        return None
-    if billing_store.count_recent_tokens(
-            user["id"], "reset_password", 60) >= RESET_REQUESTS_PER_HOUR:
-        # Throttled: stay silent rather than telling a stranger the address exists.
-        LOG.info("Password reset throttled for user %s", user["id"])
-        return None
-    token = billing_store.create_auth_token(
-        user["id"], "reset_password", RESET_TOKEN_TTL_MINUTES
-    )
-    emailer.send_password_reset(user["email"], token)
-    if emailer.EXPOSE_LINKS:
-        return f"/reset-password?token={token}"
-    return None
-
-
-def reset_password(token: str, new_password: str) -> None:
-    validate_password(new_password)
-    user_id = billing_store.consume_auth_token(token, "reset_password")
-    if not user_id:
-        raise HTTPException(
-            status_code=400,
-            detail={"message": "This reset link is invalid or has expired.",
-                    "code": "invalid_token"},
-        )
-    billing_store.set_password(user_id, hash_password(new_password))
-    # Every existing session dies with the old credential.
-    billing_store.delete_all_sessions(user_id)
-
-
-def login_with_google(credential: str, request: Request, response: Response) -> dict:
-    """Sign in (or sign up) with a verified Google identity.
-
-    The address comes from a token Google signed, never from the browser. An
-    existing account that still uses a password is never taken over by Google
-    sign-in — that address already authenticates by password, and silently
-    handing it to a Google identity would be an account-takeover path.
+    Matching is on the Supabase user id, never on the email address: Supabase
+    is the authority on identity, and an address can be changed by its owner.
     """
-    claims = google_auth.verify_id_token(credential)
-    email = validate_email(claims.get("email", ""))
-    sub = str(claims["sub"])
-    name = _clean(claims.get("name"), 120) or None
-
-    user = billing_store.get_user_by_google_sub(sub)
-    if user is None:
-        existing = billing_store.get_user_by_email(email)
-        if existing and not billing_store.is_oauth_account(existing):
-            raise HTTPException(
-                status_code=400,
-                detail={"message": "An account already uses this email with a password. "
-                                   "Sign in with it, or reset the password first.",
-                        "code": "password_account_exists"},
+    sub = identity["id"]
+    account = billing_store.get_user_by_supabase_id(sub)
+    if account is None:
+        try:
+            return billing_store.create_supabase_user(
+                sub, identity["email"], identity.get("name"),
+                bool(identity.get("email_verified")),
             )
-        if existing:
-            user = billing_store.link_google_sub(existing["id"], sub)
-        else:
-            user = billing_store.create_oauth_user(email, name, sub)
+        except billing_store.INTEGRITY_ERROR:
+            # Supabase keeps email addresses unique, so this should not happen
+            # — but if an address is already taken, fall back to that account
+            # rather than failing the sign-in.
+            LOG.warning("Email already has a billing account; linking by address")
+            return billing_store.get_user_by_email(identity["email"]) or {}
 
-    token = billing_store.create_session(
-        user["id"], request.headers.get("user-agent"), SESSION_TTL_DAYS
-    )
-    billing_store.touch_last_login(user["id"])
-    set_session_cookie(response, token)
-    return billing_store.get_user_by_id(user["id"])
+    # Keep the mirrored details in step with Supabase.
+    changes = {}
+    if identity.get("name") and identity["name"] != account.get("name"):
+        changes["name"] = identity["name"][:120]
+    if identity["email"] != account.get("email"):
+        changes["email"] = identity["email"]
+    if identity.get("email_verified") and not account.get("email_verified_at"):
+        billing_store.mark_email_verified(account["id"])
+    if changes:
+        billing_store.update_identity(account["id"], changes)
+        account = billing_store.get_user_by_id(account["id"]) or account
+    return account
 
 
-def logout(request: Request, response: Response) -> None:
-    token = _token_from_request(request)
-    if token:
-        billing_store.delete_session(token)
-    clear_session_cookie(response)
+def identity_from_request(request: Request) -> Optional[dict]:
+    """The billing account for this request, or None when nobody is signed in.
 
-
-# ── Dependencies ─────────────────────────────────────────────────────────────
-
-def current_user_optional(request: Request) -> Optional[dict]:
-    """Never raises — used on endpoints that must keep working for anonymous
-    visitors (search submit stays open by default)."""
-    token = _token_from_request(request)
+    Never raises: anonymous browsing must keep working exactly as before.
+    """
+    token = supabase_auth.bearer_token(request)
     if not token:
         return None
-    user = billing_store.get_session_user(token)
-    if user:
-        return billing_store.reset_period_if_due(user)
-    return None
+    try:
+        identity = supabase_auth.verify_access_token(token)
+    except supabase_auth.SupabaseAuthError as exc:
+        LOG.info("Rejected session: %s", exc)
+        return None
+    try:
+        return billing_store.reset_period_if_due(resolve_account(identity))
+    except Exception as exc:  # a database hiccup must not 500 the whole app
+        LOG.warning("Could not resolve the account for a session: %s",
+                    exc.__class__.__name__)
+        return None
 
 
-def current_user_required(request: Request) -> dict:
-    user = current_user_optional(request)
-    if not user:
+def identity_required(request: Request) -> dict:
+    account = identity_from_request(request)
+    if not account:
         raise HTTPException(status_code=401, detail="Sign in to continue")
-    return user
+    return account
+
+
+# Backwards-compatible names used across the codebase.
+current_user_optional = identity_from_request
+current_user_required = identity_required
