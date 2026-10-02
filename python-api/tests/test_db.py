@@ -117,5 +117,58 @@ class QueryTests(unittest.TestCase):
         self.assertIn(dbmod.DRIVER_NAME, dbmod.db.describe())
 
 
+class UnavailableTests(unittest.TestCase):
+    """The store must never block startup or crash the request path."""
+
+    def setUp(self):
+        # These exercise the Postgres path regardless of the local configuration.
+        self._previous = dbmod.USE_POSTGRES
+        dbmod.USE_POSTGRES = True
+
+    def tearDown(self):
+        dbmod.USE_POSTGRES = self._previous
+
+    def _unreachable_store(self):
+        class Unreachable(dbmod.Database):
+            def _pg(self):
+                raise dbmod.DatabaseUnavailable("unreachable")
+
+        store = Unreachable()
+        store.register_schema(
+            "CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY);",
+            "CREATE TABLE IF NOT EXISTS t (id BIGSERIAL PRIMARY KEY);",
+        )
+        return store
+
+    def test_unreachable_database_fails_fast_and_softly(self):
+        import time
+
+        store = self._unreachable_store()
+
+        started = time.time()
+        with self.assertRaises(dbmod.DatabaseUnavailable):
+            store.query_one("SELECT 1 AS ok")
+        self.assertLess(time.time() - started, 1.0, "must fail fast, not hang")
+
+        # A second attempt inside the cooldown window must not retry the network.
+        started = time.time()
+        with self.assertRaises(dbmod.DatabaseUnavailable):
+            store.query_one("SELECT 1 AS ok")
+        self.assertLess(time.time() - started, 0.5)
+
+    def test_initialize_never_raises(self):
+        import time
+
+        store = self._unreachable_store()
+        original = dbmod.db
+        dbmod.db = store
+        try:
+            started = time.time()
+            self.assertFalse(dbmod.initialize())
+            self.assertLess(time.time() - started, 1.0)
+        finally:
+            dbmod.db = original
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

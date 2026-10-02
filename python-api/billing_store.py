@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-from db import INTEGRITY_ERROR, db
+from db import INTEGRITY_ERROR, db, initialize
 
 LOG = logging.getLogger("scigraph.billing")
 
@@ -145,7 +145,30 @@ POSTGRES_SCHEMA = SQLITE_SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT",
 
 
 def init_db() -> None:
-    db.init_schema(SQLITE_SCHEMA, POSTGRES_SCHEMA)
+    """Create the schema.
+
+    Deliberately NOT called at import time: connecting during module import
+    would block container startup whenever the database is unreachable, and a
+    slow or mistyped DATABASE_URL must never take the site down. The adapter
+    creates the tables lazily on first use and retries after a failure.
+    """
+    db.register_schema(SQLITE_SCHEMA, POSTGRES_SCHEMA)
+    return None
+
+
+def ensure_schema() -> bool:
+    """Best-effort warm-up used by the startup hook. Never raises."""
+    db.register_schema(SQLITE_SCHEMA, POSTGRES_SCHEMA)
+    return initialize()
+
+
+def storage_info() -> dict:
+    from db import DRIVER_NAME, USE_POSTGRES
+    return {
+        "driver": DRIVER_NAME,
+        "location": "managed postgres" if USE_POSTGRES else str(BILLING_DB),
+        "ephemeral": (not USE_POSTGRES) and str(BILLING_DB).startswith("/tmp"),
+    }
 
 
 # ── Users ────────────────────────────────────────────────────────────────────
@@ -401,4 +424,5 @@ def stats() -> dict:
     return {"users": users["c"], "paying_users": paid["c"], "payments": payments["c"]}
 
 
+# Register the schema only — no connection is opened at import time.
 init_db()

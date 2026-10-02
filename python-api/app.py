@@ -76,6 +76,24 @@ except Exception as _billing_import_error:  # pragma: no cover - defensive
                 _billing_import_error)
 
 
+try:
+    from db import DatabaseUnavailable as _DatabaseUnavailable
+
+    @app.exception_handler(_DatabaseUnavailable)
+    async def _accounts_unavailable(request: Request, exc):
+        """A database outage must degrade accounts, never the whole site."""
+        LOG.warning("Accounts store unavailable: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": {
+                "message": "Accounts are temporarily unavailable. Please try again in a moment.",
+                "code": "accounts_unavailable",
+            }},
+        )
+except Exception:  # pragma: no cover - db module missing
+    pass
+
+
 def _entitlement_for_request(http_request: Optional[Request]):
     """Return (user, entitlement). Raises 401/402 for auth/quota problems.
     Any internal billing failure fails open so the search product stays up."""
@@ -2160,19 +2178,32 @@ async def startup():
 
     # Accounts store: say out loud which backend is in use, and shout if it is
     # ephemeral (accounts silently disappear on every redeploy otherwise).
-    try:
-        import db as _db
-        import billing_store as _billing_store
-        LOG.info("   Accounts store: %s", _db.db.describe())
-        if not _db.USE_POSTGRES and str(_billing_store.BILLING_DB).startswith("/tmp"):
-            LOG.warning(
-                "   ⚠ ACCOUNTS ARE ON EPHEMERAL STORAGE (%s) — every deploy or container "
-                "recycle deletes every account, plan and payment record. Set DATABASE_URL "
-                "(Postgres/Neon) or point BILLING_DB at a persistent disk.",
-                _billing_store.BILLING_DB,
-            )
-    except Exception as exc:
-        LOG.warning("   Could not determine the accounts store: %s", exc.__class__.__name__)
+    # Warming the connection happens in a background thread with a hard timeout:
+    # startup must never block on the database, or the container looks dead and
+    # gets killed before it can serve a single request.
+    def _warm_accounts():
+        try:
+            import billing_store as _billing_store
+            info = _billing_store.storage_info()
+            LOG.info("   Accounts store: %s (%s)", info["driver"], info["location"])
+            if info["ephemeral"]:
+                LOG.warning(
+                    "   ⚠ ACCOUNTS ARE ON EPHEMERAL STORAGE (%s) — every deploy or container "
+                    "recycle deletes every account, plan and payment record. Set DATABASE_URL "
+                    "(Postgres/Neon) or point BILLING_DB at a persistent disk.",
+                    info["location"],
+                )
+            ready = _billing_store.ensure_schema()
+            if ready:
+                LOG.info("   Accounts store ready")
+            else:
+                LOG.warning("   Accounts store NOT reachable — accounts will retry later, "
+                            "searches keep working")
+        except Exception as exc:
+            LOG.warning("   Accounts store warm-up skipped: %s", exc.__class__.__name__)
+
+    import threading as _threading
+    _threading.Thread(target=_warm_accounts, daemon=True).start()
     _run_storage_cleanup()
     # Schedule recurring cleanup every 30 minutes (cancelled on shutdown)
     async def _periodic_cleanup():

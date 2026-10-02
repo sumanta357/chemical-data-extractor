@@ -18,6 +18,7 @@ code in billing_store.py is identical on either backend.
 import os
 import sqlite3
 import threading
+import time
 from typing import Any, Optional
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
@@ -49,15 +50,51 @@ def _translate(sql: str) -> str:
     return sql.replace("?", "%s") if USE_POSTGRES else sql
 
 
+class DatabaseUnavailable(RuntimeError):
+    """The store could not be reached. Callers decide whether to degrade."""
+
+
 class Database:
     """Thin synchronous wrapper. Account traffic is low-volume, so a single
     lock-protected connection with automatic reconnect is sufficient and avoids
     pulling in a pooling dependency."""
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        # Reentrant: closing a connection and creating the schema both happen
+        # while a query already holds this lock. A plain Lock would deadlock and
+        # hang the request thread forever the first time a query failed.
+        self._lock = threading.RLock()
         self._conn = None
         self._path = os.environ.get("BILLING_DB", "/tmp/scigraph_billing.db")
+        self._sqlite_ddl = ""
+        self._postgres_ddl = ""
+        self._schema_ready = False
+        self._retry_after = 0.0
+
+    # ── schema (created lazily on first use) ──────────────────────────────
+    def register_schema(self, sqlite_ddl: str, postgres_ddl: str) -> None:
+        """Hand the DDL to the adapter. Nothing is executed here, so importing
+        this module never touches the network — the container can always boot
+        even if the database is unreachable."""
+        self._sqlite_ddl = sqlite_ddl
+        self._postgres_ddl = postgres_ddl
+
+    def _ensure_ready(self) -> None:
+        if self._schema_ready:
+            return
+        if self._retry_after and time.time() < self._retry_after:
+            # A previous attempt failed; fail fast instead of blocking boot.
+            raise DatabaseUnavailable("store is temporarily unavailable, retrying shortly")
+        try:
+            self.init_schema(self._sqlite_ddl, self._postgres_ddl)
+            self._schema_ready = True
+            self._retry_after = 0.0
+        except DatabaseUnavailable:
+            self._retry_after = time.time() + 20
+            raise
+        except Exception as exc:
+            self._retry_after = time.time() + 20
+            raise DatabaseUnavailable(f"could not initialise the accounts store: {exc}")
 
     # ── connection handling ───────────────────────────────────────────────
     def _sqlite(self) -> sqlite3.Connection:
@@ -68,9 +105,24 @@ class Database:
         return conn
 
     def _pg(self):
-        import psycopg
-        from psycopg.rows import dict_row
-        return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=15)
+        try:
+            import psycopg
+            from psycopg.rows import dict_row
+        except Exception as exc:
+            raise DatabaseUnavailable(f"psycopg is not installed: {exc}")
+        try:
+            return psycopg.connect(
+                DATABASE_URL,
+                row_factory=dict_row,
+                connect_timeout=10,
+                application_name="scigraph-api",
+                options="-c statement_timeout=15000",
+            )
+        except Exception as exc:
+            # Never echo the connection string (it holds the password).
+            raise DatabaseUnavailable(
+                f"could not reach the configured database ({exc.__class__.__name__})"
+            )
 
     def _connection(self):
         if not USE_POSTGRES:
@@ -91,6 +143,7 @@ class Database:
     # ── reads ─────────────────────────────────────────────────────────────
     def query_all(self, sql: str, params: tuple = ()) -> list[dict]:
         with self._lock:
+            self._ensure_ready()
             conn, shared = self._connection()
             cur = conn.cursor()
             try:
@@ -124,6 +177,7 @@ class Database:
             statement += " RETURNING id"
 
         with self._lock:
+            self._ensure_ready()
             conn, shared = self._connection()
             cur = conn.cursor()
             try:
@@ -167,6 +221,14 @@ class Database:
                         if statement.strip():
                             cur.execute(statement)
                     conn.commit()
+                except Exception as exc:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                    raise DatabaseUnavailable(
+                        f"could not create the accounts schema ({exc.__class__.__name__})"
+                    )
                 finally:
                     try:
                         cur.close()
@@ -196,6 +258,17 @@ def ping() -> bool:
     """Cheap health check used by the startup banner."""
     try:
         db.query_one("SELECT 1 AS ok")
+        return True
+    except Exception:
+        return False
+
+
+def initialize() -> bool:
+    """Create the schema up-front if possible. Never raises: the container must
+    boot even when the database is unreachable, and the first request will
+    retry. Returns True when the store is ready."""
+    try:
+        db._ensure_ready()
         return True
     except Exception:
         return False
