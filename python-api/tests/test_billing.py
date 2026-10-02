@@ -173,6 +173,36 @@ class SignatureTests(unittest.TestCase):
         self.assertFalse(billing.verify_webhook_signature(b"", "sig"))
 
 
+class PaymentReferenceTests(unittest.TestCase):
+    """Razorpay ids are `pay_<alphanumerics>`; the underscore used to make
+    every real reference fail validation."""
+
+    def _fetch(self, payment_id):
+        captured = {}
+
+        def fake_rzp(method, path, payload=None):
+            captured["path"] = path
+            return {"id": payment_id, "order_id": "order_" + "a" * 14}
+
+        original = billing.rzp_request
+        billing.rzp_request = fake_rzp
+        try:
+            return billing.fetch_payment(payment_id), captured
+        finally:
+            billing.rzp_request = original
+
+    def test_accepts_a_real_payment_id(self):
+        payment, captured = self._fetch("pay_" + "QKIXXbNabcdefg")
+        self.assertEqual(payment["id"], "pay_QKIXXbNabcdefg")
+        self.assertEqual(captured["path"], "/payments/pay_QKIXXbNabcdefg")
+
+    def test_rejects_traversal_and_junk(self):
+        for bad in ("", "../../etc/passwd", "pay_", "pay_short", "order_abcdef",
+                    "pay_abcdef; drop table users", "PAY_ABCDEFGH"):
+            with self.assertRaises(billing.RazorpayError):
+                billing.fetch_payment(bad)
+
+
 # ── Order creation ───────────────────────────────────────────────────────────
 
 class OrderCreationTests(unittest.TestCase):

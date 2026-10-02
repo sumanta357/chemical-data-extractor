@@ -22,6 +22,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -53,6 +54,9 @@ BILLING_ENABLED = bool(KEY_ID and KEY_SECRET and WEBHOOK_SECRET)
 REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "0").strip().lower() in ("1", "true", "yes", "on")
 
 HTTP_TIMEOUT = 20
+
+# Razorpay references: `order_XXXXXXXX`, `pay_XXXXXXXX`, `rfnd_XXXXXXXX`.
+_RAZORPAY_REF_RE = re.compile(r"^(order|pay|rfnd)_[A-Za-z0-9]{6,64}$")
 
 
 # ── Plan catalog (server-side source of truth) ───────────────────────────────
@@ -217,7 +221,10 @@ def create_razorpay_order(plan: dict, user: dict, receipt: str) -> dict:
 
 
 def fetch_payment(payment_id: str) -> dict:
-    if not payment_id or not payment_id.isalnum():
+    # Razorpay ids are `pay_<alphanumerics>` / `order_<alphanumerics>`: the
+    # underscore is part of the id, so a plain isalnum() check rejected every
+    # real reference. Only path-unsafe characters are refused here.
+    if not payment_id or not _RAZORPAY_REF_RE.match(payment_id):
         raise RazorpayError("Invalid payment reference", 400)
     return rzp_request("GET", f"/payments/{payment_id}")
 
