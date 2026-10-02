@@ -80,6 +80,7 @@ class Database:
         self._path = os.environ.get("BILLING_DB", "/tmp/scigraph_billing.db")
         self._sqlite_ddl = ""
         self._postgres_ddl = ""
+        self._columns: dict = {}
         self._schema_ready = False
         self._retry_after = 0.0
 
@@ -99,6 +100,8 @@ class Database:
             raise DatabaseUnavailable("store is temporarily unavailable, retrying shortly")
         try:
             self.init_schema(self._sqlite_ddl, self._postgres_ddl)
+            for table, columns in self._columns.items():
+                self.add_missing_columns(table, columns)
             self._schema_ready = True
             self._retry_after = 0.0
         except DatabaseUnavailable as exc:
@@ -176,6 +179,58 @@ class Database:
 
         detail = " | ".join(attempts)[-300:] if attempts else "unknown"
         raise DatabaseUnavailable(f"could not reach the configured database: {detail}")
+
+    def add_missing_columns(self, table: str, columns: dict) -> None:
+        """Idempotently add columns to a table that already exists.
+
+        `CREATE TABLE IF NOT EXISTS` never touches a table that predates a
+        column, so schema additions have to be applied as ALTERs. `table` and
+        the column names are internal constants, never request input.
+        """
+        if not columns:
+            return
+        with self._lock:
+            conn, shared = self._connection()
+            cur = conn.cursor()
+            try:
+                if USE_POSTGRES:
+                    cur.execute(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema = current_schema() AND table_name = %s",
+                        (table,),
+                    )
+                else:
+                    cur.execute(f"PRAGMA table_info({table})")
+                existing = {r["column_name"] if USE_POSTGRES else r["name"]
+                            for r in cur.fetchall()}
+                for name, sql_type in columns.items():
+                    if name not in existing:
+                        cur.execute(
+                            f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"
+                        )
+                conn.commit()
+            except Exception as exc:
+                self._note_error(exc)
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                if shared:
+                    self.close()
+                else:
+                    conn.close()
+                raise
+            finally:
+                try:
+                    cur.close()
+                except Exception:
+                    pass
+                if not shared:
+                    conn.close()
+
+    def register_columns(self, table: str, columns: dict) -> None:
+        """Columns to add on top of the base DDL when the table already exists."""
+        self._columns[table] = dict(columns)
 
     def _note_error(self, exc: Exception) -> None:
         """Remember the last statement failure so health checks can explain it.

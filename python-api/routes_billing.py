@@ -8,10 +8,12 @@ as API routes (never as the static index.html).
 
 import json
 import logging
+import os
+import secrets
 import time
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
 import auth
@@ -20,6 +22,19 @@ import billing_store
 import db as _db
 
 LOG = logging.getLogger("scigraph.billing.api")
+
+# Shared secret for the Academic directory. Unset => the endpoint is disabled
+# and answers 404, so an unconfigured deployment exposes no customer data.
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
+
+
+def _require_admin(request: Request) -> None:
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=404, detail="Not found")
+    supplied = (request.headers.get("x-admin-token")
+                or request.query_params.get("token") or "")
+    if not supplied or not secrets.compare_digest(supplied, ADMIN_TOKEN):
+        raise HTTPException(status_code=401, detail="Admin token required")
 
 router = APIRouter(tags=["accounts", "billing"])
 
@@ -30,6 +45,25 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: Optional[str] = None
+    profile: Optional[dict] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+
+class ProfileRequest(BaseModel):
+    name: Optional[str] = None
+    academic_email: Optional[str] = None
+    institute_name: Optional[str] = None
+    institute_id: Optional[str] = None
+    phone: Optional[str] = None
+    academician_type: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -77,8 +111,13 @@ async def list_plans():
 
 @router.post("/api/account/register")
 async def register(payload: RegisterRequest, request: Request, response: Response):
-    user = auth.register(request, response, payload.email, payload.password, payload.name)
-    return {"user": _public_user(user), "entitlement": billing.entitlement_for(user)}
+    user = auth.register(request, response, payload.email, payload.password,
+                         payload.name, payload.profile)
+    return {
+        "user": _public_user(user),
+        "entitlement": billing.entitlement_for(user),
+        "verification_required": not bool(user.get("email_verified_at")),
+    }
 
 
 @router.post("/api/account/login")
@@ -133,7 +172,93 @@ def _public_user(user: dict) -> dict:
         "email": user["email"],
         "name": user.get("name"),
         "created_at": user["created_at"],
+        "email_verified": bool(user.get("email_verified_at")),
     }
+
+
+# ── Email verification, forgot & reset password ─────────────────────────────
+
+@router.post("/api/account/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest):
+    """Always the same answer, whether or not the address has an account, so
+    this endpoint cannot be used to enumerate users."""
+    link = auth.request_password_reset(payload.email)
+    body = {"status": "sent",
+            "message": "If that address has an account, a reset link is on its way."}
+    if link:  # only when EMAIL_EXPOSE_LINKS is enabled for local development
+        body["dev_link"] = link
+    return body
+
+
+@router.post("/api/account/reset-password")
+async def reset_password(payload: ResetPasswordRequest, response: Response):
+    auth.reset_password(payload.token, payload.password)
+    # reset_password already killed every session server-side; clear this
+    # browser's cookie too so the stale one is not sent again.
+    auth.clear_session_cookie(response)
+    return {"status": "reset", "message": "Your password has been updated. Sign in with it now."}
+
+
+@router.get("/api/account/verify-email")
+async def verify_email(token: str):
+    user = auth.verify_email(token)
+    return {"status": "verified", "email": user.get("email"),
+            "message": "Your email address is confirmed."}
+
+
+@router.post("/api/account/resend-verification")
+async def resend_verification(payload: ForgotPasswordRequest):
+    user = billing_store.get_user_by_email((payload.email or "").strip().lower())
+    if user and not user.get("email_verified_at"):
+        auth.send_verification(user)
+    return {"status": "sent",
+            "message": "If that address needs confirming, a new link is on its way."}
+
+
+# ── Academic profile & directory ─────────────────────────────────────────────
+
+@router.get("/api/account/profile")
+async def get_profile(request: Request):
+    user = auth.current_user_required(request)
+    return {"profile": billing_store.get_profile(user["id"])}
+
+
+@router.put("/api/account/profile")
+async def put_profile(payload: ProfileRequest, request: Request):
+    user = auth.current_user_required(request)
+    fields = auth.validate_profile(payload.model_dump())
+    return {"profile": billing_store.update_profile(user["id"], fields)}
+
+
+@router.get("/api/admin/academics")
+async def list_academics(
+    request: Request,
+    q: Optional[str] = Query(None),
+    plan: str = Query("academic"),
+    academic_email: Optional[str] = Query(None),
+    institute_name: Optional[str] = Query(None),
+    institute_id: Optional[str] = Query(None),
+    phone: Optional[str] = Query(None),
+    academician_type: Optional[str] = Query(None),
+    verified: Optional[bool] = Query(None),
+    sort: str = Query("created_at"),
+    order: str = Query("desc"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    """Sortable, filterable list of academic customers.
+
+    Guarded by a shared admin token; `sort` is whitelisted in the store and
+    every filter is a bound parameter."""
+    _require_admin(request)
+    result = billing_store.list_academic_customers(
+        plan=plan or "academic", q=q, academic_email=academic_email,
+        institute_name=institute_name, institute_id=institute_id, phone=phone,
+        academician_type=academician_type, verified=verified, sort=sort,
+        order=order, limit=limit, offset=offset,
+    )
+    result["academician_types"] = billing_store.ACADEMICIAN_TYPES
+    return result
 
 
 # ── Razorpay: order creation ─────────────────────────────────────────────────

@@ -20,6 +20,10 @@ payments         captured / failed payments (idempotent on payment_id)
 usage_events     per-unit usage ledger (searches, analyst messages)
 search_owners    search_id -> user_id, so completed jobs can be attributed
 webhook_events   processed webhook event ids (idempotent replay protection)
+auth_tokens      one-time email-verification and password-reset tokens
+
+Academic customers also carry a profile (institute, academician type, phone)
+so the Academic directory can be filtered and sorted without a second store.
 """
 
 import hashlib
@@ -63,7 +67,13 @@ CREATE TABLE IF NOT EXISTS users (
     period_end          TEXT NOT NULL,
     searches_used       INTEGER NOT NULL DEFAULT 0,
     analyst_used        INTEGER NOT NULL DEFAULT 0,
-    razorpay_customer_id TEXT
+    razorpay_customer_id TEXT,
+    email_verified_at   TEXT,
+    academic_email      TEXT,
+    institute_name      TEXT,
+    institute_id        TEXT,
+    phone               TEXT,
+    academician_type    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -135,6 +145,26 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     event_type  TEXT,
     received_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    token_hash TEXT UNIQUE NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at    TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id, kind, created_at);
+
+-- Academic directory: every filter and sort column is indexed so the admin
+-- listing stays a plain indexed scan instead of a table sort.
+CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan);
+CREATE INDEX IF NOT EXISTS idx_users_institute_name ON users(institute_name);
+CREATE INDEX IF NOT EXISTS idx_users_institute_id ON users(institute_id);
+CREATE INDEX IF NOT EXISTS idx_users_academician_type ON users(academician_type);
+CREATE INDEX IF NOT EXISTS idx_users_academic_email ON users(academic_email);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 """
 
 # Identical shape; Postgres needs a sequence-backed identity instead of
@@ -142,6 +172,36 @@ CREATE TABLE IF NOT EXISTS webhook_events (
 # the code already expects.
 POSTGRES_SCHEMA = SQLITE_SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT",
                                          "BIGSERIAL PRIMARY KEY")
+
+# Academic profile: added after the first release, so on a database that
+# already has a `users` table these are applied as idempotent ALTERs.
+PROFILE_COLUMNS = {
+    "email_verified_at": "TEXT",
+    "academic_email": "TEXT",
+    "institute_name": "TEXT",
+    "institute_id": "TEXT",
+    "phone": "TEXT",
+    "academician_type": "TEXT",
+}
+
+# The academician categories the Academic plan is sold against.
+ACADEMICIAN_TYPES = [
+    "Professor",
+    "Associate Professor",
+    "Assistant Professor",
+    "Research Scientist",
+    "Research Scholar",
+    "PhD Scholar",
+    "Postdoctoral Researcher",
+    "Lecturer",
+    "Other",
+]
+
+# Columns the Academic directory may be filtered or sorted on. Whitelisted so
+# a sort key can never reach SQL as free text.
+DIRECTORY_FILTERS = ("academic_email", "institute_name", "institute_id",
+                     "phone", "academician_type")
+DIRECTORY_SORTS = DIRECTORY_FILTERS + ("email", "name", "created_at", "searches_used")
 
 
 def init_db() -> None:
@@ -153,12 +213,14 @@ def init_db() -> None:
     creates the tables lazily on first use and retries after a failure.
     """
     db.register_schema(SQLITE_SCHEMA, POSTGRES_SCHEMA)
+    db.register_columns("users", PROFILE_COLUMNS)
     return None
 
 
 def ensure_schema() -> bool:
     """Best-effort warm-up used by the startup hook. Never raises."""
     db.register_schema(SQLITE_SCHEMA, POSTGRES_SCHEMA)
+    db.register_columns("users", PROFILE_COLUMNS)
     return initialize()
 
 
@@ -195,6 +257,103 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
 
 def touch_last_login(user_id: int) -> None:
     db.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_iso(), user_id))
+
+
+# ── Academic profile ─────────────────────────────────────────────────────────
+
+def get_profile(user_id: int) -> dict:
+    user = get_user_by_id(user_id) or {}
+    return {
+        "email": user.get("email"),
+        "name": user.get("name"),
+        "academic_email": user.get("academic_email"),
+        "institute_name": user.get("institute_name"),
+        "institute_id": user.get("institute_id"),
+        "phone": user.get("phone"),
+        "academician_type": user.get("academician_type"),
+        "plan": user.get("plan", "free"),
+        "email_verified": bool(user.get("email_verified_at")),
+    }
+
+
+def update_profile(user_id: int, fields: dict) -> dict:
+    """Write the academic profile. `fields` is already validated by the caller
+    and limited to the profile columns, so no key reaches SQL from a request."""
+    allowed = ("name", "academic_email", "institute_name", "institute_id",
+               "phone", "academician_type")
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if updates:
+        assignments = ", ".join(f"{column} = ?" for column in updates)
+        db.execute(
+            f"UPDATE users SET {assignments} WHERE id = ?",
+            tuple(updates.values()) + (user_id,),
+        )
+    return get_profile(user_id)
+
+
+# ── Academic directory ───────────────────────────────────────────────────────
+
+def _ilike() -> str:
+    """Case-insensitive match: ILIKE on Postgres, LIKE on SQLite."""
+    from db import USE_POSTGRES
+    return "ILIKE" if USE_POSTGRES else "LIKE"
+
+
+def list_academic_customers(plan: str = "academic", q: Optional[str] = None,
+                            academic_email: Optional[str] = None,
+                            institute_name: Optional[str] = None,
+                            institute_id: Optional[str] = None,
+                            phone: Optional[str] = None,
+                            academician_type: Optional[str] = None,
+                            verified: Optional[bool] = None,
+                            sort: str = "created_at", order: str = "desc",
+                            limit: int = 50, offset: int = 0) -> dict:
+    """Filter + sort the academic customers. Every filter is a bound
+    parameter and the sort column is whitelisted, so this stays a plain
+    indexed query on either driver."""
+    if sort not in DIRECTORY_SORTS:
+        sort = "created_at"
+    direction = "ASC" if str(order).lower() == "asc" else "DESC"
+    like = _ilike()
+
+    where = []
+    params: list = []
+    if plan:
+        where.append("plan = ?")
+        params.append(plan)
+    for column, value in (("academic_email", academic_email),
+                          ("institute_name", institute_name),
+                          ("institute_id", institute_id),
+                          ("phone", phone),
+                          ("academician_type", academician_type)):
+        if value:
+            where.append(f"{column} {like} ?")
+            params.append(f"%{value}%")
+    if q:
+        clause = " OR ".join(
+            f"{column} {like} ?" for column in
+            ("email", "academic_email", "institute_name", "institute_id",
+             "phone", "academician_type", "name")
+        )
+        where.append(f"({clause})")
+        params.extend([f"%{q}%"] * 7)
+    if verified is not None:
+        where.append("email_verified_at IS NOT NULL" if verified
+                     else "email_verified_at IS NULL")
+
+    sql_where = f" WHERE {' AND '.join(where)}" if where else ""
+    total = db.query_one(f"SELECT COUNT(*) AS n FROM users{sql_where}", tuple(params))
+    rows = db.query_all(
+        f"""SELECT id, email, name, academic_email, institute_name, institute_id,
+                   phone, academician_type, plan, plan_status, searches_used,
+                   created_at, last_login_at, email_verified_at
+              FROM users{sql_where}
+          ORDER BY {sort} {direction}, id {direction}
+             LIMIT ? OFFSET ?""",
+        tuple(params) + (max(1, min(int(limit), 200)), max(0, int(offset))),
+    )
+    return {"academics": rows, "total": int(total["n"]) if total else 0,
+            "limit": limit, "offset": offset, "sort": sort, "order": direction.lower()}
 
 
 def set_plan(user_id: int, plan: str, period_days: int = 30,
@@ -262,6 +421,82 @@ def delete_session(token: str) -> None:
 
 def purge_expired_sessions() -> int:
     return db.execute("DELETE FROM sessions WHERE expires_at <= ?", (_iso(),))
+
+
+def delete_all_sessions(user_id: int, keep_token: Optional[str] = None) -> int:
+    """Sign every device out. Used after a password change/reset so a stolen
+    session cannot outlive the credential it was created with."""
+    if keep_token:
+        return db.execute(
+            "DELETE FROM sessions WHERE user_id = ? AND token_hash != ?",
+            (user_id, keep_token),
+        )
+    return db.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+
+# ── One-time tokens (email verification, password reset) ─────────────────────
+
+def create_auth_token(user_id: int, kind: str, ttl_minutes: int) -> str:
+    """Issue a single-use token and return it in the clear (only time it is
+    seen). Any earlier unused token of the same kind is invalidated first, so a
+    forwarded older email can never be replayed."""
+    import secrets
+    token = secrets.token_urlsafe(32)
+    now = _now()
+    db.execute(
+        "UPDATE auth_tokens SET used_at = ? WHERE user_id = ? AND kind = ? AND used_at IS NULL",
+        (_iso(now), user_id, kind),
+    )
+    db.execute(
+        """INSERT INTO auth_tokens (user_id, kind, token_hash, expires_at, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (user_id, kind, hash_token(token),
+         _iso(now + timedelta(minutes=ttl_minutes)), _iso(now)),
+    )
+    return token
+
+
+def consume_auth_token(token: str, kind: str) -> Optional[int]:
+    """Return the owning user_id exactly once, or None when the token is
+    unknown, expired, of another kind, or already used. The conditional
+    UPDATE makes the claim atomic under the adapter lock."""
+    if not token or not kind:
+        return None
+    row = db.query_one(
+        "SELECT id, user_id, expires_at FROM auth_tokens WHERE token_hash = ? AND kind = ?",
+        (hash_token(token), kind),
+    )
+    if not row or str(row.get("expires_at") or "") <= _iso():
+        return None
+    claimed = db.execute(
+        "UPDATE auth_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL",
+        (_iso(), row["id"]),
+    )
+    if not claimed:
+        return None
+    return int(row["user_id"])
+
+
+def count_recent_tokens(user_id: int, kind: str, minutes: int) -> int:
+    """Throttle password-reset spam per account (emails are rate limited by
+    the provider too, but not for free tiers)."""
+    since = _iso(_now() - timedelta(minutes=minutes))
+    row = db.query_one(
+        "SELECT COUNT(*) AS n FROM auth_tokens WHERE user_id = ? AND kind = ? AND created_at > ?",
+        (user_id, kind, since),
+    )
+    return int(row["n"]) if row else 0
+
+
+def mark_email_verified(user_id: int) -> None:
+    db.execute(
+        "UPDATE users SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?",
+        (_iso(), user_id),
+    )
+
+
+def set_password(user_id: int, password_hash: str) -> None:
+    db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
 
 
 # ── Orders & payments ────────────────────────────────────────────────────────

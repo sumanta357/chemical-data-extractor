@@ -20,6 +20,7 @@ export interface Entitlement {
   user_id?: number;
   email?: string;
   name?: string | null;
+  email_verified?: boolean;
   plan: string;
   plan_name: string;
   plan_status?: string;
@@ -75,11 +76,88 @@ export const getPlans = () => api('/api/billing/plans') as Promise<{ plans: Plan
 export const getMe = () =>
   api('/api/account/me') as Promise<{ user: any | null; entitlement: Entitlement }>;
 
-export const register = (email: string, password: string, name?: string) =>
+export const register = (email: string, password: string, name?: string, profile?: AcademicProfile) =>
   api('/api/account/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, name: name || null }),
-  }) as Promise<{ user: any; entitlement: Entitlement }>;
+    body: JSON.stringify({ email, password, name: name || null, profile: profile || null }),
+  }) as Promise<{ user: any; entitlement: Entitlement; verification_required: boolean }>;
+
+export const forgotPassword = (email: string) =>
+  api('/api/account/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }) as Promise<{ status: string; message: string; dev_link?: string }>;
+
+export const resetPassword = (token: string, password: string) =>
+  api('/api/account/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  }) as Promise<{ status: string; message: string }>;
+
+export const verifyEmail = (token: string) =>
+  api(`/api/account/verify-email?token=${encodeURIComponent(token)}`) as Promise<{
+    status: string;
+    email: string;
+    message: string;
+  }>;
+
+export const resendVerification = (email: string) =>
+  api('/api/account/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }) as Promise<{ status: string; message: string }>;
+
+export const getProfile = () => api('/api/account/profile') as Promise<{ profile: AcademicProfile }>;
+
+export const updateProfile = (profile: AcademicProfile) =>
+  api('/api/account/profile', {
+    method: 'PUT',
+    body: JSON.stringify(profile),
+  }) as Promise<{ profile: AcademicProfile }>;
+
+export interface AcademicProfile {
+  email?: string;
+  name?: string | null;
+  academic_email?: string | null;
+  institute_name?: string | null;
+  institute_id?: string | null;
+  phone?: string | null;
+  academician_type?: string | null;
+  plan?: string;
+  email_verified?: boolean;
+}
+
+export interface AcademicRecord {
+  id: number;
+  email: string;
+  name: string | null;
+  academic_email: string | null;
+  institute_name: string | null;
+  institute_id: string | null;
+  phone: string | null;
+  academician_type: string | null;
+  plan: string;
+  plan_status: string;
+  searches_used: number;
+  created_at: string;
+  last_login_at: string | null;
+  email_verified_at: string | null;
+}
+
+export const listAcademics = (params: Record<string, string>, adminToken: string) => {
+  const query = new URLSearchParams(params).toString();
+  return api(`/api/admin/academics?${query}`, {
+    headers: { 'X-Admin-Token': adminToken },
+  }) as Promise<{
+    academics: AcademicRecord[];
+    total: number;
+    limit: number;
+    offset: number;
+    sort: string;
+    order: string;
+    academician_types: string[];
+  }>;
+};
 
 export const login = (email: string, password: string) =>
   api('/api/account/login', {

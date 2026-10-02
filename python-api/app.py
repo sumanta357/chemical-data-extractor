@@ -1030,6 +1030,13 @@ async def spa(full_path: str):
             candidate = None
         if candidate and candidate.is_file():
             return FileResponse(str(candidate))
+        # A static export writes each route as <route>/index.html, so
+        # /admin/academics has to resolve to that file rather than fall
+        # through to the application shell.
+        if candidate and candidate.is_dir() and (candidate / "index.html").is_file():
+            resp = FileResponse(str(candidate / "index.html"), media_type="text/html")
+            resp.headers["Cache-Control"] = "no-cache"
+            return resp
 
     index = STATIC_DIR / "index.html"
     if index.is_file():

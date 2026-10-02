@@ -15,6 +15,8 @@ product behaves **exactly** as before: anonymous searches, no accounts, no limit
 | HTTP routes | `python-api/routes_billing.py` — `/api/account/*`, `/api/billing/*` |
 | UI | `components/AccountPanel.tsx`, `lib/billing.ts`, header entry point in `app/page.tsx` |
 | Tests | `python-api/tests/test_billing.py` — 49 tests, no network |
+| Email | `python-api/emailer.py` — Resend delivery for verification and reset |
+| Directory | `GET /api/admin/academics`, `/admin/academics` page |
 
 `python-api/app.py` changed in five small places only: the billing import, three
 helper wrappers, the entitlement gate inside `POST /api/search`, usage recording on
@@ -138,3 +140,91 @@ catch-all).
 
 For a real end-to-end run with Razorpay's sandbox, set test keys locally and use
 Razorpay's test card `4111 1111 1111 1111` (any future expiry/CVV).
+
+---
+
+# Accounts security, academic directory
+
+Three additions on top of the layer above. All of them are **off by default**
+except the profile fields, so an unconfigured deployment behaves exactly as
+before.
+
+## 1. Email verification & forgotten passwords (Resend)
+
+Existing accounts, sessions and PBKDF2 hashing are unchanged — this only adds
+one-time tokens and the email that carries them.
+
+| Route | Purpose |
+|---|---|
+| `POST /api/account/forgot-password` | always answers `{"status":"sent"}`, whether or not the address exists (no user enumeration) |
+| `POST /api/account/reset-password` | `{token, password}` — sets the password and **deletes every session** |
+| `GET /api/account/verify-email?token=` | confirms the address, marks `email_verified_at` |
+| `POST /api/account/resend-verification` | issues a fresh link (generic response) |
+
+* Tokens live in `auth_tokens`, are SHA-256 hashed, **single use**, and a reissued
+  link invalidates the previous one.
+* Throttled to `RESET_REQUESTS_PER_HOUR` per account.
+* Delivery is one HTTPS call to Resend (`python-api/emailer.py`). It fails soft:
+  a missing key or a provider outage logs the link and never fails signup, so the
+  account is still created and the token still works.
+* `REQUIRE_VERIFIED_EMAIL=1` blocks sign-in until the address is confirmed
+  (off by default — existing accounts are unaffected).
+
+### New environment variables
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `RESEND_API_KEY` | — | Resend API token. Unset ⇒ emails are not delivered, links are logged |
+| `EMAIL_FROM` | `SciGraph <onboarding@resend.dev>` | verified sender |
+| `APP_URL` | `http://localhost:8000` | public origin used to build links |
+| `EMAIL_EXPOSE_LINKS` | `0` | **local development only** — returns the link in the API response |
+| `REQUIRE_VERIFIED_EMAIL` | `0` | require a confirmed address before sign-in |
+| `VERIFY_TOKEN_TTL_MINUTES` | `1440` | confirmation link lifetime |
+| `RESET_TOKEN_TTL_MINUTES` | `60` | reset link lifetime |
+| `RESET_REQUESTS_PER_HOUR` | `5` | per-account reset throttle |
+
+Two new static routes back the emails: `/reset-password` and `/verify-email`
+(`app/reset-password`, `app/verify-email`).
+
+## 2. Academic profile & customer directory
+
+Signed-in users fill in their academic details from the account panel
+(**Academic profile**); registration accepts the same block as `profile`.
+
+Fields on `users`: `academic_email`, `institute_name`, `institute_id`, `phone`,
+`academician_type`, plus `email_verified_at`. Added as idempotent `ALTER`s by
+`db.add_missing_columns()`, so a database created before this release is
+migrated in place.
+
+`GET /api/admin/academics` — the directory. Filters: `q` (free text across every
+field), `academic_email`, `institute_name`, `institute_id`, `phone`,
+`academician_type`, `verified`, `plan`. Sorting: any of the filter columns plus
+`email`, `name`, `created_at`, `searches_used`, `order=asc|desc`, paginated with
+`limit`/`offset` and a `total`.
+
+* The sort column is whitelisted in the store; it can never reach SQL as free text.
+* Every filter is a bound parameter, and each sortable column is indexed.
+* UI: `/admin/academics` — token unlock, live filters, click-to-sort headers,
+  pagination. The token is kept in `localStorage` and sent as `X-Admin-Token`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `ADMIN_TOKEN` | — | shared secret for the directory. **Unset ⇒ the endpoint answers 404** and no customer data is exposed |
+
+## 3. Search counting
+
+No change was made — the metering path is plan-agnostic by design
+(`attach_search_owner` → `claim_search_owner` → `increment_counters`), and two
+searches accumulate to two on Academic, Professional and Team alike, across
+sessions. `python-api/tests/test_accounts.py` now pins that behaviour so a
+regression cannot creep in.
+
+## Tests
+
+```bash
+cd python-api && python3 -m pytest tests/ -q
+```
+
+128 tests: the original billing suite, the new accounts suite (directory
+filters/sorting, admin token, verification, reset, throttle, token single-use,
+per-plan quota accumulation) and static-route resolution for the new pages.

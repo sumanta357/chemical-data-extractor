@@ -3,22 +3,49 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  AcademicProfile,
   BillingConfig,
   Entitlement,
   Plan,
   createOrder,
+  forgotPassword,
   getConfig,
   getMe,
   getPlans,
+  getProfile,
   loadCheckoutScript,
   login,
   logout,
   paymentStatus,
   register,
+  resendVerification,
+  resetPassword,
+  updateProfile,
   verifyPayment,
 } from '@/lib/billing';
 
 type View = 'account' | 'plans';
+type AuthView = 'form' | 'forgot' | 'reset';
+
+const ACADEMICIAN_TYPES = [
+  'Professor',
+  'Associate Professor',
+  'Assistant Professor',
+  'Research Scientist',
+  'Research Scholar',
+  'PhD Scholar',
+  'Postdoctoral Researcher',
+  'Lecturer',
+  'Other',
+];
+
+const EMPTY_PROFILE: AcademicProfile = {
+  academic_email: '',
+  institute_name: '',
+  institute_id: '',
+  phone: '',
+  academician_type: '',
+};
 type CheckoutState =
   | { phase: 'idle' }
   | { phase: 'preparing' }
@@ -33,22 +60,51 @@ interface Props {
   onOpen: () => void;
   onClose: () => void;
   onChange?: (entitlement: Entitlement) => void;
+  /** Render the panel as soon as it mounts — used by the emailed
+   *  /reset-password and /verify-email links. */
+  initiallyOpen?: boolean;
+  /** Hide the header trigger; only for those standalone pages. */
+  hideTrigger?: boolean;
 }
 
-export default function AccountPanel({ open, onOpen, onClose, onChange }: Props) {
+export default function AccountPanel({
+  open,
+  onOpen,
+  onClose,
+  onChange,
+  initiallyOpen = false,
+  hideTrigger = false,
+}: Props) {
   const [config, setConfig] = useState<BillingConfig | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [view, setView] = useState<View>('account');
   const [email, setEmail] = useState('');
+  const [opened, setOpened] = useState(false);
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [authView, setAuthView] = useState<AuthView>('form');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [profile, setProfile] = useState<AcademicProfile>(EMPTY_PROFILE);
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<CheckoutState>({ phase: 'idle' });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  const loadProfile = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const { profile: p } = await getProfile();
+      setProfile({ ...EMPTY_PROFILE, ...p });
+    } catch {
+      /* profile is optional; ignore */
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -56,16 +112,38 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
       setEntitlement(me.entitlement);
       setConfig(cfg);
       onChange?.(me.entitlement);
+      if (me.entitlement.signed_in) void loadProfile();
     } catch {
       /* stay anonymous if the account service is unavailable */
     }
-  }, [config, onChange]);
+  }, [config, onChange, loadProfile]);
+
+  // The reset link in the password email lands on /reset-password?token=… —
+  // keep the token and show the new-password form. Email confirmation has its
+  // own page (/verify-email) and is handled there.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const token = new URLSearchParams(window.location.search).get('token');
+    if (!token) return;
+    if (!window.location.pathname.replace(/\/$/, '').endsWith('/reset-password')) return;
+    setResetToken(token);
+    setAuthView('reset');
+    setView('account');
+    onOpen();
+  }, [onOpen]);
 
   useEffect(() => {
     void refresh();
     getPlans().then((r) => setPlans(r.plans)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (initiallyOpen && !opened) {
+      setOpened(true);
+      onOpen();
+    }
+  }, [initiallyOpen, opened, onOpen]);
 
   useEffect(() => {
     if (open) {
@@ -88,6 +166,52 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
       setView('account');
     } catch (err: any) {
       setError(err.message || 'Could not sign in');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitForgot(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await forgotPassword(email);
+      setNotice(res.dev_link ? `${res.message} (dev: ${res.dev_link})` : res.message);
+    } catch (err: any) {
+      setError(err.message || 'Could not send the reset link');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitReset(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await resetPassword(resetToken, newPassword);
+      setNotice(res.message);
+      setNewPassword('');
+      setAuthView('form');
+      setMode('signin');
+    } catch (err: any) {
+      setError(err.message || 'Could not reset your password');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveProfile(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setProfileMsg(null);
+    try {
+      const { profile: saved } = await updateProfile(profile);
+      setProfile({ ...EMPTY_PROFILE, ...saved });
+      setProfileMsg('Profile saved.');
+    } catch (err: any) {
+      setProfileMsg(err.message || 'Could not save your profile');
     } finally {
       setBusy(false);
     }
@@ -202,7 +326,7 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
   const used = entitlement?.searches_used ?? 0;
   const limit = entitlement?.searches_limit ?? 0;
 
-  const trigger = (
+  const trigger = hideTrigger ? null : (
     <button
       onClick={() => {
         setError(null);
@@ -216,7 +340,7 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
     </button>
   );
 
-  const modal = open ? (
+  const modal = (hideTrigger ? opened : open) ? (
     <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm px-4 py-10">
       <div className="glass-card w-full max-w-2xl p-0 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/60">
@@ -238,6 +362,12 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
         </div>
 
         <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
+          {notice && (
+            <div className="mb-4 text-xs border border-cyan-900 text-cyan-300 rounded px-3 py-2">
+              {notice}
+            </div>
+          )}
+
           {view === 'plans' && (
             <div className="space-y-4">
               {checkout.phase !== 'idle' && (
@@ -284,7 +414,68 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
             </div>
           )}
 
-          {view === 'account' && !signedIn && (
+          {view === 'account' && !signedIn && authView === 'reset' && (
+            <form onSubmit={submitReset} className="space-y-3 max-w-sm">
+              <p className="text-xs text-gray-400">Choose a new password for your account.</p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">New password</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                />
+              </div>
+              {error && <p className="text-xs text-amber-400">{error}</p>}
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full text-sm font-medium py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
+              >
+                {busy ? 'Saving…' : 'Set new password'}
+              </button>
+            </form>
+          )}
+
+          {view === 'account' && !signedIn && authView === 'forgot' && (
+            <form onSubmit={submitForgot} className="space-y-3 max-w-sm">
+              <p className="text-xs text-gray-400">
+                Enter your email and we will send you a link to choose a new password.
+              </p>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                />
+              </div>
+              {error && <p className="text-xs text-amber-400">{error}</p>}
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full text-sm font-medium py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
+              >
+                {busy ? 'Sending…' : 'Send reset link'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthView('form');
+                  setError(null);
+                }}
+                className="text-xs text-gray-500 hover:text-gray-300"
+              >
+                Back to sign in
+              </button>
+            </form>
+          )}
+
+          {view === 'account' && !signedIn && authView === 'form' && (
             <form onSubmit={submitAuth} className="space-y-3 max-w-sm">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Email</label>
@@ -315,13 +506,28 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
               >
                 {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
               </button>
-              <button
-                type="button"
-                onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                className="text-xs text-gray-500 hover:text-gray-300"
-              >
-                {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
-              </button>
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
+                  className="text-xs text-gray-500 hover:text-gray-300"
+                >
+                  {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
+                </button>
+                {mode === 'signin' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthView('forgot');
+                      setError(null);
+                      setNotice(null);
+                    }}
+                    className="text-xs text-gray-500 hover:text-cyan-400"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
               {!config?.billing_enabled && (
                 <p className="text-xs text-gray-600">
                   Billing is not enabled on this deployment — your free account still works.
@@ -353,6 +559,99 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
                   )}
                 </div>
               </div>
+
+              {entitlement?.email_verified === false && (
+                <div className="border border-amber-900/70 text-amber-300/90 text-xs rounded px-3 py-2 flex items-center justify-between gap-3">
+                  <span>Your email address is not confirmed yet.</span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await resendVerification(entitlement.email || '');
+                        setNotice(res.message);
+                      } catch (err: any) {
+                        setError(err.message || 'Could not send the confirmation link');
+                      }
+                    }}
+                    className="shrink-0 underline hover:text-amber-200"
+                  >
+                    Resend link
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={saveProfile} className="space-y-3 border border-gray-800 p-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-100">Academic profile</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Shared with the lab so we can filter and sort our academic customers.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Academic email</label>
+                    <input
+                      type="email"
+                      value={profile.academic_email || ''}
+                      onChange={(e) => setProfile({ ...profile, academic_email: e.target.value })}
+                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Institute / University</label>
+                    <input
+                      type="text"
+                      value={profile.institute_name || ''}
+                      onChange={(e) => setProfile({ ...profile, institute_name: e.target.value })}
+                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Institute ID</label>
+                    <input
+                      type="text"
+                      value={profile.institute_id || ''}
+                      onChange={(e) => setProfile({ ...profile, institute_id: e.target.value })}
+                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                    <input
+                      type="tel"
+                      value={profile.phone || ''}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Type of academician</label>
+                    <select
+                      value={profile.academician_type || ''}
+                      onChange={(e) => setProfile({ ...profile, academician_type: e.target.value })}
+                      className="w-full bg-gray-900 border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                    >
+                      <option value="">Not set</option>
+                      {ACADEMICIAN_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {profileMsg && (
+                  <p className={`text-xs ${profileMsg.endsWith('.') ? 'text-cyan-400' : 'text-amber-400'}`}>
+                    {profileMsg}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="text-sm px-4 py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
+                >
+                  {busy ? 'Saving…' : 'Save profile'}
+                </button>
+              </form>
 
               <div className="flex gap-2">
                 <button

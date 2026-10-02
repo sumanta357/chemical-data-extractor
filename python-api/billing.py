@@ -281,6 +281,7 @@ def entitlement_for(user: Optional[dict]) -> dict:
         "user_id": user["id"],
         "email": user["email"],
         "name": user.get("name"),
+        "email_verified": bool(user.get("email_verified_at")),
         "plan": plan["id"],
         "plan_name": plan["name"],
         "plan_status": user["plan_status"],

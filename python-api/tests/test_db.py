@@ -274,5 +274,42 @@ class NaturalKeyInsertTests(unittest.TestCase):
         self.assertTrue(captured["wants_id"])
 
 
+class ColumnMigrationTests(unittest.TestCase):
+    """A column added after the first release must reach databases that already
+    have the table — CREATE TABLE IF NOT EXISTS never alters one."""
+
+    def setUp(self):
+        self.ddl = "CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY AUTOINCREMENT, a TEXT);"
+        self.path = str(Path(_TEST_DIR) / "migrate.db")
+        if Path(self.path).exists():
+            Path(self.path).unlink()
+
+    def _fresh_db(self):
+        """A store that already has `t`, as if a previous release created it."""
+        db = dbmod.Database()
+        db._path = self.path
+        db.register_schema(self.ddl, self.ddl)
+        db.query_one("SELECT 1 AS ok")
+        return db
+
+    def test_missing_column_is_added(self):
+        db = self._fresh_db()
+        db.register_columns("t", {"b": "TEXT"})
+        db._schema_ready = False  # re-run the readiness path, as a restart would
+        db.add_missing_columns("t", {"b": "TEXT"})
+        db.run("INSERT INTO t (a, b) VALUES (?, ?)", ("x", "y"))
+        self.assertEqual(db.query_one("SELECT b FROM t")["b"], "y")
+
+    def test_migration_is_idempotent(self):
+        db = self._fresh_db()
+        db.register_columns("t", {"b": "TEXT"})
+        db._schema_ready = False
+        db._ensure_ready()
+        db.add_missing_columns("t", {"b": "TEXT"})
+        db.add_missing_columns("t", {"b": "TEXT"})
+        db.run("INSERT INTO t (a) VALUES (?)", ("z",))
+        self.assertIsNotNone(db.query_one("SELECT a FROM t"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
