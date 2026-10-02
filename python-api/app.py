@@ -2157,6 +2157,22 @@ async def startup():
     LOG.info("   Exports dir: %s", EXPORTS_DIR)
     LOG.info("   Workspace dir: %s", WORKSPACE_DIR)
     LOG.info("   Storage limit: %sMB | Export retention: %s min", MAX_STORAGE_MB, EXPORT_MAX_AGE_MINUTES)
+
+    # Accounts store: say out loud which backend is in use, and shout if it is
+    # ephemeral (accounts silently disappear on every redeploy otherwise).
+    try:
+        import db as _db
+        import billing_store as _billing_store
+        LOG.info("   Accounts store: %s", _db.db.describe())
+        if not _db.USE_POSTGRES and str(_billing_store.BILLING_DB).startswith("/tmp"):
+            LOG.warning(
+                "   ⚠ ACCOUNTS ARE ON EPHEMERAL STORAGE (%s) — every deploy or container "
+                "recycle deletes every account, plan and payment record. Set DATABASE_URL "
+                "(Postgres/Neon) or point BILLING_DB at a persistent disk.",
+                _billing_store.BILLING_DB,
+            )
+    except Exception as exc:
+        LOG.warning("   Could not determine the accounts store: %s", exc.__class__.__name__)
     _run_storage_cleanup()
     # Schedule recurring cleanup every 30 minutes (cancelled on shutdown)
     async def _periodic_cleanup():

@@ -488,13 +488,7 @@ def reconcile_latest_order(user: Optional[dict], max_age_hours: int = 24) -> Opt
     if not BILLING_ENABLED or not user:
         return None
     try:
-        with billing_store._connect() as conn:
-            row = conn.execute(
-                """SELECT order_id, plan, amount_paise, created_at FROM orders
-                    WHERE user_id = ? AND status = 'created'
-                    ORDER BY created_at DESC LIMIT 1""",
-                (user["id"],),
-            ).fetchone()
+        row = billing_store.latest_unconfirmed_order(user["id"])
     except Exception as exc:
         LOG.warning("Could not read pending orders: %s", exc)
         return None

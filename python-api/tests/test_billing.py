@@ -396,9 +396,9 @@ class UsageTests(unittest.TestCase):
     def test_usage_window_resets_after_the_period(self):
         user = make_user("reset@example.com")
         billing_store.increment_counters(user["id"], searches=3)
-        with billing_store._connect() as conn:
-            conn.execute("UPDATE users SET period_end = ? WHERE id = ?",
-                         ("2000-01-01T00:00:00+00:00", user["id"]))
+        billing_store.db.execute(
+            "UPDATE users SET period_end = ? WHERE id = ?",
+            ("2000-01-01T00:00:00+00:00", user["id"]))
         ent = billing.entitlement_for(billing_store.get_user_by_id(user["id"]))
         self.assertEqual(ent["searches_used"], 0)
         self.assertEqual(ent["searches_remaining"], 3)

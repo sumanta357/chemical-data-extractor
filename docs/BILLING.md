@@ -53,17 +53,48 @@ truth — the browser can never send an amount.
 
 Use **Razorpay test keys** first (`rzp_test_…`), switch to live keys when you go live.
 
-### Important: accounts live on disk — attach a persistent disk on Render
+### Where accounts are stored
 
-By default `BILLING_DB` points at `/tmp`, which Render wipes on every restart and
-redeploy — that would delete every account and subscription. On the paid plan:
+The accounts store (`python-api/billing_store.py`) runs on **either** backend,
+selected automatically:
 
-1. Render dashboard → your service → **Disks** → add a disk mounted at `/var/data`
-   (10 GB is plenty).
-2. Set `BILLING_DB=/var/data/scigraph_billing.db`.
+| `DATABASE_URL` | Backend | Survives redeploys |
+|---|---|---|
+| not set | SQLite file at `BILLING_DB` (default `/tmp/scigraph_billing.db`) | ❌ not on `/tmp` |
+| set | **PostgreSQL** (Neon or any provider) | ✅ always |
 
-The search database (`SEARCH_DB`) keeps its current `/tmp` behaviour, so history and
-exports stay exactly as they are today.
+The service logs which one is in use at startup, and prints a warning when accounts
+sit on ephemeral storage.
+
+**Postgres / Neon setup**
+
+1. Create a project at [console.neon.tech](https://console.neon.tech)
+2. **Connection Details** → copy the **pooled** connection string
+3. Render → Environment:
+
+```
+DATABASE_URL = postgresql://user:password@ep-xxx.region.neon.tech/neondb?sslmode=require
+```
+
+Tables are created automatically on first start — there is no migration step.
+
+Notes:
+- Only the accounts store moves to Postgres. The search database (`SEARCH_DB`) stays
+  on SQLite, since it holds disposable job state.
+- `psycopg[binary]` is in `requirements.txt` but is never imported when no
+  `DATABASE_URL` is set, so SQLite deployments are unaffected.
+- Run the whole test suite against Postgres with:
+  `BILLING_DRIVER=postgres DATABASE_URL='postgresql://...' python3 -m pytest tests/ -q`
+
+**Persistent-disk alternative (no code, no external service)**
+
+1. Render → service → **Disks** → add a disk mounted at `/var/data` (1 GB is enough)
+2. Set `BILLING_DB=/var/data/scigraph_billing.db`
+
+### Without either: accounts live on /tmp and are wiped on every deploy
+
+That was the cause of "payment succeeded but the plan never activated": the captured
+payment existed at Razorpay while the order record it pointed at had been deleted.
 
 ### Razorpay dashboard setup
 

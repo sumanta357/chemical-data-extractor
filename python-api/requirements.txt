@@ -10,5 +10,10 @@ duckdb>=0.9.0            # Analytical queries
 openpyxl>=3.1.0          # Excel export & enrichment (enriched_data.xlsx)
 requests>=2.31.0         # HTTP for enrichment pipeline (CrossRef, PubChem)
 
+# Accounts store: PostgreSQL when DATABASE_URL is set (Neon and other serverless
+# Postgres providers). Unused — and never imported — when running on the default
+# SQLite file, so it costs nothing on deployments that do not need it.
+psycopg[binary]>=3.1.0
+
 # Optional: uncomment for Parquet export support (adds ~200MB)
 # pyarrow>=12.0.0
