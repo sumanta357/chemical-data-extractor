@@ -20,6 +20,8 @@ SUPABASE_ANON_KEY   the *anon / publishable* key. It is public by design and is
 
 import logging
 import os
+import threading
+import time
 from typing import Optional
 
 import requests
@@ -121,3 +123,58 @@ def bearer_token(request) -> Optional[str]:
     if header.lower().startswith("bearer "):
         return header[7:].strip()
     return None
+
+
+# ── Which sign-in providers the project actually has on ───────────────────
+# Offering a button for a provider the project disabled is worse than offering
+# none: Supabase rejects the attempt with "Unsupported provider", so the UI
+# must know the real configuration instead of guessing.
+
+_PROVIDERS_TTL = 300.0
+_providers_cache: dict = {"at": 0.0, "value": None}
+_providers_lock = threading.Lock()
+
+# Providers this UI knows how to start. Anything else Supabase has enabled is
+# reported as-is but not rendered, so we never advertise a flow we cannot run.
+KNOWN_PROVIDERS = ("email", "google", "github", "apple", "azure", "discord",
+                   "facebook", "gitlab", "slack", "spotify", "twitch", "twitter",
+                   "workos", "zoom", "notion", "bitbucket", "figma", "fly")
+
+
+def auth_providers() -> dict:
+    """Enabled sign-in providers, from Supabase's own public settings.
+
+    Returns e.g. ``{"email": True, "google": False}``. Never raises: a failure
+    falls back to a conservative answer (email on, hosted providers off) so the
+    sign-in form always renders something usable.
+    """
+    if not SUPABASE_ENABLED:
+        return {}
+
+    now = time.monotonic()
+    with _providers_lock:
+        if _providers_cache["value"] is not None and now - _providers_cache["at"] < _PROVIDERS_TTL:
+            return dict(_providers_cache["value"])
+
+    providers = {"email": True}
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/auth/v1/settings",
+            headers={"apikey": SUPABASE_ANON_KEY,
+                     "Authorization": f"Bearer {SUPABASE_ANON_KEY}"},
+            timeout=HTTP_TIMEOUT,
+        )
+        if resp.status_code < 400:
+            external = (resp.json() or {}).get("external") or {}
+            for name in KNOWN_PROVIDERS:
+                if name == "email":
+                    continue
+                entry = external.get(name)
+                providers[name] = bool(isinstance(entry, dict) and entry.get("enabled"))
+    except (requests.RequestException, ValueError):
+        LOG.warning("Could not read Supabase auth settings; assuming email only")
+
+    with _providers_lock:
+        _providers_cache["at"] = now
+        _providers_cache["value"] = dict(providers)
+    return providers

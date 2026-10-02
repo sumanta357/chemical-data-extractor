@@ -398,6 +398,10 @@ export default function AccountPanel({
   const signedIn = entitlement?.signed_in ?? false;
   const used = entitlement?.searches_used ?? 0;
   const limit = entitlement?.searches_limit ?? 0;
+  // Only offer Google when the Supabase project has it switched on. Clicking a
+  // disabled provider fails with "Unsupported provider: provider is not
+  // enabled", which reads as a broken login rather than a disabled option.
+  const googleEnabled = config?.supabase?.providers?.google === true;
   // Any in-flight checkout phase locks every plan card, so a second click can
   // never open a duplicate Razorpay modal.
   const checkoutBusy =
@@ -542,7 +546,7 @@ export default function AccountPanel({
 
           {view === 'account' && !signedIn && authView === 'form' && (
             <form onSubmit={submitAuth} className="space-y-3 max-w-sm">
-              {mode === 'signin' && supabase && (
+              {mode === 'signin' && supabase && googleEnabled && (
                 <div className="pb-1">
                   <button
                     type="button"

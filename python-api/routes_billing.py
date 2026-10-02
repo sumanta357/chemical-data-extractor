@@ -88,6 +88,10 @@ async def billing_config():
             "url": supabase_auth.SUPABASE_URL or None,
             "anon_key": supabase_auth.SUPABASE_ANON_KEY or None,
             "configured": supabase_auth.SUPABASE_ENABLED,
+            # Which providers the project actually has enabled. The UI hides
+            # buttons for anything turned off, so nobody clicks into a
+            # "provider is not enabled" error.
+            "providers": supabase_auth.auth_providers(),
         },
     }
 

@@ -49,6 +49,8 @@ export interface BillingConfig {
     url: string | null;
     anon_key: string | null;
     configured: boolean;
+    /** Sign-in providers the Supabase project has actually enabled. */
+    providers?: Record<string, boolean> | null;
   } | null;
   admin_directory?: boolean;
 }
