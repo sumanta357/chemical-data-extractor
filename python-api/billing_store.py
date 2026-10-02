@@ -156,9 +156,14 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id, kind, created_at);
+"""
 
--- Academic directory: every filter and sort column is indexed so the admin
--- listing stays a plain indexed scan instead of a table sort.
+# Indexes are applied *after* the column migration, never with the tables: an
+# index on a column that a pre-existing `users` table does not have yet makes
+# the whole schema creation fail (Postgres: undefined column). Every filter
+# and sort column of the academic directory is indexed so the listing stays a
+# plain indexed scan instead of a table sort.
+INDEX_DDL = """
 CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan);
 CREATE INDEX IF NOT EXISTS idx_users_institute_name ON users(institute_name);
 CREATE INDEX IF NOT EXISTS idx_users_institute_id ON users(institute_id);
@@ -172,6 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 # the code already expects.
 POSTGRES_SCHEMA = SQLITE_SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT",
                                          "BIGSERIAL PRIMARY KEY")
+POSTGRES_INDEX_DDL = INDEX_DDL
 
 # Academic profile: added after the first release, so on a database that
 # already has a `users` table these are applied as idempotent ALTERs.
@@ -213,6 +219,7 @@ def init_db() -> None:
     creates the tables lazily on first use and retries after a failure.
     """
     db.register_schema(SQLITE_SCHEMA, POSTGRES_SCHEMA)
+    db.register_indexes(INDEX_DDL, POSTGRES_INDEX_DDL)
     db.register_columns("users", PROFILE_COLUMNS)
     return None
 
@@ -220,6 +227,7 @@ def init_db() -> None:
 def ensure_schema() -> bool:
     """Best-effort warm-up used by the startup hook. Never raises."""
     db.register_schema(SQLITE_SCHEMA, POSTGRES_SCHEMA)
+    db.register_indexes(INDEX_DDL, POSTGRES_INDEX_DDL)
     db.register_columns("users", PROFILE_COLUMNS)
     return initialize()
 

@@ -311,5 +311,71 @@ class ColumnMigrationTests(unittest.TestCase):
         self.assertIsNotNone(db.query_one("SELECT a FROM t"))
 
 
+class ExistingDatabaseUpgradeTests(unittest.TestCase):
+    """A database created by the previous release has a `users` table without
+    the academic columns. The schema must upgrade in place: tables, then the
+    column ALTERs, and only then the indexes — an index on a column the old
+    table does not have yet makes the whole creation fail."""
+
+    OLD_SCHEMA = (
+        "CREATE TABLE IF NOT EXISTS users ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL,"
+        " password_hash TEXT NOT NULL, name TEXT, created_at TEXT NOT NULL,"
+        " last_login_at TEXT, plan TEXT NOT NULL DEFAULT 'free',"
+        " plan_status TEXT NOT NULL DEFAULT 'active',"
+        " period_start TEXT NOT NULL, period_end TEXT NOT NULL,"
+        " searches_used INTEGER NOT NULL DEFAULT 0,"
+        " analyst_used INTEGER NOT NULL DEFAULT 0, razorpay_customer_id TEXT);"
+    )
+
+    def setUp(self):
+        self.path = str(Path(_TEST_DIR) / "upgrade.db")
+        if Path(self.path).exists():
+            Path(self.path).unlink()
+        previous = dbmod.Database()
+        previous._path = self.path
+        previous.register_schema(self.OLD_SCHEMA, self.OLD_SCHEMA)
+        previous._ensure_ready()
+        previous.run("INSERT INTO users (email, password_hash, created_at,"
+                     " period_start, period_end) VALUES (?,?,?,?,?)",
+                     ("old@example.com", "hash", "then", "then", "later"))
+
+    def test_schema_upgrade_adds_columns_then_indexes(self):
+        db = dbmod.Database()
+        db._path = self.path
+        db.register_schema(billing_store.SQLITE_SCHEMA, billing_store.SQLITE_SCHEMA)
+        db.register_indexes(billing_store.INDEX_DDL, billing_store.INDEX_DDL)
+        db.register_columns("users", billing_store.PROFILE_COLUMNS)
+        db._ensure_ready()
+
+        columns = {r["name"] for r in
+                   db.query_all("PRAGMA table_info(users)")}
+        self.assertTrue(set(billing_store.PROFILE_COLUMNS) <= columns)
+
+        indexes = {r["name"] for r in db.query_all(
+            "SELECT name FROM sqlite_master WHERE type = 'index'")}
+        for index in ("idx_users_plan", "idx_users_institute_name",
+                      "idx_users_institute_id", "idx_users_academician_type",
+                      "idx_users_academic_email", "idx_users_phone"):
+            self.assertIn(index, indexes)
+
+        # The pre-existing row survives, and the new columns are usable.
+        db.run("UPDATE users SET academic_email = ?, institute_name = ?"
+               " WHERE email = ?",
+               ("a@uni.edu", "Uni", "old@example.com"))
+        self.assertEqual(db.query_one(
+            "SELECT institute_name FROM users WHERE email = ?",
+            ("old@example.com",))["institute_name"], "Uni")
+
+    def test_upgrade_is_idempotent(self):
+        for _ in range(2):
+            db = dbmod.Database()
+            db._path = self.path
+            db.register_schema(billing_store.SQLITE_SCHEMA, billing_store.SQLITE_SCHEMA)
+            db.register_indexes(billing_store.INDEX_DDL, billing_store.INDEX_DDL)
+            db.register_columns("users", billing_store.PROFILE_COLUMNS)
+            db._ensure_ready()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -81,6 +81,8 @@ class Database:
         self._sqlite_ddl = ""
         self._postgres_ddl = ""
         self._columns: dict = {}
+        self._sqlite_index_ddl = ""
+        self._postgres_index_ddl = ""
         self._schema_ready = False
         self._retry_after = 0.0
 
@@ -102,6 +104,9 @@ class Database:
             self.init_schema(self._sqlite_ddl, self._postgres_ddl)
             for table, columns in self._columns.items():
                 self.add_missing_columns(table, columns)
+            # Indexes come last: they may reference columns that only exist
+            # after the ALTERs above.
+            self._init_indexes()
             self._schema_ready = True
             self._retry_after = 0.0
         except DatabaseUnavailable as exc:
@@ -232,6 +237,22 @@ class Database:
         """Columns to add on top of the base DDL when the table already exists."""
         self._columns[table] = dict(columns)
 
+    def register_indexes(self, sqlite_ddl: str, postgres_ddl: str) -> None:
+        """Index DDL, applied after the tables and the column migration."""
+        self._sqlite_index_ddl = sqlite_ddl
+        self._postgres_index_ddl = postgres_ddl
+
+    def _init_indexes(self) -> None:
+        if USE_POSTGRES:
+            self._exec_postgres(self._postgres_index_ddl, "could not create the indexes")
+        elif self._sqlite_index_ddl.strip():
+            conn = self._sqlite()
+            try:
+                conn.executescript(self._sqlite_index_ddl)
+                conn.commit()
+            finally:
+                conn.close()
+
     def _note_error(self, exc: Exception) -> None:
         """Remember the last statement failure so health checks can explain it.
 
@@ -340,30 +361,33 @@ class Database:
                 except Exception:
                     pass
 
+    def _exec_postgres(self, ddl: str, failure: str) -> None:
+        """Run a multi-statement DDL script on its own connection."""
+        with self._lock:
+            conn = self._pg()
+            cur = conn.cursor()
+            try:
+                for statement in ddl.split(";"):
+                    if statement.strip():
+                        cur.execute(statement)
+                conn.commit()
+            except Exception as exc:
+                self._note_error(exc)
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                raise DatabaseUnavailable(f"{failure} ({exc.__class__.__name__})")
+            finally:
+                try:
+                    cur.close()
+                except Exception:
+                    pass
+                conn.close()
+
     def init_schema(self, sqlite_ddl: str, postgres_ddl: str) -> None:
         if USE_POSTGRES:
-            with self._lock:
-                conn = self._pg()
-                cur = conn.cursor()
-                try:
-                    for statement in postgres_ddl.split(";"):
-                        if statement.strip():
-                            cur.execute(statement)
-                    conn.commit()
-                except Exception as exc:
-                    try:
-                        conn.rollback()
-                    except Exception:
-                        pass
-                    raise DatabaseUnavailable(
-                        f"could not create the accounts schema ({exc.__class__.__name__})"
-                    )
-                finally:
-                    try:
-                        cur.close()
-                    except Exception:
-                        pass
-                    conn.close()
+            self._exec_postgres(postgres_ddl, "could not create the accounts schema")
             return
 
         import pathlib
