@@ -177,6 +177,13 @@ class Database:
         detail = " | ".join(attempts)[-300:] if attempts else "unknown"
         raise DatabaseUnavailable(f"could not reach the configured database: {detail}")
 
+    def _note_error(self, exc: Exception) -> None:
+        """Remember the last statement failure so health checks can explain it.
+
+        Scrubbed: the connection string password must never reach a response.
+        """
+        self._last_error = _scrub(f"{exc.__class__.__name__}: {exc}")[:300]
+
     def _connection(self):
         if not USE_POSTGRES:
             return self._sqlite(), False
@@ -205,7 +212,8 @@ class Database:
                 if not shared:
                     conn.close()
                 return [dict(r) for r in rows]
-            except Exception:
+            except Exception as exc:
+                self._note_error(exc)
                 if shared:
                     self.close()
                 else:
@@ -248,7 +256,8 @@ class Database:
                 if not shared:
                     conn.close()
                 return result
-            except Exception:
+            except Exception as exc:
+                self._note_error(exc)
                 try:
                     conn.rollback()
                 except Exception:
@@ -322,7 +331,9 @@ def status() -> dict:
     return {
         "driver": DRIVER_NAME,
         "reachable": reachable,
-        "error": None if reachable else (_last_error() or "unavailable"),
+        # `ping` only proves the socket works; a statement can still fail, so
+        # report the last known error even while reachable.
+        "error": None if reachable and not _last_error() else (_last_error() or "unavailable"),
     }
 
 

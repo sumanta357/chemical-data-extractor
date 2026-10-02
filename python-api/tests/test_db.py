@@ -188,7 +188,9 @@ class StatusAndScrubbingTests(unittest.TestCase):
         self.assertIn("reachable", status)
         self.assertIn("error", status)
         if status["reachable"]:
-            self.assertIsNone(status["error"])
+            # A reachable store can still carry the last statement failure, so
+            # the error is either absent (healthy) or a scrubbed string.
+            self.assertTrue(status["error"] is None or isinstance(status["error"], str))
 
 
 class ConnectVariantTests(unittest.TestCase):
