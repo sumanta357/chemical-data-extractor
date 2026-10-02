@@ -20,6 +20,7 @@ import auth
 import billing
 import billing_store
 import db as _db
+import emailer
 
 LOG = logging.getLogger("scigraph.billing.api")
 
@@ -99,6 +100,15 @@ async def billing_config():
         "auth_required": billing.REQUIRE_AUTH,
         "checkout_script": "https://checkout.razorpay.com/v1/checkout.js",
         "accounts_store": store,
+        # Whether verification/reset email can actually be sent. Booleans
+        # only — the key itself never leaves the server.
+        "email": {
+            "configured": emailer.EMAIL_ENABLED,
+            "app_url_configured": bool(emailer.APP_URL),
+            "sender": emailer.EMAIL_FROM,
+            "require_verified_email": auth.REQUIRE_VERIFIED_EMAIL,
+        },
+        "admin_directory": bool(ADMIN_TOKEN),
     }
 
 
