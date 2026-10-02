@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -434,6 +435,92 @@ def confirm_captured_payment(order_id: str, payment_id: str) -> Optional[dict]:
     if status not in ("captured", "authorized"):
         raise RazorpayError(f"Payment is not completed (status: {status or 'unknown'})", 400)
     return activate_for_payment(payment)
+
+
+def reconcile_captured_payment(payment_id: str,
+                               user: Optional[dict] = None) -> tuple[Optional[dict], Optional[dict]]:
+    """Server-side safety net for a captured-but-not-activated payment.
+
+    The browser normally confirms the payment right after checkout, and the
+    webhook confirms it a moment later. If either is lost (closed tab, dropped
+    request, webhook not yet configured) Razorpay still holds the money while
+    the account stays on Free. This asks Razorpay directly and credits the plan
+    when the payment really is captured.
+
+    Returns (activated_user_or_None, provider_payment_or_None).
+    """
+    if not BILLING_ENABLED or not payment_id:
+        return None, None
+    try:
+        payment = fetch_payment(payment_id)
+    except RazorpayError as exc:
+        LOG.info("Reconcile could not read payment %s: %s", payment_id, exc)
+        return None, None
+
+    if (payment.get("status") or "").lower() != "captured":
+        return None, payment
+
+    order_id = payment.get("order_id")
+    order = billing_store.get_order(order_id) if order_id else None
+    if not order:
+        LOG.warning("Reconcile: payment %s has no matching order", payment_id)
+        return None, payment
+
+    # Never credit a payment to somebody else's account.
+    if user is not None and order["user_id"] != user["id"]:
+        LOG.warning("Reconcile refused: payment %s belongs to another account", payment_id)
+        return None, payment
+
+    owner = billing_store.get_user_by_id(order["user_id"])
+    if owner and owner["plan"] == order["plan"] and owner["plan_status"] == "active":
+        return None, payment   # already credited
+
+    return activate_for_payment(payment), payment
+
+
+def reconcile_latest_order(user: Optional[dict], max_age_hours: int = 24) -> Optional[dict]:
+    """Recover a payment made in an earlier session.
+
+    Looks at the caller's most recent order that we never saw confirmed and
+    asks Razorpay whether a payment against it was captured. Lets a customer
+    who closed the tab mid-checkout get their plan on the next visit.
+    """
+    if not BILLING_ENABLED or not user:
+        return None
+    try:
+        with billing_store._connect() as conn:
+            row = conn.execute(
+                """SELECT order_id, plan, amount_paise, created_at FROM orders
+                    WHERE user_id = ? AND status = 'created'
+                    ORDER BY created_at DESC LIMIT 1""",
+                (user["id"],),
+            ).fetchone()
+    except Exception as exc:
+        LOG.warning("Could not read pending orders: %s", exc)
+        return None
+    if not row:
+        return None
+
+    try:
+        created = datetime.fromisoformat(row["created_at"])
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - created > timedelta(hours=max_age_hours):
+            return None
+    except (TypeError, ValueError):
+        return None
+
+    try:
+        order = rzp_request("GET", f"/orders/{row['order_id']}")
+    except RazorpayError:
+        return None
+
+    for payment in (order or {}).get("payments") or []:
+        if (payment.get("status") or "").lower() == "captured":
+            payload = dict(payment)
+            payload["order_id"] = row["order_id"]
+            return activate_for_payment(payload)
+    return None
 
 
 def downgrade_for_refund(payment_id: str) -> Optional[dict]:

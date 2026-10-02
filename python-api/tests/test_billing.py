@@ -274,6 +274,91 @@ class PaymentLifecycleTests(unittest.TestCase):
         finally:
             billing.fetch_payment = original
 
+    def test_reconcile_credits_a_captured_payment(self):
+        user = make_user("reconcile@example.com")
+        billing_store.create_order("order_rec_1", user["id"], "starter", 49900, "rcpt")
+        original = billing.fetch_payment
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_rec_1",
+                                             "amount": 49900, "status": "captured",
+                                             "method": "upi"}
+        try:
+            activated, payment = billing.reconcile_captured_payment("pay_rec_1", user)
+        finally:
+            billing.fetch_payment = original
+        self.assertIsNotNone(activated)
+        self.assertEqual(activated["plan"], "starter")
+        self.assertEqual(payment["status"], "captured")
+
+    def test_reconcile_is_a_no_op_when_already_activated(self):
+        user = make_user("reconcile-twice@example.com")
+        billing_store.create_order("order_rec_2", user["id"], "starter", 49900, "rcpt")
+        payment = {"id": "pay_rec_2", "order_id": "order_rec_2", "amount": 49900,
+                   "status": "captured", "method": "upi"}
+        original = billing.fetch_payment
+        billing.fetch_payment = lambda pid: dict(payment)
+        try:
+            first, _ = billing.reconcile_captured_payment("pay_rec_2", user)
+            self.assertIsNotNone(first)
+            second, _ = billing.reconcile_captured_payment("pay_rec_2", user)
+        finally:
+            billing.fetch_payment = original
+        self.assertIsNone(second, "an already-activated plan must not be re-activated")
+        self.assertEqual(billing_store.get_user_by_id(user["id"])["searches_used"], 0)
+
+    def test_reconcile_refuses_another_accounts_payment(self):
+        owner = make_user("reconcile-owner@example.com")
+        other = make_user("reconcile-other@example.com")
+        billing_store.create_order("order_rec_3", owner["id"], "pro", 199900, "rcpt")
+        original = billing.fetch_payment
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_rec_3",
+                                             "amount": 199900, "status": "captured"}
+        try:
+            activated, _ = billing.reconcile_captured_payment("pay_rec_3", other)
+        finally:
+            billing.fetch_payment = original
+        self.assertIsNone(activated)
+        self.assertEqual(billing_store.get_user_by_id(owner["id"])["plan"], "free")
+
+    def test_reconcile_ignores_failed_payments(self):
+        user = make_user("reconcile-failed@example.com")
+        billing_store.create_order("order_rec_4", user["id"], "starter", 49900, "rcpt")
+        original = billing.fetch_payment
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_rec_4",
+                                             "amount": 49900, "status": "failed"}
+        try:
+            activated, payment = billing.reconcile_captured_payment("pay_rec_4", user)
+        finally:
+            billing.fetch_payment = original
+        self.assertIsNone(activated)
+        self.assertEqual(payment["status"], "failed")
+
+    def test_reconcile_latest_order_recovers_an_earlier_session(self):
+        user = make_user("reconcile-order@example.com")
+        billing_store.create_order("order_rec_5", user["id"], "pro", 199900, "rcpt")
+        original = billing.rzp_request
+        billing.rzp_request = lambda m, p, payload=None: {
+            "id": "order_rec_5", "status": "paid",
+            "payments": [{"id": "pay_rec_5", "amount": 199900, "status": "captured",
+                          "method": "card"}],
+        }
+        try:
+            activated = billing.reconcile_latest_order(billing_store.get_user_by_id(user["id"]))
+        finally:
+            billing.rzp_request = original
+        self.assertIsNotNone(activated)
+        self.assertEqual(activated["plan"], "pro")
+
+    def test_reconcile_latest_order_ignores_unpaid_orders(self):
+        user = make_user("reconcile-unpaid@example.com")
+        billing_store.create_order("order_rec_6", user["id"], "pro", 199900, "rcpt")
+        original = billing.rzp_request
+        billing.rzp_request = lambda m, p, payload=None: {"id": "order_rec_6", "payments": []}
+        try:
+            activated = billing.reconcile_latest_order(billing_store.get_user_by_id(user["id"]))
+        finally:
+            billing.rzp_request = original
+        self.assertIsNone(activated)
+
     def test_refund_downgrades_to_free(self):
         user = make_user("refund@example.com")
         billing_store.create_order("order_life_5", user["id"], "starter", 49900, "rcpt")
@@ -434,6 +519,21 @@ class ApiTests(unittest.TestCase):
         res = self.client.get("/api/billing/payment-status/pay_api_3")
         self.assertEqual(res.status_code, 200)
         self.assertIn(res.json()["status"], ("captured", "pending"))
+
+    def test_payment_status_credits_a_captured_payment(self):
+        """A payment captured upstream but never verified must still land."""
+        self._register("api-reconcile@example.com")
+        billing.rzp_request = lambda m, p, payload=None: {
+            "id": "order_rec_http", "amount": 49900, "currency": "INR"}
+        self.client.post("/api/billing/create-order", json={"plan": "starter"})
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_rec_http",
+                                             "amount": 49900, "status": "captured"}
+
+        res = self.client.get("/api/billing/payment-status/pay_rec_http")
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body["entitlement"]["plan"], "starter")
+        self.assertEqual(body["entitlement"]["searches_limit"], 50)
 
     def test_webhook_rejects_invalid_signature(self):
         res = self.client.post("/api/billing/webhook",

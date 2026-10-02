@@ -88,8 +88,19 @@ async def logout(request: Request, response: Response):
 
 @router.get("/api/account/me")
 async def me(request: Request):
-    """Always 200 — the UI needs to know it is anonymous, not to fail."""
+    """Always 200 — the UI needs to know it is anonymous, not to fail.
+
+    Best effort: if this account has an order that was paid for but never
+    confirmed (closed tab, lost request), credit it before answering.
+    """
     user = auth.current_user_optional(request)
+    if user:
+        try:
+            activated = billing.reconcile_latest_order(user)
+            if activated:
+                user = activated
+        except Exception as exc:  # never fail the session check over this
+            LOG.info("Order reconciliation skipped: %s", exc.__class__.__name__)
     return {
         "user": _public_user(user) if user else None,
         "entitlement": billing.entitlement_for(user),
@@ -188,21 +199,25 @@ async def verify_payment(payload: VerifyPaymentRequest, request: Request):
 
 @router.get("/api/billing/payment-status/{payment_id}")
 async def payment_status(payment_id: str, request: Request):
-    """Payment progress for the UI (polled after checkout)."""
+    """Payment progress for the UI, and a reconciliation point.
+
+    If Razorpay reports the payment as captured but we never activated the
+    plan (the browser's verify call was lost, or the webhook is not set up
+    yet), this credits it now — the plan is only ever granted after asking
+    Razorpay, never on the browser's word.
+    """
     user = auth.current_user_required(request)
     record = billing_store.get_payment(payment_id)
 
     if record and record.get("user_id") and record["user_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Not your payment")
 
-    provider_status = None
-    if billing.BILLING_ENABLED:
-        try:
-            provider_status = billing.fetch_payment(payment_id).get("status")
-        except billing.RazorpayError:
-            provider_status = None
+    activated, provider_payment = billing.reconcile_captured_payment(payment_id, user)
+    provider_status = (provider_payment or {}).get("status")
+    if activated:
+        record = billing_store.get_payment(payment_id)
 
-    ent = billing.entitlement_for(user)
+    ent = billing.entitlement_for(activated or user)
     return {
         "payment_id": payment_id,
         "recorded": bool(record),

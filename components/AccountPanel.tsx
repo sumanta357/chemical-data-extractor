@@ -159,6 +159,20 @@ export default function AccountPanel({ open, onOpen, onClose, onChange }: Props)
                   : result.message,
               });
             } catch (err: any) {
+              // The checkout signature did not verify. Before giving up, ask the
+              // server to reconcile with Razorpay — it can still credit the plan
+              // if the payment really was captured.
+              try {
+                const status = await paymentStatus(response.razorpay_payment_id);
+                if (status.entitlement?.signed_in && status.entitlement.plan !== 'free') {
+                  setEntitlement(status.entitlement);
+                  onChange?.(status.entitlement);
+                  setCheckout({ phase: 'done', message: `${status.entitlement.plan_name} plan is active.` });
+                  return;
+                }
+              } catch {
+                /* fall through to the error message */
+              }
               setCheckout({
                 phase: 'error',
                 message:
