@@ -6,6 +6,8 @@ import ProgressView from '@/components/ProgressView';
 import ResultsView from '@/components/ResultsView';
 import HistoryPanel from '@/components/HistoryPanel';
 import AIAssistant from '@/components/AIAssistant';
+import AccountPanel from '@/components/AccountPanel';
+import { getMe, type Entitlement } from '@/lib/billing';
 import type { SearchState } from '@/lib/types';
 
 export default function HomePage() {
@@ -13,6 +15,8 @@ export default function HomePage() {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [activeTab, setActiveTab] = useState<'search' | 'history'>('search');
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleSearch = useCallback(
@@ -28,8 +32,18 @@ export default function HomePage() {
           body: JSON.stringify({ query, query_type: queryType, hops }),
         });
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ detail: res.statusText }));
-          throw new Error(err.detail || 'Search failed to start');
+          const payload = await res.json().catch(() => ({ detail: res.statusText }));
+          const detail = payload?.detail;
+          // The engine answers 401/402 with {message, code} when accounts or
+          // plan limits are enforced — surface the message and open the panel.
+          if (detail && typeof detail === 'object') {
+            if (detail.code === 'quota_reached' || detail.code === 'auth_required') {
+              setAccountOpen(true);
+              void getMe().then((r) => setEntitlement(r.entitlement)).catch(() => {});
+            }
+            throw new Error(detail.message || 'Search failed to start');
+          }
+          throw new Error(typeof detail === 'string' ? detail : 'Search failed to start');
         }
         const data = await res.json();
         setSearch(data);
@@ -107,6 +121,11 @@ export default function HomePage() {
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
           setIsRunning(false);
+          // Usage was counted server-side when the job completed — refresh the
+          // header so the remaining-searches figure stays accurate.
+          if (status.status === 'completed') {
+            void getMe().then((r) => setEntitlement(r.entitlement)).catch(() => {});
+          }
         }
       } catch {
         // One failed poll (network blip, brief proxy hiccup) should not kill
@@ -189,6 +208,13 @@ export default function HomePage() {
             >
               History
             </button>
+            <span className="w-px bg-gray-800 self-stretch mx-1" />
+            <AccountPanel
+              open={accountOpen}
+              onOpen={() => setAccountOpen(true)}
+              onClose={() => setAccountOpen(false)}
+              onChange={setEntitlement}
+            />
           </nav>
         </div>
       </header>

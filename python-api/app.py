@@ -28,7 +28,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -60,6 +60,76 @@ if not LOG.handlers:
     h = logging.StreamHandler(sys.stderr)
     h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     LOG.addHandler(h)
+
+# ── Accounts & payments (optional layer) ─────────────────────────────────────
+# The platform keeps working exactly as before when this layer is disabled:
+#   * no RAZORPAY_* keys  -> payments endpoints report "not configured"
+#   * no REQUIRE_AUTH=1  -> anonymous visitors search unmetered, as today
+# Only signed-in accounts are metered, so the free public product is unchanged.
+try:
+    import billing as _billing
+    from routes_billing import router as billing_router
+except Exception as _billing_import_error:  # pragma: no cover - defensive
+    _billing = None
+    billing_router = None
+    LOG.warning("Billing layer unavailable (%s) — continuing without accounts",
+                _billing_import_error)
+
+
+def _entitlement_for_request(http_request: Optional[Request]):
+    """Return (user, entitlement). Raises 401/402 for auth/quota problems.
+    Any internal billing failure fails open so the search product stays up."""
+    if _billing is None or http_request is None:
+        return None, {}
+    try:
+        return _billing.require_search_entitlement(http_request)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOG.warning("Entitlement check failed (%s) — allowing the search", exc)
+        return None, {}
+
+
+def _analyst_gate(http_request: Optional[Request]):
+    """Meter one AI analyst interaction for signed-in users (fail open)."""
+    if _billing is None or http_request is None:
+        return
+    try:
+        user = _billing.record_analyst_usage(http_request)
+        if user:
+            ent = _billing.entitlement_for(user)
+            if _billing.REQUIRE_AUTH and ent["analyst_remaining"] <= 0:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "message": (f"You have used all {ent['analyst_limit']} AI analyst "
+                                    f"messages on the {ent['plan_name']} plan this month."),
+                        "code": "analyst_quota_reached",
+                        "upgrade_url": "/#pricing",
+                    },
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOG.warning("Analyst metering failed (%s) — allowing the request", exc)
+
+
+def _attach_search_owner(search_id: str, user: Optional[dict]) -> None:
+    if _billing is not None and user:
+        try:
+            _billing.attach_search_owner(search_id, user)
+        except Exception as exc:
+            LOG.warning("Could not attach search owner (%s)", exc)
+
+
+def _record_search_usage(search_id: str) -> None:
+    """Count one search once its job completed (best effort, never fatal)."""
+    if _billing is not None:
+        try:
+            _billing.record_search_usage(search_id)
+        except Exception as exc:
+            LOG.warning("Search usage accounting failed (%s)", exc)
+
 
 # ── Persistent search state (SQLite) ─────────────────────────────────────────
 import sqlite3
@@ -365,6 +435,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             else:
                 state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s"
             _save_search(state)
+            _record_search_usage(search_id)
         else:
             state["status"] = "failed"
             state["error"] = f"Process exited with code {rc}"
@@ -436,14 +507,21 @@ async def health():
 
 
 @app.post("/api/search", response_model=SearchStatus)
-async def start_search(request: SearchRequest, background_tasks: BackgroundTasks):
-    """Start a new knowledge graph search (runs in the background)."""
+async def start_search(request: SearchRequest, background_tasks: BackgroundTasks,
+                        http_request: Request = None):
+    """Start a new knowledge graph search (runs in the background).
+
+    Accounts are optional: anonymous callers behave exactly as before unless
+    REQUIRE_AUTH=1, and signed-in callers are metered against their plan.
+    """
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
     if request.hops < 1 or request.hops > 4:
         raise HTTPException(status_code=400, detail="Hops must be 1-4")
     if request.query_type not in ("protein", "ligand", "auto"):
         raise HTTPException(status_code=400, detail="query_type must be protein, ligand, or auto")
+
+    user, entitlement = _entitlement_for_request(http_request)
 
     search_id = str(uuid.uuid4())[:8]
     clean_q = re.sub(r"[^a-zA-Z0-9_\-]", "_", request.query.strip())[:30]
@@ -465,6 +543,7 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
     }
     searches[search_id] = state
     _save_search(state)
+    _attach_search_owner(search_id, user)
 
     background_tasks.add_task(
         run_search_in_background,
@@ -804,12 +883,17 @@ class AnalyzeRequest(BaseModel):
 
 
 @app.post("/api/analyze")
-def analyze(request: AnalyzeRequest):
+def analyze(request: AnalyzeRequest, http_request: Request = None):
     """AI analysis with multi-provider fallback. Sync endpoint — FastAPI runs
     it in a worker thread, so the blocking `requests` calls never stall the
-    event loop that serves search polling."""
+    event loop that serves search polling.
+
+    Signed-in users are metered here against their plan's analyst allowance
+    (no-op for anonymous visitors unless REQUIRE_AUTH=1)."""
     if not request.prompt or not request.prompt.strip():
         raise HTTPException(status_code=400, detail="prompt is required")
+
+    _analyst_gate(http_request)
 
     providers = [p for p in _get_providers() if not _cooling_down(p["name"])]
     if not providers:
@@ -901,6 +985,13 @@ def analyze(request: AnalyzeRequest):
         {"detail": f"All AI providers failed. Last error: {last_error}", "fallback": True},
         status_code=502,
     )
+
+
+# ── Accounts & payments routes ───────────────────────────────────────────────
+# Mounted here, immediately before the SPA catch-all, so /api/account/* and
+# /api/billing/* are always matched as API routes.
+if billing_router is not None:
+    app.include_router(billing_router)
 
 
 # ── Static UI serving (registered after all API routes) ─────────────────────

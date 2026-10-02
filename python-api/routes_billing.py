@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+"""
+Account + billing HTTP endpoints.
+
+Mounted from app.py BEFORE the SPA catch-all route so these paths are matched
+as API routes (never as the static index.html).
+"""
+
+import json
+import logging
+import time
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Request, Response
+from pydantic import BaseModel
+
+import auth
+import billing
+import billing_store
+
+LOG = logging.getLogger("scigraph.billing.api")
+
+router = APIRouter(tags=["accounts", "billing"])
+
+
+# ── Request models ───────────────────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class CreateOrderRequest(BaseModel):
+    plan: str
+
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+# ── Public configuration ─────────────────────────────────────────────────────
+
+@router.get("/api/billing/config")
+async def billing_config():
+    """Everything the browser needs to run checkout. Only the publishable key
+    id is exposed; the key secret never leaves the server."""
+    return {
+        "billing_enabled": billing.BILLING_ENABLED,
+        "key_id": billing.KEY_ID if billing.BILLING_ENABLED else None,
+        "currency": "INR",
+        "auth_required": billing.REQUIRE_AUTH,
+        "checkout_script": "https://checkout.razorpay.com/v1/checkout.js",
+    }
+
+
+@router.get("/api/billing/plans")
+async def list_plans():
+    return {"plans": billing.public_plans()}
+
+
+# ── Accounts ─────────────────────────────────────────────────────────────────
+
+@router.post("/api/account/register")
+async def register(payload: RegisterRequest, request: Request, response: Response):
+    user = auth.register(request, response, payload.email, payload.password, payload.name)
+    return {"user": _public_user(user), "entitlement": billing.entitlement_for(user)}
+
+
+@router.post("/api/account/login")
+async def login(payload: LoginRequest, request: Request, response: Response):
+    user = auth.login(request, response, payload.email, payload.password)
+    return {"user": _public_user(user), "entitlement": billing.entitlement_for(user)}
+
+
+@router.post("/api/account/logout")
+async def logout(request: Request, response: Response):
+    auth.logout(request, response)
+    return {"status": "signed_out"}
+
+
+@router.get("/api/account/me")
+async def me(request: Request):
+    """Always 200 — the UI needs to know it is anonymous, not to fail."""
+    user = auth.current_user_optional(request)
+    return {
+        "user": _public_user(user) if user else None,
+        "entitlement": billing.entitlement_for(user),
+    }
+
+
+@router.get("/api/account/usage")
+async def usage(request: Request):
+    user = auth.current_user_optional(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue")
+    ent = billing.entitlement_for(user)
+    return {
+        "entitlement": ent,
+        "payments": billing_store.recent_payments(user["id"]),
+        "recent_searches": billing_store.recent_usage(user["id"], "search", 50),
+    }
+
+
+def _public_user(user: dict) -> dict:
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user.get("name"),
+        "created_at": user["created_at"],
+    }
+
+
+# ── Razorpay: order creation ─────────────────────────────────────────────────
+
+@router.post("/api/billing/create-order")
+async def create_order(payload: CreateOrderRequest, request: Request):
+    user = auth.current_user_required(request)
+    if not billing.BILLING_ENABLED:
+        raise HTTPException(status_code=503,
+                            detail="Payments are not configured on this server yet")
+
+    plan = billing.get_plan(payload.plan)
+    if plan["amount_paise"] <= 0:
+        raise HTTPException(status_code=400, detail="The free plan does not require payment")
+
+    receipt = f"scigraph_{user['id']}_{int(time.time())}"
+    try:
+        order = billing.create_razorpay_order(plan, user, receipt)
+    except billing.RazorpayError as exc:
+        LOG.warning("Order creation failed for plan %s: %s", plan["id"], exc)
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc))
+
+    billing_store.create_order(
+        order["id"], user["id"], plan["id"], int(order.get("amount", plan["amount_paise"])),
+        receipt,
+    )
+    return {
+        "order_id": order["id"],
+        "amount": int(order.get("amount", plan["amount_paise"])),
+        "currency": order.get("currency", "INR"),
+        "key_id": billing.KEY_ID,
+        "plan": plan["id"],
+        "plan_name": plan["name"],
+        "receipt": receipt,
+    }
+
+
+# ── Razorpay: verification after checkout ────────────────────────────────────
+
+@router.post("/api/billing/verify-payment")
+async def verify_payment(payload: VerifyPaymentRequest, request: Request):
+    user = auth.current_user_required(request)
+
+    if not billing.verify_checkout_signature(
+        payload.razorpay_order_id, payload.razorpay_payment_id, payload.razorpay_signature
+    ):
+        LOG.warning("Rejected payment verification for user %s (bad signature)", user["id"])
+        raise HTTPException(status_code=400, detail="Payment verification failed")
+
+    order = billing_store.get_order(payload.razorpay_order_id)
+    if not order or order["user_id"] != user["id"]:
+        raise HTTPException(status_code=400, detail="This order does not belong to your account")
+
+    try:
+        updated = billing.confirm_captured_payment(
+            payload.razorpay_order_id, payload.razorpay_payment_id
+        )
+    except billing.RazorpayError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc))
+
+    if not updated:
+        raise HTTPException(status_code=400, detail="Could not match this payment to a plan")
+
+    return {
+        "status": "active",
+        "message": f"{billing.PLANS[updated['plan']]['name']} plan is active.",
+        "entitlement": billing.entitlement_for(updated),
+    }
+
+
+@router.get("/api/billing/payment-status/{payment_id}")
+async def payment_status(payment_id: str, request: Request):
+    """Payment progress for the UI (polled after checkout)."""
+    user = auth.current_user_required(request)
+    record = billing_store.get_payment(payment_id)
+
+    if record and record.get("user_id") and record["user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not your payment")
+
+    provider_status = None
+    if billing.BILLING_ENABLED:
+        try:
+            provider_status = billing.fetch_payment(payment_id).get("status")
+        except billing.RazorpayError:
+            provider_status = None
+
+    ent = billing.entitlement_for(user)
+    return {
+        "payment_id": payment_id,
+        "recorded": bool(record),
+        "status": (record or {}).get("status") or provider_status or "pending",
+        "plan": (record or {}).get("plan") or (ent["plan"] if provider_status == "captured" else None),
+        "amount_paise": (record or {}).get("amount_paise"),
+        "entitlement": ent,
+    }
+
+
+# ── Razorpay: webhooks (source of truth for the plan) ────────────────────────
+
+@router.post("/api/billing/webhook")
+async def webhook(request: Request):
+    raw = await request.body()
+    signature = request.headers.get("x-razorpay-signature", "")
+
+    if not billing.verify_webhook_signature(raw, signature):
+        LOG.warning("Rejected webhook with an invalid signature")
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    try:
+        event = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    event_type = event.get("event", "")
+    payload_entity = (event.get("payload") or {}).get("payment", {}).get("entity", {})
+
+    if event_type == "payment.captured" and payload_entity.get("id"):
+        payment_id = payload_entity["id"]
+        if billing_store.claim_webhook_event(f"payment.captured:{payment_id}", event_type):
+            billing.activate_for_payment(payload_entity)
+
+    elif event_type == "payment.failed" and payload_entity.get("id"):
+        payment_id = payload_entity["id"]
+        if billing_store.claim_webhook_event(f"payment.failed:{payment_id}", event_type):
+            billing_store.record_payment(
+                payment_id,
+                payload_entity.get("order_id"),
+                None,
+                None,
+                payload_entity.get("amount"),
+                "failed",
+                payload_entity.get("method"),
+            )
+
+    elif event_type == "refund.processed":
+        refund = (event.get("payload") or {}).get("refund", {}).get("entity", {})
+        payment_id = refund.get("payment_id")
+        if payment_id and billing_store.claim_webhook_event(
+            f"refund.processed:{refund.get('id', payment_id)}", event_type
+        ):
+            billing.downgrade_for_refund(payment_id)
+
+    return {"status": "ok"}

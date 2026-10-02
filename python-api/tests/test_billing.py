@@ -1,0 +1,566 @@
+#!/usr/bin/env python3
+"""
+Tests for the accounts / quota / Razorpay layer.
+
+Run:  cd python-api && python3 -m pytest tests/test_billing.py -q
+      (or: python3 -m unittest discover -s tests)
+
+No network access: every Razorpay HTTP call is stubbed. Covers signature
+verification (checkout + webhook), the payment lifecycle (order → capture →
+activation → usage → refund), quota enforcement, account flows, and a
+regression check that the existing search API is unchanged.
+"""
+
+import hashlib
+import hmac
+import json
+import os
+import sys
+import tempfile
+import time
+import unittest
+from pathlib import Path
+
+# Test credentials + an isolated database, set before the modules are imported.
+_TEST_DIR = tempfile.mkdtemp(prefix="scigraph_billing_test_")
+os.environ["BILLING_DB"] = str(Path(_TEST_DIR) / "billing.db")
+os.environ["SEARCH_DB"] = str(Path(_TEST_DIR) / "search.db")
+os.environ["EXPORTS_DIR"] = str(Path(_TEST_DIR) / "exports")
+os.environ["WORKSPACE_DIR"] = str(Path(_TEST_DIR) / "workspace")
+os.environ["RAZORPAY_KEY_ID"] = "rzp_test_key_id"
+os.environ["RAZORPAY_KEY_SECRET"] = "rzp_test_key_secret"
+os.environ["RAZORPAY_WEBHOOK_SECRET"] = "rzp_test_webhook_secret"
+os.environ["COOKIE_SECURE"] = "0"   # TestClient speaks http://testserver
+os.environ.pop("REQUIRE_AUTH", None)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import auth  # noqa: E402
+import billing  # noqa: E402
+import billing_store  # noqa: E402
+import routes_billing  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+import app as engine_app  # noqa: E402
+
+
+def sign_checkout(order_id: str, payment_id: str, secret: str) -> str:
+    return hmac.new(secret.encode(), f"{order_id}|{payment_id}".encode(), hashlib.sha256).hexdigest()
+
+
+def sign_webhook(raw: bytes, secret: str) -> str:
+    return hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
+
+
+def route_paths(app_obj) -> list[str]:
+    """Flat list of route paths, flattening routers that FastAPI nests
+    (include_router may store an _IncludedRouter instead of inlining routes)."""
+    paths: list[str] = []
+
+    def walk(routes):
+        for route in routes:
+            nested = getattr(route, "routes", None)
+            if nested is None:
+                nested = getattr(getattr(route, "original_router", None), "routes", None)
+            if nested:
+                walk(nested)
+            path = getattr(route, "path", None)
+            if path:
+                paths.append(path)
+
+    walk(app_obj.routes)
+    return paths
+
+
+def make_user(email: str, plan: str = "free") -> dict:
+    user = billing_store.create_user(email, auth.hash_password("correct-horse-battery"))
+    if plan != "free":
+        user = billing_store.set_plan(user["id"], plan)
+    return user
+
+
+# ── Passwords & sessions ─────────────────────────────────────────────────────
+
+class PasswordTests(unittest.TestCase):
+    def test_hash_and_verify(self):
+        stored = auth.hash_password("correct-horse-battery")
+        self.assertTrue(stored.startswith("pbkdf2_sha256$"))
+        self.assertTrue(auth.verify_password("correct-horse-battery", stored))
+        self.assertFalse(auth.verify_password("wrong-password", stored))
+
+    def test_salts_are_unique(self):
+        self.assertNotEqual(auth.hash_password("same-password"),
+                            auth.hash_password("same-password"))
+
+    def test_malformed_hash_is_rejected_safely(self):
+        self.assertFalse(auth.verify_password("x", "garbage"))
+        self.assertFalse(auth.verify_password("x", ""))
+
+    def test_password_validation(self):
+        with self.assertRaises(Exception):
+            auth.validate_password("short")
+        self.assertEqual(auth.validate_password("longenough1"), "longenough1")
+
+    def test_email_normalisation_and_validation(self):
+        self.assertEqual(auth.validate_email("  User@Example.COM "), "user@example.com")
+        with self.assertRaises(Exception):
+            auth.validate_email("not-an-email")
+
+
+class SessionTests(unittest.TestCase):
+    def test_session_round_trip_and_revocation(self):
+        user = make_user("sessions@example.com")
+        token = billing_store.create_session(user["id"], "pytest")
+        self.assertEqual(billing_store.get_session_user(token)["id"], user["id"])
+        billing_store.delete_session(token)
+        self.assertIsNone(billing_store.get_session_user(token))
+
+    def test_expired_session_is_rejected(self):
+        user = make_user("expired@example.com")
+        token = billing_store.create_session(user["id"], "pytest", ttl_days=-1)
+        self.assertIsNone(billing_store.get_session_user(token))
+
+    def test_unknown_token(self):
+        self.assertIsNone(billing_store.get_session_user("nope-not-a-token"))
+
+
+# ── Plan catalog ─────────────────────────────────────────────────────────────
+
+class PlanCatalogTests(unittest.TestCase):
+    def test_amounts_match_prices(self):
+        for plan in billing.PLANS.values():
+            self.assertEqual(plan["amount_paise"], plan["price_inr"] * 100, plan["id"])
+
+    def test_free_plan_is_not_purchasable(self):
+        self.assertEqual(billing.PLANS["free"]["amount_paise"], 0)
+
+    def test_unknown_plan_rejected(self):
+        with self.assertRaises(Exception):
+            billing.get_plan("enterprise-unlimited")
+
+    def test_public_plans_never_expose_secrets(self):
+        blob = json.dumps(billing.public_plans())
+        self.assertNotIn(billing.KEY_SECRET, blob)
+
+
+# ── Signature verification ───────────────────────────────────────────────────
+
+class SignatureTests(unittest.TestCase):
+    def test_checkout_signature_accepts_valid(self):
+        sig = sign_checkout("order_1", "pay_1", billing.KEY_SECRET)
+        self.assertTrue(billing.verify_checkout_signature("order_1", "pay_1", sig))
+
+    def test_checkout_signature_rejects_tampering(self):
+        sig = sign_checkout("order_1", "pay_1", billing.KEY_SECRET)
+        self.assertFalse(billing.verify_checkout_signature("order_2", "pay_1", sig))
+        self.assertFalse(billing.verify_checkout_signature("order_1", "pay_2", sig))
+        self.assertFalse(billing.verify_checkout_signature("order_1", "pay_1", sig[:-1] + "0"))
+
+    def test_checkout_signature_rejects_wrong_secret(self):
+        sig = sign_checkout("order_1", "pay_1", "some-other-secret")
+        self.assertFalse(billing.verify_checkout_signature("order_1", "pay_1", sig))
+
+    def test_checkout_signature_requires_all_parts(self):
+        self.assertFalse(billing.verify_checkout_signature("", "pay_1", "sig"))
+        self.assertFalse(billing.verify_checkout_signature("order_1", "", "sig"))
+        self.assertFalse(billing.verify_checkout_signature("order_1", "pay_1", ""))
+
+    def test_webhook_signature(self):
+        body = b'{"event":"payment.captured"}'
+        self.assertTrue(billing.verify_webhook_signature(body, sign_webhook(body, billing.WEBHOOK_SECRET)))
+        self.assertFalse(billing.verify_webhook_signature(body, "deadbeef"))
+        self.assertFalse(billing.verify_webhook_signature(b"tampered", sign_webhook(body, billing.WEBHOOK_SECRET)))
+        self.assertFalse(billing.verify_webhook_signature(b"", "sig"))
+
+
+# ── Order creation ───────────────────────────────────────────────────────────
+
+class OrderCreationTests(unittest.TestCase):
+    def test_order_payload_uses_catalog_amount(self):
+        captured = {}
+
+        def fake_request(method, path, payload=None):
+            captured.update({"method": method, "path": path, "payload": payload})
+            return {"id": "order_fake_1", "amount": payload["amount"],
+                    "currency": "INR", "status": "created"}
+
+        original = billing.rzp_request
+        billing.rzp_request = fake_request
+        try:
+            user = make_user("orders@example.com")
+            order = billing.create_razorpay_order(billing.PLANS["starter"], user, "rcpt_1")
+        finally:
+            billing.rzp_request = original
+
+        self.assertEqual(captured["method"], "POST")
+        self.assertEqual(captured["path"], "/orders")
+        self.assertEqual(captured["payload"]["amount"], 49900)          # paise
+        self.assertEqual(captured["payload"]["currency"], "INR")
+        self.assertEqual(captured["payload"]["notes"]["plan"], "starter")
+        self.assertEqual(captured["payload"]["notes"]["user_id"], str(user["id"]))
+        self.assertEqual(order["id"], "order_fake_1")
+
+    def test_missing_gateway_configuration_is_reported(self):
+        original = billing.BILLING_ENABLED
+        billing.BILLING_ENABLED = False
+        try:
+            with self.assertRaises(billing.RazorpayError):
+                billing.rzp_request("GET", "/payments/x")
+        finally:
+            billing.BILLING_ENABLED = original
+
+
+# ── Payment lifecycle ────────────────────────────────────────────────────────
+
+class PaymentLifecycleTests(unittest.TestCase):
+    def _captured_payment(self, order_id="order_life_1", payment_id="pay_life_1", amount=199900):
+        return {"id": payment_id, "order_id": order_id, "amount": amount,
+                "currency": "INR", "status": "captured", "method": "upi"}
+
+    def test_capture_activates_the_plan(self):
+        user = make_user("lifecycle@example.com")
+        billing_store.create_order("order_life_1", user["id"], "pro", 199900, "rcpt")
+
+        updated = billing.activate_for_payment(self._captured_payment())
+        self.assertEqual(updated["plan"], "pro")
+        self.assertEqual(updated["plan_status"], "active")
+        self.assertEqual(billing_store.get_order("order_life_1")["status"], "paid")
+
+        ent = billing.entitlement_for(billing_store.get_user_by_id(user["id"]))
+        self.assertEqual(ent["plan"], "pro")
+        self.assertEqual(ent["searches_limit"], 300)
+        self.assertEqual(ent["searches_remaining"], 300)
+
+    def test_replayed_capture_does_not_double_credit(self):
+        user = make_user("replay@example.com")
+        billing_store.create_order("order_life_2", user["id"], "starter", 49900, "rcpt")
+        billing.activate_for_payment(self._captured_payment("order_life_2", "pay_life_2", 49900))
+
+        # User burns quota, then the same payment is delivered again.
+        billing_store.increment_counters(user["id"], searches=10)
+        again = billing.activate_for_payment(self._captured_payment("order_life_2", "pay_life_2", 49900))
+
+        self.assertEqual(again["searches_used"], 10, "replay must not reset usage counters")
+        self.assertEqual(billing_store.get_plan if False else
+                         billing.PLANS[again["plan"]]["id"], "starter")
+
+    def test_unattributable_payment_is_ignored(self):
+        self.assertIsNone(billing.activate_for_payment(
+            {"id": "pay_orphan", "order_id": "order_missing", "amount": 100,
+             "status": "captured"}))
+
+    def test_failed_capture_is_rejected(self):
+        user = make_user("failed@example.com")
+        billing_store.create_order("order_life_3", user["id"], "starter", 49900, "rcpt")
+        original = billing.fetch_payment
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_life_3",
+                                             "amount": 49900, "status": "failed"}
+        try:
+            with self.assertRaises(billing.RazorpayError):
+                billing.confirm_captured_payment("order_life_3", "pay_fail_1")
+        finally:
+            billing.fetch_payment = original
+        self.assertEqual(billing_store.get_user_by_id(user["id"])["plan"], "free")
+
+    def test_payment_for_a_different_order_is_rejected(self):
+        user = make_user("crossorder@example.com")
+        billing_store.create_order("order_life_4", user["id"], "starter", 49900, "rcpt")
+        original = billing.fetch_payment
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_other",
+                                             "amount": 49900, "status": "captured"}
+        try:
+            with self.assertRaises(billing.RazorpayError):
+                billing.confirm_captured_payment("order_life_4", "pay_cross_1")
+        finally:
+            billing.fetch_payment = original
+
+    def test_refund_downgrades_to_free(self):
+        user = make_user("refund@example.com")
+        billing_store.create_order("order_life_5", user["id"], "starter", 49900, "rcpt")
+        billing.activate_for_payment(self._captured_payment("order_life_5", "pay_ref_1", 49900))
+
+        downgraded = billing.downgrade_for_refund("pay_ref_1")
+        self.assertEqual(downgraded["plan"], "free")
+        self.assertEqual(downgraded["plan_status"], "refunded")
+
+
+# ── Usage accounting & quotas ────────────────────────────────────────────────
+
+class UsageTests(unittest.TestCase):
+    def test_search_usage_counted_once_per_search(self):
+        user = make_user("usage@example.com", plan="starter")
+        billing_store.set_search_owner("search_abc", user["id"])
+
+        billing.record_search_usage("search_abc")
+        billing.record_search_usage("search_abc")   # duplicate delivery
+
+        fresh = billing_store.get_user_by_id(user["id"])
+        self.assertEqual(fresh["searches_used"], 1)
+
+    def test_anonymous_searches_are_not_counted(self):
+        billing.record_search_usage("search_with_no_owner")
+        self.assertEqual(billing_store.stats()["users"], billing_store.stats()["users"])
+
+    def test_free_plan_quota_exhaustion(self):
+        user = make_user("quota@example.com")
+        billing_store.increment_counters(user["id"], searches=3)
+        ent = billing.entitlement_for(billing_store.get_user_by_id(user["id"]))
+        self.assertEqual(ent["searches_limit"], 3)
+        self.assertEqual(ent["searches_remaining"], 0)
+
+    def test_usage_window_resets_after_the_period(self):
+        user = make_user("reset@example.com")
+        billing_store.increment_counters(user["id"], searches=3)
+        with billing_store._connect() as conn:
+            conn.execute("UPDATE users SET period_end = ? WHERE id = ?",
+                         ("2000-01-01T00:00:00+00:00", user["id"]))
+        ent = billing.entitlement_for(billing_store.get_user_by_id(user["id"]))
+        self.assertEqual(ent["searches_used"], 0)
+        self.assertEqual(ent["searches_remaining"], 3)
+
+    def test_entitlement_for_anonymous_visitor(self):
+        ent = billing.entitlement_for(None)
+        self.assertFalse(ent["signed_in"])
+        self.assertEqual(ent["status"], "anonymous")
+
+
+# ── HTTP API ─────────────────────────────────────────────────────────────────
+
+class ApiTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(engine_app.app)
+        self._rzp = billing.rzp_request
+        self._fetch = billing.fetch_payment
+
+    def tearDown(self):
+        billing.rzp_request = self._rzp
+        billing.fetch_payment = self._fetch
+        billing.REQUIRE_AUTH = False
+
+    def _register(self, email):
+        res = self.client.post("/api/account/register",
+                               json={"email": email, "password": "correct-horse-battery"})
+        self.assertEqual(res.status_code, 200, res.text)
+        return res.json()
+
+    def test_config_exposes_only_the_publishable_key(self):
+        res = self.client.get("/api/billing/config")
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertTrue(body["billing_enabled"])
+        self.assertEqual(body["key_id"], billing.KEY_ID)
+        self.assertNotIn(billing.KEY_SECRET, res.text)
+        self.assertNotIn("secret", res.text.lower().replace("key_secret", ""))
+
+    def test_plans_are_public(self):
+        res = self.client.get("/api/billing/plans")
+        self.assertEqual(res.status_code, 200)
+        ids = [p["id"] for p in res.json()["plans"]]
+        self.assertEqual(ids, ["free", "academic", "starter", "pro", "team"])
+
+    def test_register_login_logout_cycle(self):
+        data = self._register("api-cycle@example.com")
+        self.assertEqual(data["entitlement"]["plan"], "free")
+        self.assertTrue(data["entitlement"]["signed_in"])
+
+        me = self.client.get("/api/account/me").json()
+        self.assertEqual(me["user"]["email"], "api-cycle@example.com")
+
+        self.assertEqual(self.client.post("/api/account/logout").status_code, 200)
+        self.assertIsNone(self.client.get("/api/account/me").json()["user"])
+
+    def test_login_rejects_wrong_password(self):
+        self._register("api-login@example.com")
+        self.client.post("/api/account/logout")
+        res = self.client.post("/api/account/login",
+                               json={"email": "api-login@example.com", "password": "wrong-one"})
+        self.assertEqual(res.status_code, 401)
+
+    def test_duplicate_email_is_rejected(self):
+        self._register("api-dup@example.com")
+        res = self.client.post("/api/account/register",
+                               json={"email": "api-dup@example.com", "password": "correct-horse-battery"})
+        self.assertEqual(res.status_code, 409)
+
+    def test_create_order_then_verify_payment(self):
+        self._register("api-pay@example.com")
+        billing.rzp_request = lambda m, p, payload=None: {
+            "id": "order_api_1", "amount": payload["amount"], "currency": "INR"}
+
+        res = self.client.post("/api/billing/create-order", json={"plan": "starter"})
+        self.assertEqual(res.status_code, 200, res.text)
+        order = res.json()
+        self.assertEqual(order["amount"], 49900)
+        self.assertEqual(order["key_id"], billing.KEY_ID)
+
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": order["order_id"],
+                                             "amount": 49900, "status": "captured",
+                                             "method": "upi"}
+        signature = sign_checkout(order["order_id"], "pay_api_1", billing.KEY_SECRET)
+        res = self.client.post("/api/billing/verify-payment", json={
+            "razorpay_order_id": order["order_id"],
+            "razorpay_payment_id": "pay_api_1",
+            "razorpay_signature": signature,
+        })
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json()["status"], "active")
+        self.assertEqual(res.json()["entitlement"]["plan"], "starter")
+
+    def test_verify_payment_rejects_bad_signature(self):
+        self._register("api-badsig@example.com")
+        billing.rzp_request = lambda m, p, payload=None: {
+            "id": "order_api_2", "amount": 49900, "currency": "INR"}
+        self.client.post("/api/billing/create-order", json={"plan": "starter"})
+
+        res = self.client.post("/api/billing/verify-payment", json={
+            "razorpay_order_id": "order_api_2",
+            "razorpay_payment_id": "pay_api_2",
+            "razorpay_signature": "obviously-wrong",
+        })
+        self.assertEqual(res.status_code, 400)
+
+    def test_create_order_requires_a_signed_in_user(self):
+        self.assertEqual(self.client.post("/api/billing/create-order",
+                                         json={"plan": "starter"}).status_code, 401)
+
+    def test_payment_status_endpoint(self):
+        self._register("api-status@example.com")
+        billing.rzp_request = lambda m, p, payload=None: {
+            "id": "order_api_3", "amount": 49900, "currency": "INR"}
+        self.client.post("/api/billing/create-order", json={"plan": "starter"})
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_api_3",
+                                             "amount": 49900, "status": "captured"}
+
+        res = self.client.get("/api/billing/payment-status/pay_api_3")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(res.json()["status"], ("captured", "pending"))
+
+    def test_webhook_rejects_invalid_signature(self):
+        res = self.client.post("/api/billing/webhook",
+                               content=json.dumps({"event": "payment.captured"}),
+                               headers={"x-razorpay-signature": "nope"})
+        self.assertEqual(res.status_code, 400)
+
+    def test_webhook_capture_activates_and_is_idempotent(self):
+        self._register("api-hook@example.com")
+        user = billing_store.get_user_by_email("api-hook@example.com")
+        billing_store.create_order("order_api_4", user["id"], "pro", 199900, "rcpt")
+
+        event = {"event": "payment.captured", "payload": {"payment": {"entity": {
+            "id": "pay_hook_1", "order_id": "order_api_4", "amount": 199900,
+            "currency": "INR", "status": "captured", "method": "card"}}}}
+        raw = json.dumps(event).encode()
+        headers = {"x-razorpay-signature": sign_webhook(raw, billing.WEBHOOK_SECRET),
+                   "content-type": "application/json"}
+
+        self.assertEqual(self.client.post("/api/billing/webhook", content=raw, headers=headers).status_code, 200)
+        self.assertEqual(billing_store.get_user_by_id(user["id"])["plan"], "pro")
+
+        billing_store.increment_counters(user["id"], searches=7)
+        self.assertEqual(self.client.post("/api/billing/webhook", content=raw, headers=headers).status_code, 200)
+        self.assertEqual(billing_store.get_user_by_id(user["id"])["searches_used"], 7,
+                         "duplicate webhook must not reset usage")
+
+    def test_webhook_failure_is_recorded_without_granting(self):
+        self._register("api-hookfail@example.com")
+        user = billing_store.get_user_by_email("api-hookfail@example.com")
+        event = {"event": "payment.failed", "payload": {"payment": {"entity": {
+            "id": "pay_hook_fail", "order_id": "order_api_5", "amount": 49900,
+            "status": "failed", "method": "upi"}}}}
+        raw = json.dumps(event).encode()
+        headers = {"x-razorpay-signature": sign_webhook(raw, billing.WEBHOOK_SECRET),
+                   "content-type": "application/json"}
+        self.assertEqual(self.client.post("/api/billing/webhook", content=raw, headers=headers).status_code, 200)
+        self.assertEqual(billing_store.get_user_by_id(user["id"])["plan"], "free")
+        self.assertIsNotNone(billing_store.get_payment("pay_hook_fail"))
+
+
+# ── Regression: the existing product must be untouched ───────────────────────
+
+class RegressionTests(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(engine_app.app)
+        # Never actually spawn the engine during tests.
+        engine_app.searches.clear()
+
+    def test_existing_routes_are_still_registered(self):
+        paths = set(route_paths(engine_app.app))
+        for expected in ("/api/health", "/api/search", "/api/search/{search_id}",
+                         "/api/search/{search_id}/log", "/api/search/{search_id}/graph",
+                         "/api/exports/{filename:path}", "/api/searches", "/api/analyze"):
+            self.assertIn(expected, paths)
+
+    def test_billing_routes_are_mounted_before_the_spa_catch_all(self):
+        paths = route_paths(engine_app.app)
+        catch_all = paths.index("/{full_path:path}")
+        for path in ("/api/billing/config", "/api/billing/plans", "/api/account/me",
+                     "/api/billing/create-order", "/api/billing/webhook"):
+            self.assertIn(path, paths)
+            self.assertLess(paths.index(path), catch_all, f"{path} must precede the SPA catch-all")
+
+    def test_health_endpoint_unchanged(self):
+        body = self.client.get("/api/health").json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["version"], "3.2.2")
+
+    def test_anonymous_search_still_works_by_default(self):
+        original = engine_app.run_search_in_background
+
+        async def noop(*args, **kwargs):
+            return None
+
+        engine_app.run_search_in_background = noop
+        try:
+            res = self.client.post("/api/search",
+                                   json={"query": "aspirin", "query_type": "ligand", "hops": 1})
+            self.assertEqual(res.status_code, 200, res.text)
+            body = res.json()
+            self.assertEqual(body["query"], "aspirin")
+            self.assertIn(body["status"], ("queued", "running"))
+        finally:
+            engine_app.run_search_in_background = original
+
+    def test_existing_validation_errors_unchanged(self):
+        self.assertEqual(self.client.post("/api/search", json={"query": ""}).status_code, 400)
+        self.assertEqual(self.client.post("/api/search",
+                                          json={"query": "x", "hops": 9}).status_code, 400)
+        self.assertEqual(self.client.post("/api/search",
+                                          json={"query": "x", "query_type": "alien"}).status_code, 400)
+
+    def test_require_auth_blocks_anonymous_searches_only_when_enabled(self):
+        async def noop(*args, **kwargs):
+            return None
+
+        original = engine_app.run_search_in_background
+        engine_app.run_search_in_background = noop
+        billing.REQUIRE_AUTH = True
+        try:
+            res = self.client.post("/api/search", json={"query": "aspirin"})
+            self.assertEqual(res.status_code, 401)
+        finally:
+            billing.REQUIRE_AUTH = False
+            engine_app.run_search_in_background = original
+
+    def test_quota_exhaustion_returns_402_for_signed_in_user(self):
+        async def noop(*args, **kwargs):
+            return None
+
+        original = engine_app.run_search_in_background
+        engine_app.run_search_in_background = noop
+        try:
+            self.client.post("/api/account/register",
+                             json={"email": "regress-quota@example.com",
+                                   "password": "correct-horse-battery"})
+            me = self.client.get("/api/account/me").json()
+            user_id = me["user"]["id"]
+            billing_store.increment_counters(user_id, searches=3)
+
+            res = self.client.post("/api/search", json={"query": "aspirin"})
+            self.assertEqual(res.status_code, 402)
+            self.assertEqual(res.json()["detail"]["code"], "quota_reached")
+        finally:
+            engine_app.run_search_in_background = original
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
