@@ -20,8 +20,17 @@ export function isSupabaseConfigured(url?: string | null): boolean {
   return Boolean(url);
 }
 
-/** Create (once) the Supabase client. Returns null when it is not configured. */
+/** Create (once) the Supabase client. Returns null when it is not configured.
+ *
+ *  Called with no arguments it returns the client built earlier. Pages that
+ *  load their config asynchronously (e.g. /reset-password) rely on this: the
+ *  cached client is the only way their later handlers can reach it.
+ */
 export function getSupabase(url?: string | null, anonKey?: string | null): SupabaseClient | null {
+  // No arguments: hand back the client an earlier call already created. Without
+  // this, a page that bootstraps the client from /api/billing/config gets null
+  // in its submit handler and silently does nothing.
+  if (!url && !anonKey) return client;
   if (!url || !anonKey) return null;
   if (client && configuredUrl === url) return client;
 
