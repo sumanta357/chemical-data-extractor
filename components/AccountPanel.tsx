@@ -165,6 +165,14 @@ export default function AccountPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The panel renders into a portal on <body>, which only exists in the
+  // browser. This flag gates that portal so the server-rendered HTML matches
+  // the first client render; without it set to true the modal is never
+  // created and clicking the trigger looks completely dead.
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (initiallyOpen && !opened) {
       setOpened(true);
@@ -450,6 +458,12 @@ export default function AccountPanel({
                   {checkout.phase === 'cancelled' && 'Payment cancelled. Nothing was charged.'}
                   {checkout.phase === 'error' && <span className="text-amber-400">{checkout.message}</span>}
                 </div>
+              )}
+
+              {plans.filter((p) => p.price_inr > 0).length === 0 && (
+                <p className="text-xs text-gray-500">
+                  Plans could not be loaded. Please close this and try again.
+                </p>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
