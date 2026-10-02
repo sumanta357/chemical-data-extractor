@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS users (
     analyst_used        INTEGER NOT NULL DEFAULT 0,
     razorpay_customer_id TEXT,
     email_verified_at   TEXT,
+    google_sub          TEXT,
     academic_email      TEXT,
     institute_name      TEXT,
     institute_id        TEXT,
@@ -170,6 +171,7 @@ CREATE INDEX IF NOT EXISTS idx_users_institute_id ON users(institute_id);
 CREATE INDEX IF NOT EXISTS idx_users_academician_type ON users(academician_type);
 CREATE INDEX IF NOT EXISTS idx_users_academic_email ON users(academic_email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub);
 """
 
 # Identical shape; Postgres needs a sequence-backed identity instead of
@@ -183,6 +185,7 @@ POSTGRES_INDEX_DDL = INDEX_DDL
 # already has a `users` table these are applied as idempotent ALTERs.
 PROFILE_COLUMNS = {
     "email_verified_at": "TEXT",
+    "google_sub": "TEXT",
     "academic_email": "TEXT",
     "institute_name": "TEXT",
     "institute_id": "TEXT",
@@ -265,6 +268,44 @@ def get_user_by_id(user_id: int) -> Optional[dict]:
 
 def touch_last_login(user_id: int) -> None:
     db.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_iso(), user_id))
+
+
+# ── Google accounts ──────────────────────────────────────────────────────────
+
+# An account created through Google has no password. The placeholder is not a
+# valid hash (verify_password splits on '$' and fails), so a password sign-in
+# can never be forged against it, while the column stays NOT NULL.
+OAUTH_PASSWORD_PREFIX = "oauth:"
+
+
+def is_oauth_account(user: dict) -> bool:
+    return str(user.get("password_hash") or "").startswith(OAUTH_PASSWORD_PREFIX)
+
+
+def get_user_by_google_sub(sub: str) -> Optional[dict]:
+    if not sub:
+        return None
+    return db.query_one("SELECT * FROM users WHERE google_sub = ?", (sub,))
+
+
+def create_oauth_user(email: str, name: Optional[str], sub: str) -> dict:
+    """Create an account for a verified Google identity. The address is
+    confirmed by Google, so it is marked verified immediately."""
+    now = _now()
+    user_id = db.execute(
+        """INSERT INTO users (email, password_hash, name, created_at, plan,
+               plan_status, period_start, period_end, google_sub, email_verified_at)
+           VALUES (?, ?, ?, ?, 'free', 'active', ?, ?, ?, ?)""",
+        (email.lower(), f"{OAUTH_PASSWORD_PREFIX}{sub}", name, _iso(now),
+         _iso(now), _iso(now + timedelta(days=30)), sub, _iso(now)),
+    )
+    return get_user_by_id(user_id)
+
+
+def link_google_sub(user_id: int, sub: str) -> dict:
+    db.execute("UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL",
+               (sub, user_id))
+    return get_user_by_id(user_id) or {}
 
 
 # ── Academic profile ─────────────────────────────────────────────────────────

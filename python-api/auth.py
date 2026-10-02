@@ -26,6 +26,7 @@ if str(_HERE) not in sys.path:
 
 import billing_store  # noqa: E402
 import emailer  # noqa: E402
+import google_auth  # noqa: E402
 
 # Opt-in: when 1, an account must confirm its email address before it can sign
 # in. Off by default so existing accounts keep working untouched.
@@ -269,6 +270,42 @@ def reset_password(token: str, new_password: str) -> None:
     billing_store.set_password(user_id, hash_password(new_password))
     # Every existing session dies with the old credential.
     billing_store.delete_all_sessions(user_id)
+
+
+def login_with_google(credential: str, request: Request, response: Response) -> dict:
+    """Sign in (or sign up) with a verified Google identity.
+
+    The address comes from a token Google signed, never from the browser. An
+    existing account that still uses a password is never taken over by Google
+    sign-in — that address already authenticates by password, and silently
+    handing it to a Google identity would be an account-takeover path.
+    """
+    claims = google_auth.verify_id_token(credential)
+    email = validate_email(claims.get("email", ""))
+    sub = str(claims["sub"])
+    name = _clean(claims.get("name"), 120) or None
+
+    user = billing_store.get_user_by_google_sub(sub)
+    if user is None:
+        existing = billing_store.get_user_by_email(email)
+        if existing and not billing_store.is_oauth_account(existing):
+            raise HTTPException(
+                status_code=400,
+                detail={"message": "An account already uses this email with a password. "
+                                   "Sign in with it, or reset the password first.",
+                        "code": "password_account_exists"},
+            )
+        if existing:
+            user = billing_store.link_google_sub(existing["id"], sub)
+        else:
+            user = billing_store.create_oauth_user(email, name, sub)
+
+    token = billing_store.create_session(
+        user["id"], request.headers.get("user-agent"), SESSION_TTL_DAYS
+    )
+    billing_store.touch_last_login(user["id"])
+    set_session_cookie(response, token)
+    return billing_store.get_user_by_id(user["id"])
 
 
 def logout(request: Request, response: Response) -> None:

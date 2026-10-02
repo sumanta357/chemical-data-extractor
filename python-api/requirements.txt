@@ -15,5 +15,9 @@ requests>=2.31.0         # HTTP for enrichment pipeline (CrossRef, PubChem)
 # SQLite file, so it costs nothing on deployments that do not need it.
 psycopg[binary]>=3.1.0
 
+# "Sign in with Google": verifies Google's RS256 ID tokens against their
+# published JWKS. cryptography comes in as a PyJWT extra.
+PyJWT[crypto]>=2.8.0
+
 # Optional: uncomment for Parquet export support (adds ~200MB)
 # pyarrow>=12.0.0

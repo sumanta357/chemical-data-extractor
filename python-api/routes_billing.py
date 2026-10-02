@@ -21,6 +21,7 @@ import billing
 import billing_store
 import db as _db
 import emailer
+import google_auth
 
 LOG = logging.getLogger("scigraph.billing.api")
 
@@ -72,6 +73,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleSignInRequest(BaseModel):
+    credential: str
+
+
 class CreateOrderRequest(BaseModel):
     plan: str
 
@@ -109,6 +114,8 @@ async def billing_config():
             "require_verified_email": auth.REQUIRE_VERIFIED_EMAIL,
         },
         "admin_directory": bool(ADMIN_TOKEN),
+        # Public OAuth client id — the browser needs it to render the button.
+        "google_client_id": google_auth.GOOGLE_CLIENT_ID or None,
     }
 
 
@@ -133,6 +140,16 @@ async def register(payload: RegisterRequest, request: Request, response: Respons
 @router.post("/api/account/login")
 async def login(payload: LoginRequest, request: Request, response: Response):
     user = auth.login(request, response, payload.email, payload.password)
+    return {"user": _public_user(user), "entitlement": billing.entitlement_for(user)}
+
+
+@router.post("/api/account/google")
+async def google_sign_in(payload: GoogleSignInRequest, request: Request, response: Response):
+    """Verify a Google credential server-side and start a normal session."""
+    try:
+        user = auth.login_with_google(payload.credential, request, response)
+    except google_auth.GoogleAuthError as exc:
+        raise HTTPException(status_code=exc.status, detail=str(exc))
     return {"user": _public_user(user), "entitlement": billing.entitlement_for(user)}
 
 

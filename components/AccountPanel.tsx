@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AcademicProfile,
@@ -13,6 +13,7 @@ import {
   getMe,
   getPlans,
   getProfile,
+  googleSignIn,
   loadCheckoutScript,
   login,
   logout,
@@ -93,6 +94,70 @@ export default function AccountPanel({
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<CheckoutState>({ phase: 'idle' });
   const [mounted, setMounted] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  // The host page owns `open`; the emailed-link pages own `opened`.
+  const isPanelOpen = hideTrigger ? opened : open;
+
+  // ── "Sign in with Google" ───────────────────────────────────────────────
+  // Google Identity Services renders the button into our own div. The
+  // credential it returns is a JWT the server verifies; nothing is trusted
+  // from the browser.
+  const handleGoogleCredential = useCallback(
+    async (response: { credential?: string }) => {
+      if (!response?.credential) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const result = await googleSignIn(response.credential);
+        setEntitlement(result.entitlement);
+        onChange?.(result.entitlement);
+        setNotice(`Signed in as ${result.user.email}.`);
+        setView('account');
+      } catch (err: any) {
+        setError(err.message || 'Google sign-in was not accepted');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onChange],
+  );
+
+  const clientId = config?.google_client_id;
+  useEffect(() => {
+    if (!clientId || !googleButtonRef.current) return;
+    let cancelled = false;
+    const render = () => {
+      const target = googleButtonRef.current;
+      const google = (window as any).google;
+      if (cancelled || !target || !google?.accounts?.id) return;
+      target.innerHTML = ''; // renderButton appends; clear to avoid duplicates
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredential,
+      });
+      google.accounts.id.renderButton(target, {
+        theme: 'filled_black',
+        size: 'medium',
+        width: 280,
+        text: 'continue_with',
+      });
+    };
+    if ((window as any).google?.accounts?.id) {
+      render();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = render;
+      script.onerror = () =>
+        setError('Could not load Google sign-in. Check your connection and try again.');
+      document.body.appendChild(script);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, handleGoogleCredential, isPanelOpen]);
 
   useEffect(() => setMounted(true), []);
 
@@ -340,7 +405,7 @@ export default function AccountPanel({
     </button>
   );
 
-  const modal = (hideTrigger ? opened : open) ? (
+  const modal = isPanelOpen ? (
     <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm px-4 py-10">
       <div className="glass-card w-full max-w-2xl p-0 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/60">
@@ -477,6 +542,18 @@ export default function AccountPanel({
 
           {view === 'account' && !signedIn && authView === 'form' && (
             <form onSubmit={submitAuth} className="space-y-3 max-w-sm">
+              {clientId && (
+                <div className="pb-1">
+                  <div ref={googleButtonRef} className="flex justify-center min-h-[44px]" />
+                  <div className="flex items-center gap-3 my-4">
+                    <span className="h-px flex-1 bg-gray-800" />
+                    <span className="text-[10px] uppercase tracking-widest text-gray-600">
+                      or
+                    </span>
+                    <span className="h-px flex-1 bg-gray-800" />
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Email</label>
                 <input

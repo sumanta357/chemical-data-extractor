@@ -42,6 +42,7 @@ export interface BillingConfig {
   currency: string;
   auth_required: boolean;
   checkout_script: string;
+  google_client_id?: string | null;
 }
 
 async function api(path: string, init?: RequestInit): Promise<any> {
@@ -166,6 +167,13 @@ export const login = (email: string, password: string) =>
   }) as Promise<{ user: any; entitlement: Entitlement }>;
 
 export const logout = () => api('/api/account/logout', { method: 'POST' });
+
+/** Exchange a Google Identity Services credential for a session. */
+export const googleSignIn = (credential: string) =>
+  api('/api/account/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential }),
+  }) as Promise<{ user: any; entitlement: Entitlement }>;
 
 export const createOrder = (plan: string) =>
   api('/api/billing/create-order', {

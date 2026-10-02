@@ -228,3 +228,39 @@ cd python-api && python3 -m pytest tests/ -q
 128 tests: the original billing suite, the new accounts suite (directory
 filters/sorting, admin token, verification, reset, throttle, token single-use,
 per-plan quota accumulation) and static-route resolution for the new pages.
+
+---
+
+# "Sign in with Google"
+
+Google Identity Services on top of the same accounts, sessions and quotas. The
+browser receives a JWT credential and posts it to `POST /api/account/google`;
+**nothing is trusted from the browser** — the server verifies the RS256
+signature against Google's published keys and requires our client id as the
+audience, a Google issuer, an unexpired `exp`, and `email_verified`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | — | OAuth 2.0 **Web application** client id. Unset ⇒ the endpoint answers 503 and the button is hidden |
+
+Set it up in Google Cloud Console → *APIs & Services* → *Credentials* →
+*Create credentials* → *OAuth client ID* → **Web application**, with
+`https://chemical-data-extractor.onrender.com` as an authorised JavaScript
+origin (and `http://localhost:8000` for local testing). Add
+`http://localhost:8000/api/account/google` as a redirect URI only if you later
+switch from the GIS button to the redirect flow.
+
+### Account rules
+
+* First sign-in creates an account with **no password** — the password column
+  holds an `oauth:<sub>` placeholder that can never pass verification, so a
+  Google-only account cannot be signed into with a guessed password.
+* Google already verified the address, so the account is marked verified at once.
+  Email verification and password reset therefore apply to password accounts.
+* If that address already belongs to an account that **uses a password**, Google
+  sign-in is refused with `password_account_exists` rather than silently handing
+  the account over. The user signs in with their password, or resets it.
+* Accounts are matched on Google's `sub` first, then on the verified email.
+
+`PyJWT[crypto]` was added to `python-api/requirements.txt` for the signature
+check; Google's signing keys are cached for an hour.
