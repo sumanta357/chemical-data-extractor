@@ -16,6 +16,7 @@ code in billing_store.py is identical on either backend.
 """
 
 import os
+import socket
 import sqlite3
 import threading
 import time
@@ -117,6 +118,34 @@ class Database:
         conn.execute("PRAGMA busy_timeout=5000")
         return conn
 
+    @staticmethod
+    def _connect_variants() -> list[dict]:
+        """Connection attempts in order of preference.
+
+        Neon (and most managed Postgres) publish both A and AAAA records. Hosts
+        without IPv6 routing — Render's containers among them — fail
+        immediately when libpq resolves the AAAA record first, so prefer an
+        explicit IPv4 address via libpq's `hostaddr` and keep the plain
+        connection as the final fallback.
+        """
+        variants: list[dict] = []
+
+        override = os.environ.get("DATABASE_HOSTADDR", "").strip()
+        if override:
+            variants.append({"hostaddr": override})
+
+        try:
+            from urllib.parse import urlsplit
+            host = urlsplit(DATABASE_URL).hostname
+            if host:
+                for info in socket.getaddrinfo(host, 5432, socket.AF_INET)[:1]:
+                    variants.append({"hostaddr": info[4][0]})
+        except Exception:
+            pass
+
+        variants.append({})
+        return variants
+
     def _pg(self):
         try:
             import psycopg
@@ -124,19 +153,26 @@ class Database:
         except Exception as exc:
             raise DatabaseUnavailable(f"psycopg is not installed: {exc}")
         try:
-            return psycopg.connect(
-                DATABASE_URL,
-                row_factory=dict_row,
-                connect_timeout=10,
-                application_name="scigraph-api",
-                options="-c statement_timeout=15000",
-            )
-        except Exception as exc:
-            # Report enough to diagnose (host, port, TLS) but never the password.
-            detail = _scrub(str(exc)).strip().replace("\n", " ")[:300]
-            raise DatabaseUnavailable(
-                f"could not reach the configured database: {detail or exc.__class__.__name__}"
-            )
+            base = {
+                "row_factory": dict_row,
+                "connect_timeout": 10,
+                "application_name": "scigraph-api",
+                "options": "-c statement_timeout=15000",
+            }
+        except Exception as exc:  # pragma: no cover - defensive
+            raise DatabaseUnavailable(f"psycopg is not usable: {exc}")
+
+        attempts: list[str] = []
+        for extra in self._connect_variants():
+            label = extra.get("hostaddr", "default")
+            try:
+                return psycopg.connect(DATABASE_URL, **{**base, **extra})
+            except Exception as exc:
+                # Report enough to diagnose (host, port, TLS) but never the password.
+                attempts.append(f"{label}: {_scrub(str(exc)).strip().replace(chr(10), ' ')[:200]}")
+
+        detail = " | ".join(attempts)[-300:] if attempts else "unknown"
+        raise DatabaseUnavailable(f"could not reach the configured database: {detail}")
 
     def _connection(self):
         if not USE_POSTGRES:

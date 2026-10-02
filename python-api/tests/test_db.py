@@ -191,5 +191,32 @@ class StatusAndScrubbingTests(unittest.TestCase):
             self.assertIsNone(status["error"])
 
 
+class ConnectVariantTests(unittest.TestCase):
+    """Render containers have no IPv6 route, so the connection must prefer an
+    explicit IPv4 address and fall back to plain DNS."""
+
+    def test_variants_end_with_the_plain_connection(self):
+        variants = dbmod.Database._connect_variants()
+        self.assertEqual(variants[-1], {}, "the plain connection must always be tried")
+
+    def test_ipv4_address_is_preferred_when_resolvable(self):
+        original = dbmod.DATABASE_URL
+        # localhost resolves to IPv4 without touching the network.
+        dbmod.DATABASE_URL = "postgresql://u:pw@127.0.0.1/neondb"
+        try:
+            variants = dbmod.Database._connect_variants()
+            self.assertEqual(variants[0], {"hostaddr": "127.0.0.1"})
+        finally:
+            dbmod.DATABASE_URL = original
+
+    def test_explicit_hostaddr_override_is_used_first(self):
+        os.environ["DATABASE_HOSTADDR"] = "203.0.113.10"
+        try:
+            variants = dbmod.Database._connect_variants()
+            self.assertEqual(variants[0], {"hostaddr": "203.0.113.10"})
+        finally:
+            os.environ.pop("DATABASE_HOSTADDR", None)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
