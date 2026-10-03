@@ -234,6 +234,13 @@ _shutdown = asyncio.Event()
 # OOM-kills the container (Render free tier = 512MB shared with Node).
 _search_slots = asyncio.Semaphore(int(os.environ.get("MAX_CONCURRENT_SEARCHES", "1")))
 
+# Download 2D structure images during enrichment? On by default. Set
+# SEARCH_ENRICH_IMAGES=0 on a memory-constrained host (Render free tier) to cut
+# the peak footprint of a search; the enriched Excel workbook is still produced.
+ENRICH_IMAGES = os.environ.get("SEARCH_ENRICH_IMAGES", "1").strip().lower() not in (
+    "0", "false", "no", "off",
+)
+
 # ── Per-IP search rate limit ────────────────────────────────────────────────
 # Account creation happens in the browser against Supabase directly, so this
 # server never observes a sign-up and cannot rate-limit one. Anyone can mint
@@ -552,6 +559,12 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
                     str(ENGINE_DIR / "enrich_exports.py"),
                     "--export-dir", export_dir,
                 ]
+                # Downloading a structure image per compound is the peak-memory
+                # step of a search. On a 512MB container that is what gets the
+                # process OOM-killed mid-run, so it can be turned off while
+                # keeping the enriched multi-sheet workbook.
+                if not ENRICH_IMAGES:
+                    enrich_cmd.append("--skip-images")
                 enrich_proc = await asyncio.create_subprocess_exec(
                     *enrich_cmd,
                     stdout=asyncio.subprocess.PIPE,

@@ -802,17 +802,17 @@ def write_summary_sheet(wb, compound_count, compound_enriched, inhibitor_count,
 
 # ── Main Pipeline ───────────────────────────────────────────────────────────
 
-def run_enrichment(export_dir: str = "exports") -> None:
+def run_enrichment(export_dir: str = "exports", skip_images: bool = False) -> None:
     """Run the full enrichment pipeline on a given export directory.
     
     Args:
         export_dir: Path to the directory containing nodes.csv and edges.csv
     """
     set_export_dir(export_dir)
-    return _run_pipeline()
+    return _run_pipeline(skip_images=skip_images)
 
 
-def _run_pipeline():
+def _run_pipeline(skip_images: bool = False):
     start_time = time.time()
     print("=" * 60)
     print("  CHEMICAL DATA EXTRACTOR — ENRICHMENT PIPELINE")
@@ -830,8 +830,15 @@ def _run_pipeline():
     compound_enriched = sum(1 for n in compound_nodes.values() if n.get("_enriched_smiles"))
 
     # 3. Download structure images
-    print("\n🖼️  Downloading 2D structure images...")
-    img_count = download_structure_images(compound_nodes)
+    # Skipped on small containers: one HTTP fetch and image write per compound
+    # is the peak-memory step, and skipping it costs only the thumbnails while
+    # keeping the enriched workbook. See SEARCH_ENRICH_IMAGES in app.py.
+    if skip_images:
+        print("\n🖼️  Skipping 2D structure images (SEARCH_ENRICH_IMAGES=0)")
+        img_count = 0
+    else:
+        print("\n🖼️  Downloading 2D structure images...")
+        img_count = download_structure_images(compound_nodes)
 
     # 4. Enrich publications
     print("\n📄 Enriching publications (CrossRef)...")
@@ -885,8 +892,10 @@ def main():
     parser = argparse.ArgumentParser(description="Enrich chemical data exports with SMILES, properties, and publication metadata.")
     parser.add_argument("--export-dir", default="exports",
                         help="Directory containing nodes.csv and edges.csv (default: ./exports)")
+    parser.add_argument("--skip-images", action="store_true",
+                        help="Skip downloading 2D structure images (lower peak memory)")
     args = parser.parse_args()
-    return run_enrichment(args.export_dir)
+    return run_enrichment(args.export_dir, skip_images=args.skip_images)
 
 
 if __name__ == "__main__":
