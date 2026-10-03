@@ -539,6 +539,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             )
             state["elapsed_seconds"] = time.time() - start_time
             _save_search(state)
+            _discard_failed_export(export_dir)
             return
 
         await read_task
@@ -606,6 +607,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
         else:
             state["status"] = "failed"
             state["error"] = f"Process exited with code {rc}"
+            _discard_failed_export(export_dir)
             state["elapsed_seconds"] = time.time() - start_time
             _save_search(state)
 
@@ -614,6 +616,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
         state["error"] = str(e)
         state["elapsed_seconds"] = time.time() - start_time
         _save_search(state)
+        _discard_failed_export(export_dir)
 
 
 def _update_progress(state: dict, line: str):
@@ -2314,6 +2317,23 @@ MAX_STORAGE_MB = int(os.environ.get("MAX_STORAGE_MB", "500"))
 MAX_LOG_LINES_COMPLETED = 100  # Keep only last 100 log lines for completed searches
 EXPORT_MAX_AGE_MINUTES = 30  # Auto-delete exports older than 30 minutes
 CLEANUP_INTERVAL_SECONDS = 1800  # Run cleanup every 30 minutes
+
+def _discard_failed_export(export_dir: str) -> None:
+    """Delete a failed search's export directory immediately.
+
+    A run that died part-way leaves partial files behind, and on a small
+    container that disk is scarce — holding them for the full retention window
+    costs space a working search needs. A search that completed keeps its files
+    until the normal expiry; a search that failed is dropped straight away.
+    """
+    if not export_dir:
+        return
+    try:
+        shutil.rmtree(export_dir, ignore_errors=True)
+        LOG.info("Removed failed export dir %s", export_dir)
+    except Exception as exc:
+        LOG.warning("Could not remove failed export dir %s: %s", export_dir, exc)
+
 
 def _cleanup_old_exports():
     """Delete export directories older than EXPORT_MAX_AGE_MINUTES."""
