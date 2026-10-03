@@ -173,10 +173,48 @@ export const listAcademics = (params: Record<string, string>, adminToken: string
   }>;
 };
 
-export const createOrder = (plan: string) =>
+/** Academic plan eligibility, as the server sees it. */
+export interface AcademicVerification {
+  required: boolean;
+  status: 'none' | 'pending' | 'verified' | 'rejected' | string;
+  verified_email?: string | null;
+  verified_at?: string | null;
+  institute_name?: string | null;
+  academician_type?: string | null;
+  /** True once SMTP is configured and mailbox confirmation is expected. */
+  mailbox_proof_required?: boolean;
+}
+
+export const getAcademicStatus = () =>
+  api('/api/account/academic/status') as Promise<{
+    verification: AcademicVerification;
+    profile: AcademicProfile;
+  }>;
+
+export const verifyAcademic = (fields: {
+  academic_email: string;
+  institute_name?: string;
+  institute_id?: string;
+  academician_type?: string;
+}) =>
+  api('/api/account/academic/verify', {
+    method: 'POST',
+    body: JSON.stringify(fields),
+  }) as Promise<{
+    status: string;
+    message: string;
+    verification: AcademicVerification;
+    token: string;
+    expires_in: number;
+  }>;
+
+export const createOrder = (plan: string, academicVerificationToken?: string | null) =>
   api('/api/billing/create-order', {
     method: 'POST',
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({
+      plan,
+      ...(academicVerificationToken ? { academic_verification_token: academicVerificationToken } : {}),
+    }),
   }) as Promise<{
     order_id: string;
     amount: number;

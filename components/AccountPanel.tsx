@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AcademicProfile,
@@ -18,8 +18,13 @@ import {
   verifyPayment,
 } from '@/lib/billing';
 import { authErrorMessage, getSupabase } from '@/lib/supabase';
+import {
+  getAcademicStatus,
+  verifyAcademic,
+  type AcademicVerification,
+} from '@/lib/billing';
 
-type View = 'account' | 'plans';
+type View = 'account' | 'plans' | 'academic';
 type AuthView = 'form' | 'forgot';
 
 const ACADEMICIAN_TYPES = [
@@ -97,6 +102,11 @@ export default function AccountPanel({
   const [profile, setProfile] = useState<AcademicProfile>(EMPTY_PROFILE);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<CheckoutState>({ phase: 'idle' });
+  const [academic, setAcademic] = useState<AcademicVerification | null>(null);
+  const [academicToken, setAcademicToken] = useState<string | null>(null);
+  const [academicBusy, setAcademicBusy] = useState(false);
+  const [academicError, setAcademicError] = useState<string | null>(null);
+  const [academicNotice, setAcademicNotice] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   // The host page owns `open`; the emailed-link pages own `opened`.
   const isPanelOpen = hideTrigger ? opened : open;
@@ -129,6 +139,9 @@ export default function AccountPanel({
       setConfig(cfg);
       onChange?.(me.entitlement);
       if (me.entitlement.signed_in) void loadProfile();
+      void getAcademicStatus()
+        .then((r) => setAcademic(r.verification))
+        .catch(() => {});
     } catch {
       /* stay anonymous if the account service is unavailable */
     }
@@ -309,7 +322,31 @@ export default function AccountPanel({
     });
   }
 
-  async function startCheckout(plan: Plan) {
+  async function runAcademicVerification(e?: FormEvent) {
+    e?.preventDefault();
+    setAcademicBusy(true);
+    setAcademicError(null);
+    setAcademicNotice(null);
+    try {
+      const result = await verifyAcademic({
+        academic_email: profile.academic_email || '',
+        institute_name: profile.institute_name || undefined,
+        institute_id: profile.institute_id || undefined,
+        academician_type: profile.academician_type || undefined,
+      });
+      setAcademic(result.verification);
+      setAcademicToken(result.token);
+      setCheckout({ phase: 'idle' });
+      setAcademicNotice(result.message);
+    } catch (err: any) {
+      setAcademicToken(null);
+      setAcademicError(err?.message || 'Could not verify that academic email.');
+    } finally {
+      setAcademicBusy(false);
+    }
+  }
+
+  async function startCheckout(plan: Plan, academicToken?: string | null) {
     setCheckout({ phase: 'preparing' });
     setError(null);
     if (!signedIn) {
@@ -321,7 +358,7 @@ export default function AccountPanel({
     }
     try {
       if (!config?.key_id) throw new Error('Payments are not configured on this server yet.');
-      const order = await createOrder(plan.id);
+      const order = await createOrder(plan.id, academicToken);
       const loaded = await loadCheckoutScript(config.checkout_script);
       if (!loaded) throw new Error('Could not load the secure checkout.');
 
@@ -396,6 +433,7 @@ export default function AccountPanel({
   }
 
   const signedIn = entitlement?.signed_in ?? false;
+  const academicVerified = academic?.status === 'verified';
   const used = entitlement?.searches_used ?? 0;
   const limit = entitlement?.searches_limit ?? 0;
   // Only offer Google when the Supabase project has it switched on. Clicking a
@@ -429,7 +467,7 @@ export default function AccountPanel({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/60">
           <div>
             <h3 className="text-base font-semibold text-gray-100">
-              {view === 'plans' ? 'Plans' : 'Your account'}
+              {view === 'plans' ? 'Plans' : view === 'academic' ? 'Academic verification' : 'Your account'}
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
               {view === 'plans'
@@ -479,7 +517,18 @@ export default function AccountPanel({
                     <button
                       key={plan.id}
                       type="button"
-                      onClick={() => startCheckout(plan)}
+                      onClick={() => {
+                        if (plan.id === 'academic' && !academicVerified) {
+                          // Academic must be verified server-side before money
+                          // moves; show the verification step instead of checkout.
+                          setCheckout({ phase: 'idle' });
+                          setAcademicError(null);
+                          setAcademicNotice(null);
+                          setView('academic');
+                          return;
+                        }
+                        startCheckout(plan, plan.id === 'academic' ? academicToken : null);
+                      }}
                       disabled={checkoutBusy}
                       aria-busy={checkout.phase === 'preparing'}
                       className="text-left border border-gray-800 rounded p-4 flex flex-col hover:border-cyan-700 hover:bg-cyan-500/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-800 disabled:hover:bg-transparent focus:outline-none focus-visible:border-cyan-600"
@@ -541,6 +590,95 @@ export default function AccountPanel({
               >
                 Back to sign in
               </button>
+            </form>
+          )}
+
+          {view === 'academic' && signedIn && (
+            <form onSubmit={runAcademicVerification} className="space-y-3 max-w-sm">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                The Academic plan is for students and academic labs. Enter your
+                institutional email and we will check it against the recognised
+                academic domains before you pay.
+              </p>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Academic email</label>
+                <input
+                  type="email"
+                  required
+                  value={profile.academic_email || ''}
+                  onChange={(e) =>
+                    setProfile((p) => ({ ...p, academic_email: e.target.value }))
+                  }
+                  placeholder="you@university.edu"
+                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Institution</label>
+                <input
+                  type="text"
+                  value={profile.institute_name || ''}
+                  onChange={(e) =>
+                    setProfile((p) => ({ ...p, institute_name: e.target.value }))
+                  }
+                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Your role</label>
+                <select
+                  value={profile.academician_type || ''}
+                  onChange={(e) =>
+                    setProfile((p) => ({ ...p, academician_type: e.target.value }))
+                  }
+                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                >
+                  <option value="">Select…</option>
+                  {ACADEMICIAN_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {academicNotice && (
+                <p className="text-xs text-emerald-400">{academicNotice}</p>
+              )}
+              {academicError && <p className="text-xs text-red-400">{academicError}</p>}
+
+              <button
+                type="submit"
+                disabled={academicBusy}
+                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-sm py-2 disabled:opacity-50"
+              >
+                {academicBusy ? 'Checking…' : 'Verify academic email'}
+              </button>
+
+              {academicVerified && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const plan = plans.find((p) => p.id === 'academic');
+                    if (plan) startCheckout(plan, academicToken);
+                  }}
+                  disabled={checkoutBusy || !academicToken}
+                  className="w-full border border-cyan-700 hover:bg-cyan-500/10 text-cyan-300 text-sm py-2 disabled:opacity-50"
+                >
+                  Continue to payment — ₹249
+                </button>
+              )}
+
+              <p className="text-[11px] text-gray-600">
+                {academicVerified
+                  ? `Verified as ${academic?.verified_email}. The verification is checked again on the server when the payment is made.`
+                  : academic?.mailbox_proof_required
+                    ? 'We will email a confirmation link to the address you enter.'
+                    : 'We currently confirm that the domain belongs to an academic institution.'}
+              </p>
             </form>
           )}
 

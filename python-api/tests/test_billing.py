@@ -551,12 +551,13 @@ class ApiTests(unittest.TestCase):
     def test_payment_status_endpoint(self):
         self._sign_in_as("api-status@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
-            "id": "order_api_3", "amount": 49900, "currency": "INR"}
+            "id": "order_api000000003", "amount": 49900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
-        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_api_3",
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_api000000003",
                                              "amount": 49900, "status": "captured"}
-
-        res = self.client.get("/api/billing/payment-status/pay_api_3")
+        # Real Razorpay ids are `pay_<alphanumerics>`; the endpoint validates
+        # the shape, so the fixture has to look like a real one.
+        res = self.client.get("/api/billing/payment-status/pay_api000000003")
         self.assertEqual(res.status_code, 200)
         self.assertIn(res.json()["status"], ("captured", "pending"))
 
@@ -564,12 +565,12 @@ class ApiTests(unittest.TestCase):
         """A payment captured upstream but never verified must still land."""
         self._sign_in_as("api-reconcile@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
-            "id": "order_rec_http", "amount": 49900, "currency": "INR"}
+            "id": "order_rec0000000001", "amount": 49900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
-        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_rec_http",
+        billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_rec0000000001",
                                              "amount": 49900, "status": "captured"}
 
-        res = self.client.get("/api/billing/payment-status/pay_rec_http")
+        res = self.client.get("/api/billing/payment-status/pay_rec0000000001")
         self.assertEqual(res.status_code, 200, res.text)
         body = res.json()
         self.assertEqual(body["entitlement"]["plan"], "starter")

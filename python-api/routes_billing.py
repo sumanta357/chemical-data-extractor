@@ -11,12 +11,14 @@ import logging
 import os
 import secrets
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 
 import auth
+import academic
 import billing
 import billing_store
 import db as _db
@@ -27,6 +29,12 @@ LOG = logging.getLogger("scigraph.billing.api")
 # Shared secret for the Academic directory. Unset => the endpoint is disabled
 # and answers 404, so an unconfigured deployment exposes no customer data.
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
+
+
+def _iso_utc(timestamp: float) -> str:
+    """UTC ISO string, matching how billing_store writes timestamps so the
+    comparisons in SQL compare like with like."""
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat()
 
 
 def _require_admin(request: Request) -> None:
@@ -53,6 +61,16 @@ class ProfileRequest(BaseModel):
 
 class CreateOrderRequest(BaseModel):
     plan: str
+    # Short-lived attestation from POST /api/account/academic/verify. Required
+    # for the Academic plan; ignored for the others.
+    academic_verification_token: Optional[str] = None
+
+
+class AcademicVerifyRequest(BaseModel):
+    academic_email: str
+    institute_name: Optional[str] = None
+    institute_id: Optional[str] = None
+    academician_type: Optional[str] = None
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -162,6 +180,100 @@ async def put_profile(payload: ProfileRequest, request: Request):
     return {"profile": billing_store.update_profile(user["id"], fields)}
 
 
+# ── Academic plan verification ──────────────────────────────────────────────
+
+@router.get("/api/account/academic/status")
+async def academic_status(request: Request):
+    """Current verification state, for rendering the checkout gate."""
+    user = auth.current_user_required(request)
+    return {
+        "verification": academic.status_for(user),
+        "profile": billing_store.get_profile(user["id"]),
+    }
+
+
+@router.post("/api/account/academic/verify")
+async def verify_academic(payload: AcademicVerifyRequest, request: Request):
+    """Run the eligibility check and, when it passes, mark the account verified.
+
+    Rate limited per account so this cannot be used to enumerate which domains
+    are accepted by hammering the endpoint.
+    """
+    user = auth.current_user_required(request)
+
+    window_start = (time.time() - 3600)
+    try:
+        recent = billing_store.count_academic_attempts_since(
+            user["id"], _iso_utc(window_start)
+        )
+    except Exception as exc:
+        LOG.warning("Academic attempt count failed (%s) — allowing", exc.__class__.__name__)
+        recent = 0
+    if recent >= academic.MAX_ATTEMPTS_PER_HOUR:
+        raise HTTPException(
+            status_code=429,
+            detail={"message": "Too many verification attempts. Try again in an hour.",
+                    "code": "academic_rate_limited"},
+        )
+
+    try:
+        email = auth.validate_email(payload.academic_email)
+    except HTTPException:
+        raise HTTPException(status_code=400,
+                            detail={"message": "Enter a valid academic email address.",
+                                    "code": "academic_invalid_email"})
+
+    verdict = academic.classify_email(email)
+    billing_store.record_academic_attempt(
+        user["id"], email, verdict["domain"], verdict["eligible"], verdict["reason"]
+    )
+
+    if not verdict["eligible"]:
+        billing_store.set_academic_status(user["id"], "rejected")
+        raise HTTPException(
+            status_code=422,
+            detail={"message": verdict["reason"],
+                    "code": "academic_not_eligible",
+                    "domain": verdict["domain"]},
+        )
+
+    if billing_store.academic_email_claimed_by_other(email, user["id"]):
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "That academic email is already linked to another account.",
+                    "code": "academic_already_claimed"},
+        )
+
+    # Persist the institutional details alongside the verification so the
+    # academic directory and the refund trail agree with what was checked.
+    fields = auth.validate_profile({
+        "academic_email": email,
+        "institute_name": payload.institute_name,
+        "institute_id": payload.institute_id,
+        "academician_type": payload.academician_type,
+    })
+    billing_store.update_profile(user["id"], fields)
+    updated = billing_store.set_academic_status(user["id"], "verified", email)
+
+    token = academic.issue_token(user["id"], email)
+    if not token:
+        # Refuse rather than hand back an unverifiable purchase.
+        billing_store.set_academic_status(user["id"], "none")
+        raise HTTPException(
+            status_code=503,
+            detail={"message": "Academic verification is not configured on this server.",
+                    "code": "academic_verification_unavailable"},
+        )
+
+    return {
+        "status": "verified",
+        "message": f"{verdict['domain']} is an eligible academic institution.",
+        "verification": academic.status_for(updated),
+        "token": token,
+        "expires_in": academic.TOKEN_TTL_SECONDS,
+    }
+
+
 @router.get("/api/admin/academics")
 async def list_academics(
     request: Request,
@@ -205,6 +317,21 @@ async def create_order(payload: CreateOrderRequest, request: Request):
     plan = billing.get_plan(payload.plan)
     if plan["amount_paise"] <= 0:
         raise HTTPException(status_code=400, detail="The free plan does not require payment")
+
+    # Academic eligibility is enforced here, on the server, before any money
+    # moves. A caller who skips the UI and posts straight to this endpoint with
+    # plan='academic' gets the same refusal as the UI shows.
+    if plan["id"] == "academic":
+        allowed, reason = billing.academic_purchase_allowed(
+            user, payload.academic_verification_token
+        )
+        if not allowed:
+            LOG.info("Blocked Academic checkout for user %s: %s", user["id"], reason)
+            raise HTTPException(
+                status_code=403,
+                detail={"message": reason,
+                        "code": "academic_verification_required"},
+            )
 
     receipt = f"scigraph_{user['id']}_{int(time.time())}"
     try:
@@ -271,6 +398,11 @@ async def payment_status(payment_id: str, request: Request):
     Razorpay, never on the browser's word.
     """
     user = auth.current_user_required(request)
+    # Reject a malformed reference up front instead of reporting it as a
+    # "pending" payment. The value is parameterised everywhere it is used, so
+    # this is about an honest API rather than an injection defence.
+    if not billing.is_razorpay_reference(payment_id):
+        raise HTTPException(status_code=400, detail="Invalid payment reference")
     record = billing_store.get_payment(payment_id)
 
     if record and record.get("user_id") and record["user_id"] != user["id"]:

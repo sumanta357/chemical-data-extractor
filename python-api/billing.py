@@ -41,6 +41,8 @@ import requests as _requests  # noqa: E402  (already a project dependency)
 
 LOG = logging.getLogger("scigraph.billing")
 
+import academic  # noqa: E402  (eligibility rules + attestation tokens)
+
 RAZORPAY_API = "https://api.razorpay.com/v1"
 KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "").strip()
 KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()
@@ -220,6 +222,12 @@ def create_razorpay_order(plan: dict, user: dict, receipt: str) -> dict:
     if not order.get("id"):
         raise RazorpayError("The payment provider did not return an order id", 502)
     return order
+
+
+def is_razorpay_reference(value: str) -> bool:
+    """True when `value` has the shape of a Razorpay id. Exposed so routes can
+    reject a malformed reference instead of treating it as a pending payment."""
+    return bool(value) and bool(_RAZORPAY_REF_RE.match(value))
 
 
 def fetch_payment(payment_id: str) -> dict:
@@ -409,6 +417,24 @@ def _order_plan(order_id: str) -> Optional[tuple[dict, dict]]:
     return order, user
 
 
+def academic_purchase_allowed(user: dict, token: Optional[str] = None) -> tuple[bool, str]:
+    """Server-side authority for buying the Academic plan.
+
+    Called from order creation *and* again at activation, because a caller can
+    reach `activate_for_payment` through the webhook path, which never sees the
+    attestation token. Both checks must hold: the durable verified status, and a
+    live attestation that proves verification happened moments ago.
+    """
+    if not academic.is_verified(user):
+        return False, ("Verify your academic email before buying the Academic plan.")
+    if not token:
+        return False, ("Your verification expired. Please verify your academic email again.")
+    result = academic.verify_token(token, user["id"], user.get("academic_verified_email") or "")
+    if not result["ok"]:
+        return False, result["reason"]
+    return True, "verified"
+
+
 def activate_for_payment(payment: dict) -> Optional[dict]:
     """Activate the plan tied to a captured payment. Idempotent.
 
@@ -426,6 +452,26 @@ def activate_for_payment(payment: dict) -> Optional[dict]:
     order, user = found
 
     plan = PLANS.get(order["plan"], PLANS["free"])
+
+    # Academic entitlement is re-checked here, not just at checkout. Reaching
+    # this function through the webhook or the reconcile path means no
+    # attestation token was presented, so the durable verified status is the
+    # only thing we can check — and it is enough to refuse an Academic upgrade
+    # for an account that never verified. The payment is still recorded so the
+    # money is traceable and support can refund it.
+    if order["plan"] == "academic" and not academic.is_verified(user):
+        LOG.warning("Refusing Academic activation for user %s: not verified (payment %s)",
+                    user["id"], payment_id)
+        billing_store.record_payment(
+            payment_id, order_id, user["id"], order["plan"],
+            int(payment.get("amount") or order["amount_paise"]),
+            "captured_unverified", payment.get("method"), captured=True,
+        )
+        billing_store.record_subscription(
+            user["id"], "academic", "blocked_unverified", payment_id,
+            order["amount_paise"], plan["period_days"],
+        )
+        return None
     is_new = billing_store.record_payment(
         payment_id,
         order_id,

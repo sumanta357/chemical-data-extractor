@@ -138,6 +138,18 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     received_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS academic_verifications (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    academic_email TEXT NOT NULL,
+    domain         TEXT,
+    eligible       INTEGER NOT NULL DEFAULT 0,
+    reason         TEXT,
+    created_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_academic_verif_user ON academic_verifications(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_academic_verif_email ON academic_verifications(academic_email);
+
 """
 
 # Indexes are applied *after* the column migration, never with the tables: an
@@ -172,6 +184,13 @@ PROFILE_COLUMNS = {
     "institute_id": "TEXT",
     "phone": "TEXT",
     "academician_type": "TEXT",
+    # Academic plan eligibility: set only by the verification endpoint, reset
+    # whenever the academic address on the profile changes.
+    "academic_status": "TEXT",
+    "academic_verified_at": "TEXT",
+    "academic_verified_email": "TEXT",
+    "academic_attempts": "INTEGER",
+    "academic_last_attempt_at": "TEXT",
 }
 
 # The academician categories the Academic plan is sold against.
@@ -297,6 +316,9 @@ def get_profile(user_id: int) -> dict:
         "institute_id": user.get("institute_id"),
         "phone": user.get("phone"),
         "academician_type": user.get("academician_type"),
+        "academic_status": user.get("academic_status") or "none",
+        "academic_verified_at": user.get("academic_verified_at"),
+        "academic_verified_email": user.get("academic_verified_email"),
         "plan": user.get("plan", "free"),
         "email_verified": bool(user.get("email_verified_at")),
     }
@@ -314,7 +336,77 @@ def update_profile(user_id: int, fields: dict) -> dict:
             f"UPDATE users SET {assignments} WHERE id = ?",
             tuple(updates.values()) + (user_id,),
         )
+        # Changing the academic address invalidates any verification that was
+        # granted for the previous one. Without this, a verified user could keep
+        # their Academic plan while pointing the profile at a new address, and
+        # a fresh sign-up could carry over a stale 'verified' status.
+        if "academic_email" in updates:
+            current = get_user_by_id(user_id) or {}
+            if (current.get("academic_verified_email") or "").strip().lower() != \
+                    str(updates["academic_email"]).strip().lower():
+                clear_academic_verification(user_id)
     return get_profile(user_id)
+
+
+# ── Academic verification ────────────────────────────────────────────────────
+
+def set_academic_status(user_id: int, status: str, verified_email: Optional[str] = None) -> dict:
+    """Set the verification state. `verified` stamps the address and time;
+    anything else clears both so a stale address can never be acted on."""
+    now = _iso()
+    if status == "verified":
+        db.execute(
+            """UPDATE users SET academic_status = ?, academic_verified_at = ?,
+                   academic_verified_email = ?, academic_attempts = academic_attempts + 1,
+                   academic_last_attempt_at = ?
+                WHERE id = ?""",
+            ("verified", now, verified_email, now, user_id),
+        )
+    else:
+        db.execute(
+            """UPDATE users SET academic_status = ?, academic_verified_at = NULL,
+                   academic_verified_email = NULL, academic_last_attempt_at = ?
+                WHERE id = ?""",
+            (status, now, user_id),
+        )
+    return get_user_by_id(user_id) or {}
+
+
+def clear_academic_verification(user_id: int) -> None:
+    set_academic_status(user_id, "pending")
+
+
+def count_academic_attempts_since(user_id: int, since_iso: str) -> int:
+    """Attempts in the window, used to rate-limit verification requests."""
+    row = db.query_one(
+        """SELECT COUNT(*) AS n FROM academic_verifications
+            WHERE user_id = ? AND created_at >= ?""",
+        (user_id, since_iso),
+    )
+    return int(row["n"]) if row else 0
+
+
+def record_academic_attempt(user_id: int, academic_email: str, domain: str,
+                            eligible: bool, reason: str) -> None:
+    """Audit row for every verification attempt, successful or not."""
+    db.execute(
+        """INSERT INTO academic_verifications
+               (user_id, academic_email, domain, eligible, reason, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (user_id, academic_email, domain, 1 if eligible else 0, reason, _iso()),
+    )
+
+
+def academic_email_claimed_by_other(academic_email: str, user_id: int) -> bool:
+    """True when a *different* already-verified account holds this address.
+    One institutional address, one Academic subscription."""
+    row = db.query_one(
+        """SELECT id FROM users
+            WHERE academic_verified_email = ? AND academic_status = 'verified'
+              AND id != ? LIMIT 1""",
+        (academic_email.strip().lower(), user_id),
+    )
+    return row is not None
 
 
 # ── Academic directory ───────────────────────────────────────────────────────

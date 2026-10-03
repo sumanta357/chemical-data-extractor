@@ -58,6 +58,62 @@ truth — the browser can never send an amount.
 | `SUPABASE_URL` | for accounts | Supabase project URL (identity — see below) |
 | `SUPABASE_ANON_KEY` | for accounts | Supabase **anon / publishable** key, never `service_role` |
 | `ADMIN_TOKEN` | no | Shared secret for the academic directory. Unset ⇒ the endpoint 404s |
+| `ACADEMIC_VERIFICATION_SECRET` | for the Academic plan | Signing key for academic attestations. Falls back to `RAZORPAY_KEY_SECRET`; if neither is set, Academic checkout is refused rather than allowed |
+| `ACADEMIC_ALLOWED_DOMAINS` | no | Comma-separated institutional domains. When set, **only** these (and their subdomains) are eligible, replacing the built-in suffix list |
+| `ACADEMIC_TOKEN_TTL_SECONDS` | no | Attestation lifetime, default `1800` |
+| `ACADEMIC_MAX_ATTEMPTS_PER_HOUR` | no | Verification attempts per account per hour, default `5` |
+| `ACADEMIC_REQUIRE_MAILBOX_PROOF` | no | Set once SMTP is configured; tells the UI to promise a confirmation email |
+
+---
+
+## Academic plan verification
+
+The Academic plan is **not** an ordinary paid plan. Buying it requires a
+server-side eligibility check, and the check is repeated when the payment is
+activated — so skipping the UI, replaying a captured payment or hitting the
+webhook directly still cannot grant an Academic subscription.
+
+```
+POST /api/account/academic/verify     →  status + short-lived attestation token
+POST /api/billing/create-order        →  403 academic_verification_required unless
+                                         verified AND a live token is presented
+POST /api/billing/verify-payment      →  signature + provider confirmation
+POST /api/billing/webhook             →  re-checks the durable verified status
+```
+
+Two distinct facts are tracked, deliberately:
+
+| | Meaning | Lifetime |
+|---|---|---|
+| `academic_status = 'verified'` | the address passed eligibility | durable until the profile address changes |
+| attestation token | verification happened moments ago | `ACADEMIC_TOKEN_TTL_SECONDS` (30 min default) |
+
+Changing `academic_email` on the profile **resets** the verification, so a
+verified account cannot swap in a different address and keep the entitlement.
+Every attempt — accepted or refused — is written to `academic_verifications`
+for the audit trail, and one institutional address may back only one Academic
+subscription.
+
+### What this does *not* prove yet
+
+This verifies that the **domain** is an academic institution. It cannot prove
+the requester controls the mailbox, because no confirmation mail is sent until
+SMTP is configured. When that is set, turn on `ACADEMIC_REQUIRE_MAILBOX_PROOF`
+so the UI stops implying more assurance than we actually have, and add the
+mailbox confirmation step.
+
+### Country TLDs
+
+`.ca`, `.de`, `.uk`, `.in` and friends carry commercial providers as well as
+schools, so they are **not** auto-accepted (`yahoo.ca` would otherwise get the
+Academic plan). Serve those countries by listing institutions explicitly:
+
+```
+ACADEMIC_ALLOWED_DOMAINS=uwaterloo.ca,ubc.ca,uni-bonn.de,ox.ac.uk
+```
+
+The consumer-mailbox blocklist is applied *before* the allowlist, so adding a
+broad entry still cannot wave through `gmail.com` or `yahoo.ca`.
 
 Use **Razorpay test keys** first (`rzp_test_…`), switch to live keys when you go live.
 
