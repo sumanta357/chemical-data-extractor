@@ -472,18 +472,38 @@ export default function AccountPanel({
     checkout.phase === 'awaiting' ||
     checkout.phase === 'verifying';
 
-  const trigger = hideTrigger ? null : (
+  const openAt = (next: View) => {
+    setError(null);
+    setCheckout({ phase: 'idle' });
+    setView(next);
+    onOpen();
+  };
+
+  /* Signing in and buying are separate intentions. One button labelled
+     "Pricing" that opened the plan grid left a visitor who only wanted to
+     sign in guessing at checkout, so each now gets its own control. */
+  const trigger = hideTrigger ? null : signedIn ? (
     <button
-      onClick={() => {
-        setError(null);
-        setCheckout({ phase: 'idle' });
-        setView(signedIn ? 'account' : 'plans');
-        onOpen();
-      }}
+      onClick={() => openAt('account')}
       className="px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-cyan-400 border border-gray-800 hover:border-cyan-700 transition-colors"
     >
-      {signedIn ? `${entitlement?.plan_name} · ${used}/${limit || '—'}` : 'Pricing'}
+      {entitlement?.plan_name} · {used}/{limit || '—'}
     </button>
+  ) : (
+    <>
+      <button
+        onClick={() => openAt('account')}
+        className="px-3 py-1.5 text-sm font-medium text-cyan-400 hover:text-cyan-300 border border-cyan-700 hover:bg-cyan-500/10 transition-colors"
+      >
+        Sign in
+      </button>
+      <button
+        onClick={() => openAt('plans')}
+        className="px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-cyan-400 border border-gray-800 hover:border-cyan-700 transition-colors"
+      >
+        Pricing
+      </button>
+    </>
   );
 
   const modal = isPanelOpen ? (
@@ -524,6 +544,23 @@ export default function AccountPanel({
                   {checkout.phase === 'done' && <span className="text-cyan-400">{checkout.message}</span>}
                   {checkout.phase === 'cancelled' && 'Payment cancelled. Nothing was charged.'}
                   {checkout.phase === 'error' && <span className="text-amber-400">{checkout.message}</span>}
+                </div>
+              )}
+
+              {/* Reaching the plan grid signed out used to be a dead end:
+                  nothing there said how to actually buy anything. */}
+              {!signedIn && (
+                <div className="flex items-center justify-between gap-3 border border-cyan-900/60 bg-cyan-950/30 px-3 py-2">
+                  <p className="text-xs text-cyan-200/90">
+                    Sign in or create a free account to buy a plan.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => openAt('account')}
+                    className="shrink-0 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium px-3 py-1.5"
+                  >
+                    Sign in
+                  </button>
                 </div>
               )}
 
