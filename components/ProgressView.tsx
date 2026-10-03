@@ -50,6 +50,12 @@ function tone(line: string): Tone {
 export default function ProgressView({ search, logLines }: Props) {
   const cfg = statusConfig[search.status] || statusConfig.queued;
 
+  /* True when this job is queued behind another search rather than waiting
+     for a cold container. The engine sets this exact wording in
+     python-api/app.py when the single search slot is already taken. */
+  const busyBehindOther =
+    !!search.progress && /waiting for another search/i.test(search.progress);
+
   // Empty logLines from a parent stream must not blank out real log data.
   const lines = logLines?.length ? logLines : search.log;
 
@@ -120,13 +126,26 @@ export default function ProgressView({ search, logLines }: Props) {
       {search.progress && (
         <div className="px-5 py-2 bg-gray-950/50 border-b border-gray-800">
           <p className="text-sm text-cyan-300 font-mono">{search.progress}</p>
-          {(search.status === 'queued' ||
-            (search.status === 'running' &&
-              /queued|starting|contacting/i.test(search.progress))) && (
+          {/* The engine runs one job at a time, so "queued" has two very
+              different causes. Only the cold-start one is worth explaining
+              here — telling someone the engine is waking when it is awake and
+              busy sends them looking at the wrong problem. */}
+          {busyBehindOther ? (
             <p className="text-xs text-gray-400 mt-1">
-              The search engine wakes from idle on the first request — this can
-              take up to a minute. Subsequent searches start instantly.
+              The engine is awake and already running another search. Only one
+              search runs at a time, so this one starts as soon as that
+              finishes — the engine has not failed.
             </p>
+          ) : (
+            !busyBehindOther &&
+            (search.status === 'queued' ||
+              (search.status === 'running' &&
+                /queued|starting|contacting/i.test(search.progress ?? ''))) && (
+              <p className="text-xs text-gray-400 mt-1">
+                The search engine wakes from idle on the first request — this
+                can take up to a minute. Subsequent searches start instantly.
+              </p>
+            )
           )}
         </div>
       )}
