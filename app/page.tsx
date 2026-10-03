@@ -7,7 +7,7 @@ import ResultsView from '@/components/ResultsView';
 import HistoryPanel from '@/components/HistoryPanel';
 import AIAssistant from '@/components/AIAssistant';
 import AccountPanel from '@/components/AccountPanel';
-import { getMe, type Entitlement } from '@/lib/billing';
+import { getMe, authHeaders, type Entitlement } from '@/lib/billing';
 import type { SearchState } from '@/lib/types';
 
 export default function HomePage() {
@@ -26,9 +26,11 @@ export default function HomePage() {
       setSearch(null);
 
       try {
+        // The engine meters this search to an account, so it must carry the
+        // caller's Supabase access token.
         const res = await fetch('/api/search', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
           body: JSON.stringify({ query, query_type: queryType, hops }),
         });
         if (!res.ok) {

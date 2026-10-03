@@ -16,7 +16,8 @@ export interface Plan {
   features: string[];
 }
 
-import { getAccessToken, getSupabase as getSupabaseClient } from './supabase';
+import { getAccessToken, getSupabase } from './supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface Entitlement {
   signed_in: boolean;
@@ -55,14 +56,41 @@ export interface BillingConfig {
   admin_directory?: boolean;
 }
 
+/** Ensure the Supabase client exists, bootstrapping it from the server config
+ * if the account panel has not loaded it yet. Searches are auth-gated, so a
+ * signed-in visitor must never be refused just because /api/billing/config was
+ * still in flight when they clicked. Memoized so concurrent callers share it. */
+let clientBootstrap: Promise<void> | null = null;
+async function ensureSupabase(): Promise<SupabaseClient | null> {
+  const existing = getSupabase();
+  if (existing) return existing;
+  if (!clientBootstrap) {
+    clientBootstrap = fetch('/api/billing/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((cfg) => getSupabase(cfg?.supabase?.url, cfg?.supabase?.anon_key))
+      .catch(() => null)
+      .then(() => undefined);
+  }
+  await clientBootstrap;
+  return getSupabase();
+}
+
+/** Authorization headers for the Supabase session, empty when signed out.
+ * Every account-gated endpoint (`/api/search`, `/api/analyze`) needs this or
+ * the engine cannot tell who is calling and refuses the request. */
+export async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken(await ensureSupabase());
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function api(path: string, init?: RequestInit): Promise<any> {
   // Supabase owns the session: attach its access token when we have one.
-  const token = await getAccessToken(getSupabaseClient());
+  const auth = await authHeaders();
   const res = await fetch(path, {
     credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...auth,
       ...(init?.headers || {}),
     },
     ...init,

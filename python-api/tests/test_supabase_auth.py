@@ -26,7 +26,7 @@ os.environ["RAZORPAY_KEY_SECRET"] = "rzp_test_key_secret"
 os.environ["RAZORPAY_WEBHOOK_SECRET"] = "rzp_test_webhook_secret"
 os.environ["SUPABASE_URL"] = "https://project.supabase.co"
 os.environ["SUPABASE_ANON_KEY"] = "test-anon-key"
-os.environ.pop("REQUIRE_AUTH", None)
+os.environ["REQUIRE_AUTH"] = "0"  # sign-in is enforced in production; test the guest tier explicitly
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))

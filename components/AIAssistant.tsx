@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
+import { authHeaders } from '@/lib/billing';
 
 interface Props {
   searchId?: string | null;
@@ -47,7 +48,7 @@ export default function AIAssistant({ searchId, query }: Props) {
 
       const res = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ prompt: trimmed, context }),
       });
       const data = await res.json().catch(() => ({}));
@@ -58,13 +59,19 @@ export default function AIAssistant({ searchId, query }: Props) {
           { role: 'assistant', text: data.analysis },
         ]);
       } else {
+        // The engine answers 401/402 with {message, code}; a bare string is
+        // used for unconfigured providers. Never render the object itself.
+        const detail = data.detail;
+        const text =
+          typeof detail === 'string'
+            ? detail
+            : detail?.message ||
+              'AI analysis is temporarily unavailable — please try again shortly.';
         setTurns([
           ...nextTurns,
           {
             role: 'assistant',
-            text:
-              data.detail ||
-              'AI analysis is temporarily unavailable — please try again shortly.',
+            text,
             error: true,
           },
         ]);

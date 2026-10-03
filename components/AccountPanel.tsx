@@ -546,6 +546,13 @@ export default function AccountPanel({
 
           {view === 'account' && !signedIn && authView === 'form' && (
             <form onSubmit={submitAuth} className="space-y-3 max-w-sm">
+              {config?.auth_required && (
+                <div className="border border-cyan-900/60 bg-cyan-950/30 px-3 py-2 text-xs text-cyan-200/90">
+                  {mode === 'signup'
+                    ? 'Create a free account to start searching — it takes a few seconds and your 3 free searches are waiting.'
+                    : 'Sign in to search. New here? Tap “Create one” below for 3 free searches.'}
+                </div>
+              )}
               {mode === 'signin' && supabase && googleEnabled && (
                 <div className="pb-1">
                   <button

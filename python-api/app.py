@@ -64,8 +64,9 @@ if not LOG.handlers:
 # ── Accounts & payments (optional layer) ─────────────────────────────────────
 # The platform keeps working exactly as before when this layer is disabled:
 #   * no RAZORPAY_* keys  -> payments endpoints report "not configured"
-#   * no REQUIRE_AUTH=1  -> anonymous visitors search unmetered, as today
-# Only signed-in accounts are metered, so the free public product is unchanged.
+#   * REQUIRE_AUTH=0      -> the unmetered guest tier is reopened
+# Accounts are enforced by default, so a search is always attributable to a
+# signed-in account and can be metered against that account's plan.
 try:
     import billing as _billing
     from routes_billing import router as billing_router
@@ -113,19 +114,22 @@ def _analyst_gate(http_request: Optional[Request]):
     if _billing is None or http_request is None:
         return
     try:
-        user = _billing.record_analyst_usage(http_request)
-        if user:
-            ent = _billing.entitlement_for(user)
-            if _billing.REQUIRE_AUTH and ent["analyst_remaining"] <= 0:
-                raise HTTPException(
-                    status_code=402,
-                    detail={
-                        "message": (f"You have used all {ent['analyst_limit']} AI analyst "
-                                    f"messages on the {ent['plan_name']} plan this month."),
-                        "code": "analyst_quota_reached",
-                        "upgrade_url": "/#pricing",
-                    },
-                )
+        # Sign-in first, so a 401 is never confused with a metering failure.
+        user = _billing.require_analyst_entitlement(http_request)
+        if user is None:
+            return
+        _billing.record_analyst_usage(http_request)
+        ent = _billing.entitlement_for(user)
+        if _billing.REQUIRE_AUTH and ent["analyst_remaining"] <= 0:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "message": (f"You have used all {ent['analyst_limit']} AI analyst "
+                                f"messages on the {ent['plan_name']} plan this month."),
+                    "code": "analyst_quota_reached",
+                    "upgrade_url": "/#pricing",
+                },
+            )
     except HTTPException:
         raise
     except Exception as exc:
@@ -529,8 +533,9 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
                         http_request: Request = None):
     """Start a new knowledge graph search (runs in the background).
 
-    Accounts are optional: anonymous callers behave exactly as before unless
-    REQUIRE_AUTH=1, and signed-in callers are metered against their plan.
+    Accounts are enforced: an anonymous caller is refused with 401 unless
+    REQUIRE_AUTH=0 reopened the guest tier, and signed-in callers are metered
+    against their plan.
     """
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
@@ -906,8 +911,9 @@ def analyze(request: AnalyzeRequest, http_request: Request = None):
     it in a worker thread, so the blocking `requests` calls never stall the
     event loop that serves search polling.
 
-    Signed-in users are metered here against their plan's analyst allowance
-    (no-op for anonymous visitors unless REQUIRE_AUTH=1)."""
+    Signed-in users are metered here against their plan's analyst allowance.
+    Anonymous callers are refused with 401 while accounts are enforced
+    (REQUIRE_AUTH=1, the default)."""
     if not request.prompt or not request.prompt.strip():
         raise HTTPException(status_code=400, detail="prompt is required")
 

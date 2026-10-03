@@ -31,7 +31,7 @@ os.environ["WORKSPACE_DIR"] = str(Path(_TEST_DIR) / "workspace")
 os.environ["RAZORPAY_KEY_ID"] = "rzp_test_key_id"
 os.environ["RAZORPAY_KEY_SECRET"] = "rzp_test_key_secret"
 os.environ["RAZORPAY_WEBHOOK_SECRET"] = "rzp_test_webhook_secret"
-os.environ.pop("REQUIRE_AUTH", None)
+os.environ["REQUIRE_AUTH"] = "0"  # sign-in is enforced in production; test the guest tier explicitly
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -108,6 +108,42 @@ class AccountIdentityTests(unittest.TestCase):
         self.assertEqual(auth.validate_email("  User@Example.COM "), "user@example.com")
         with self.assertRaises(Exception):
             auth.validate_email("not-an-email")
+
+
+class RequireAuthDefaultTests(unittest.TestCase):
+    """Sign-in is enforced unless an operator deliberately opts out.
+
+    This is the guard on the product decision itself: if the default ever
+    slips back to "0", every deploy silently reopens unmetered anonymous
+    searching and this fails.
+    """
+
+    def test_sign_in_is_enforced_when_the_env_var_is_absent(self):
+        import importlib
+
+        previous = os.environ.pop("REQUIRE_AUTH", None)
+        try:
+            reloaded = importlib.reload(billing)
+            self.assertTrue(reloaded.REQUIRE_AUTH)
+        finally:
+            if previous is not None:
+                os.environ["REQUIRE_AUTH"] = previous
+            importlib.reload(billing)
+        self.assertFalse(billing.REQUIRE_AUTH)
+
+    def test_explicit_opt_out_is_honoured(self):
+        import importlib
+
+        previous = os.environ.get("REQUIRE_AUTH")
+        os.environ["REQUIRE_AUTH"] = "0"
+        try:
+            self.assertFalse(importlib.reload(billing).REQUIRE_AUTH)
+        finally:
+            if previous is None:
+                os.environ.pop("REQUIRE_AUTH", None)
+            else:
+                os.environ["REQUIRE_AUTH"] = previous
+            importlib.reload(billing)
 
 
 # ── Plan catalog ─────────────────────────────────────────────────────────────
@@ -644,6 +680,48 @@ class RegressionTests(unittest.TestCase):
         finally:
             billing.REQUIRE_AUTH = False
             engine_app.run_search_in_background = original
+
+    def test_anonymous_search_is_refused_with_a_sign_in_code(self):
+        """The shape the UI keys off: 401 + code=auth_required."""
+        anon = TestClient(engine_app.app)
+        billing.REQUIRE_AUTH = True
+        try:
+            res = anon.post("/api/search", json={"query": "aspirin"})
+            self.assertEqual(res.status_code, 401)
+            detail = res.json()["detail"]
+            self.assertEqual(detail["code"], "auth_required")
+            self.assertIn("Sign in", detail["message"])
+        finally:
+            billing.REQUIRE_AUTH = False
+
+    def test_signed_in_search_still_works_when_auth_is_required(self):
+        """Regression guard: enforcing sign-in must not reject real accounts.
+        The browser sends the Supabase bearer token on /api/search; if that
+        header were ever dropped, every paying customer would get a 401."""
+        async def noop(*args, **kwargs):
+            return None
+
+        SupabaseStub(email="enforced@example.com").install(self)
+        signed_in = TestClient(engine_app.app, headers=AUTH_HEADERS)
+        original = engine_app.run_search_in_background
+        engine_app.run_search_in_background = noop
+        billing.REQUIRE_AUTH = True
+        try:
+            res = signed_in.post("/api/search", json={"query": "aspirin"})
+            self.assertEqual(res.status_code, 200, res.text)
+        finally:
+            billing.REQUIRE_AUTH = False
+            engine_app.run_search_in_background = original
+
+    def test_anonymous_analyst_is_refused_when_auth_is_required(self):
+        anon = TestClient(engine_app.app)
+        billing.REQUIRE_AUTH = True
+        try:
+            res = anon.post("/api/analyze", json={"prompt": "summarise"})
+            self.assertEqual(res.status_code, 401)
+            self.assertEqual(res.json()["detail"]["code"], "auth_required")
+        finally:
+            billing.REQUIRE_AUTH = False
 
     def test_quota_exhaustion_returns_402_for_signed_in_user(self):
         async def noop(*args, **kwargs):

@@ -50,8 +50,10 @@ WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "").strip() or KEY_SE
 # behaves exactly as it does today (free, unmetered, no account required).
 BILLING_ENABLED = bool(KEY_ID and KEY_SECRET and WEBHOOK_SECRET)
 
-# Opt-in gate: when 1, anonymous visitors cannot start searches.
-REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "0").strip().lower() in ("1", "true", "yes", "on")
+# Accounts are enforced by default: an anonymous visitor must sign in before
+# they can start a search. Set REQUIRE_AUTH=0 in the environment to reopen the
+# unmetered guest tier (useful for demos or landing-page previews).
+REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "1").strip().lower() in ("1", "true", "yes", "on")
 
 HTTP_TIMEOUT = 20
 
@@ -301,10 +303,11 @@ def entitlement_for(user: Optional[dict]) -> dict:
 def require_search_entitlement(request: Optional[Request]) -> tuple[Optional[dict], dict]:
     """Gate for POST /api/search.
 
-    Non-breaking by design: when accounts are not enforced (REQUIRE_AUTH unset,
-    the default) anonymous visitors are allowed exactly as they are today and
-    nothing is metered. Once an account is signed in it *is* metered, and once
-    REQUIRE_AUTH=1 anonymous searches are refused with 401.
+    Accounts are enforced by default: anonymous searches are refused with 401
+    so every search is attributable to an account and can be metered. With
+    REQUIRE_AUTH=0 the guest tier is reopened and anonymous searches run
+    unmetered, exactly as they did before accounts existed. Either way, once an
+    account is signed in it *is* metered.
     """
     if request is None:
         return None, entitlement_for(None)
@@ -334,6 +337,27 @@ def require_search_entitlement(request: Optional[Request]) -> tuple[Optional[dic
             },
         )
     return user, ent
+
+
+def require_analyst_entitlement(request: Optional[Request]) -> Optional[dict]:
+    """Gate for POST /api/analyze — the analyst costs real LLM tokens, so it
+    follows the same sign-in rule as search. Returns the user when signed in,
+    or None when the guest tier is open."""
+    if request is None:
+        return None
+    try:
+        user = auth.current_user_optional(request)
+    except Exception as exc:  # identity lookup must never break the product
+        LOG.warning("Analyst identity lookup failed: %s", exc.__class__.__name__)
+        return None
+    if user is None and REQUIRE_AUTH:
+        raise HTTPException(
+            status_code=401,
+            detail={"message": "Sign in to use the AI analyst",
+                    "code": "auth_required",
+                    "upgrade_url": "/#pricing"},
+        )
+    return user
 
 
 def record_search_usage(search_id: str) -> None:

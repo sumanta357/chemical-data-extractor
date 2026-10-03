@@ -3,6 +3,11 @@
 Optional monetisation layer for the hosted platform. When it is not configured the
 product behaves **exactly** as before: anonymous searches, no accounts, no limits.
 
+Accounts are otherwise **enforced by default** (`REQUIRE_AUTH=1`): a search must
+carry a Supabase access token, so every search is attributable to an account and
+can be metered against that account's plan. Set `REQUIRE_AUTH=0` to reopen the
+unmetered guest tier.
+
 ---
 
 ## What was added
@@ -49,7 +54,7 @@ truth — the browser can never send an amount.
 | `RAZORPAY_KEY_SECRET` | for payments | **Server only.** Never logged, never returned to a client |
 | `RAZORPAY_WEBHOOK_SECRET` | recommended | Secret configured in the Razorpay dashboard for webhook signature checks |
 | `BILLING_DB` | no | Path to the accounts database (default `/tmp/scigraph_billing.db`) |
-| `REQUIRE_AUTH` | no | `1` = anonymous visitors must sign in before searching. Default `0` keeps the site open |
+| `REQUIRE_AUTH` | no | Sign-in gate. **Default `1`**: anonymous visitors must sign in before searching or using the AI analyst. Set `0` to reopen the unmetered guest tier (demos, landing-page previews) |
 | `SUPABASE_URL` | for accounts | Supabase project URL (identity — see below) |
 | `SUPABASE_ANON_KEY` | for accounts | Supabase **anon / publishable** key, never `service_role` |
 | `ADMIN_TOKEN` | no | Shared secret for the academic directory. Unset ⇒ the endpoint 404s |
@@ -136,7 +141,8 @@ Covers: the plan catalog, checkout and webhook signature accept/reject, order
 payload correctness, capture → activation → usage → quota exhaustion, duplicate
 webhook replays, refunds, Supabase session resolution over HTTP, the academic
 directory filters and sorting, and a regression suite proving the existing search
-API is unchanged (including that anonymous search still works and that the
+API is unchanged (including that a signed-in search still starts normally, that
+the sign-in gate answers `401` with `code: "auth_required"`, and that the
 billing routes are mounted before the SPA catch-all).
 
 For a real end-to-end run with Razorpay's sandbox, set test keys locally and use
