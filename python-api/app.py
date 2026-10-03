@@ -270,6 +270,75 @@ class SearchRequest(BaseModel):
     export_dir: Optional[str] = None
 
 
+def _contained_export_dir(search_id: str, clean_q: str, requested: Optional[str]) -> str:
+    """Resolve the output directory, refusing anything outside EXPORTS_DIR.
+
+    `export_dir` arrives from the client and is handed to the engine as its
+    output directory, then read back through the graph endpoint. Taken
+    verbatim it is an arbitrary-directory-write and arbitrary-file-read
+    primitive for any signed-in user, so a path that resolves outside our own
+    exports root is ignored in favour of the generated default.
+
+    Kept permissive *within* the root so a caller that deliberately places an
+    export in a subdirectory still works.
+    """
+    root = EXPORTS_DIR.resolve()
+    if requested:
+        try:
+            candidate = Path(requested).resolve()
+        except (OSError, ValueError):
+            candidate = None
+        if candidate is not None and (candidate == root or root in candidate.parents):
+            return str(candidate)
+        LOG.warning("Ignored out-of-tree export_dir %r for search %s", requested, search_id)
+    return str(root / f"{search_id}_{clean_q}")
+
+
+def _export_dir_is_safe(export_dir: str) -> bool:
+    """True when a stored export_dir is still inside EXPORTS_DIR. Defence in
+    depth for state written before this was enforced."""
+    if not export_dir:
+        return False
+    try:
+        root = EXPORTS_DIR.resolve()
+        candidate = Path(export_dir).resolve()
+    except (OSError, ValueError):
+        return False
+    return candidate == root or root in candidate.parents
+
+
+def _require_search_owner(search_id: str, state: dict, http_request: Optional[Request]) -> None:
+    """A search belongs to the account that started it.
+
+    Search ids are eight hex characters, so they are enumerable. Anonymous
+    searches (only possible while REQUIRE_AUTH is off) carry no owner and stay
+    readable; anything owned is readable only by its owner. 404 rather than 403
+    so the response does not confirm that someone else's search exists.
+    """
+    owner_id = state.get("owner_user_id")
+    if owner_id is None:
+        try:
+            owner_id = billing_store.get_search_owner(search_id)
+        except Exception as exc:
+            LOG.warning("Ownership lookup failed for %s: %s", search_id, exc.__class__.__name__)
+            owner_id = None
+    if owner_id is None:
+        return
+    try:
+        user = _billing.auth.current_user_optional(http_request) if _billing else None
+    except Exception:
+        user = None
+    if user is not None and int(user["id"]) == int(owner_id):
+        return
+    raise HTTPException(status_code=404, detail="Search not found")
+
+
+
+
+
+
+
+
 def _clean_status(d: dict) -> dict:
     """Strip empty/None fields and convert truncated log strings to empty lists."""
     out = {}
@@ -548,7 +617,7 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
 
     search_id = str(uuid.uuid4())[:8]
     clean_q = re.sub(r"[^a-zA-Z0-9_\-]", "_", request.query.strip())[:30]
-    export_dir = request.export_dir or str(EXPORTS_DIR / f"{search_id}_{clean_q}")
+    export_dir = _contained_export_dir(search_id, clean_q, request.export_dir)
 
     state: dict = {
         "search_id": search_id,
@@ -560,6 +629,7 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
         "log": [],
         "export_files": [],
         "export_dir": export_dir,
+        "owner_user_id": user["id"] if user else None,
         "created_at": datetime.utcnow().isoformat(),
         "elapsed_seconds": None,
         "error": None,
@@ -585,11 +655,12 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
 
 
 @app.get("/api/search/{search_id}", response_model=SearchStatus)
-async def get_search_status(search_id: str):
+async def get_search_status(search_id: str, http_request: Request = None):
     """Get the status of a search."""
     state = searches.get(search_id)
     if not state:
         raise HTTPException(status_code=404, detail="Search not found")
+    _require_search_owner(search_id, state, http_request)
 
     if state.get("status") == "completed" and not state.get("export_files"):
         state["export_files"] = _list_export_files(state.get("export_dir", ""))
@@ -605,11 +676,13 @@ async def get_search_status(search_id: str):
 
 
 @app.get("/api/search/{search_id}/log")
-async def get_search_log(search_id: str, offset: int = Query(0, ge=0)):
+async def get_search_log(search_id: str, http_request: Request = None,
+                         offset: int = Query(0, ge=0)):
     """Get incremental log output from a search."""
     state = searches.get(search_id)
     if not state:
         raise HTTPException(status_code=404, detail="Search not found")
+    _require_search_owner(search_id, state, http_request)
     log = state.get("log")
     if isinstance(log, str):
         log = []
@@ -625,14 +698,17 @@ async def get_search_log(search_id: str, offset: int = Query(0, ge=0)):
 
 
 @app.get("/api/search/{search_id}/graph")
-async def get_search_graph(search_id: str):
+async def get_search_graph(search_id: str, http_request: Request = None):
     """Return nodes and edges as Cytoscape.js-compatible JSON for interactive graph visualization."""
     import csv as _csv
     state = searches.get(search_id)
     if not state:
         raise HTTPException(status_code=404, detail="Search not found")
+    _require_search_owner(search_id, state, http_request)
 
     export_dir = Path(state.get("export_dir", ""))
+    if not _export_dir_is_safe(str(export_dir)):
+        raise HTTPException(status_code=404, detail="Graph data not available yet")
     nodes_file = export_dir / "nodes.csv"
     edges_file = export_dir / "edges.csv"
 

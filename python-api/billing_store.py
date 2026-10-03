@@ -608,6 +608,12 @@ def set_search_owner(search_id: str, user_id: int) -> None:
     )
 
 
+def get_search_owner(search_id: str) -> Optional[int]:
+    """The account that started a search, or None for an anonymous one."""
+    row = db.query_one("SELECT user_id FROM search_owners WHERE search_id = ?", (search_id,))
+    return int(row["user_id"]) if row else None
+
+
 def claim_search_owner(search_id: str) -> Optional[int]:
     """Return the owning user_id exactly once (marks the search as counted).
 
