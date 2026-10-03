@@ -439,6 +439,77 @@ class SearchStatus(BaseModel):
 
 # ── Background Search Runner ─────────────────────────────────────────────────
 
+# A silent search is not automatically a dead one. The engine prints between
+# steps, and long connector batches can be quiet for minutes on a throttled
+# free-tier CPU while still finishing, so silence alone must not throw a search
+# away. STALL_POLL_SECONDS is how often the engine's CPU time is sampled;
+# STALL_TIMEOUT is how long it must be silent *and* idle before it is killed;
+# MAX_SEARCH_SECONDS is the ceiling that applies however busy it is.
+#
+# Both limits are set generously for the memory-constrained free tier, where a
+# large query is slow rather than hung and a premature kill throws away real
+# work: a genuinely dead process is rare, and the ceiling still guarantees the
+# single search slot is released.
+STALL_POLL_SECONDS = 10.0
+STALL_TIMEOUT = 900.0
+MAX_SEARCH_SECONDS = 3000.0
+
+
+def _process_cpu_seconds(pid: int) -> Optional[float]:
+    """Total CPU seconds a process has used, or None if that cannot be read.
+
+    The watchdog needs to tell "quiet but working" from "dead", and on Linux
+    the truthful signal is whether the process is still consuming CPU. Returns
+    None where /proc is unavailable or unreadable, which the caller treats as
+    "cannot tell" rather than as proof of a stall.
+    """
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as fh:
+            data = fh.read()
+    except OSError:
+        return None
+    try:
+        # The comm field is parenthesised and may itself contain spaces, so
+        # count from the closing bracket: state is field 3, utime 14, stime 15.
+        fields = data[data.rindex(b")") + 2:].split()
+        ticks = int(fields[11]) + int(fields[12])
+        return ticks / os.sysconf("SC_CLK_TCK")
+    except (ValueError, IndexError, OSError):
+        return None
+
+
+def _quiet_since_update(quiet_since: float, cpu_now: Optional[float],
+                        cpu_last: Optional[float], now: float,
+                        saw_output: bool = False) -> float:
+    """Reset the quiet timer on either sign of life the sample found.
+
+    Two, because they fail independently. A process that is consuming CPU is
+    making progress even while it prints nothing — that is what saves a slow
+    search on a throttled container. A process that printed a line is alive even
+    if it is parked on a slow connector request using no CPU; measuring only
+    output would kill it, and measuring only CPU would too. If CPU time cannot
+    be read, that counts as unknown rather than as idle — unknown is not idle.
+    """
+    if saw_output:
+        return now
+    if cpu_now is not None and cpu_last is not None and cpu_now > cpu_last:
+        return now
+    return quiet_since
+
+
+def _is_stalled(quiet_for: float, running_for: float) -> bool:
+    """True when a search subprocess should be killed as stalled.
+
+    Called only after a sample that showed no output; the caller resets the
+    quiet timer whenever the engine advances its CPU time, so a process that is
+    still working never reaches the threshold. The ceiling is unconditional —
+    a process can spin without ever printing, and a search must not hold the
+    single search slot for ever.
+    """
+    if running_for >= MAX_SEARCH_SECONDS:
+        return True
+    return quiet_for >= STALL_TIMEOUT
+
 async def run_search_in_background(search_id: str, query: str, query_type: str, hops: int, export_dir: str):
     """Run api/scigraph.py as a subprocess, then enrich, capturing output."""
     state = searches.get(search_id)
@@ -461,6 +532,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
     state["status"] = "running"
     state["log"] = []
     start_time = time.time()
+    started_monotonic = time.monotonic()
     _save_search(state)
 
     # Build CLI command
@@ -497,30 +569,50 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
 
         assert process.stdout is not None
 
-        # Watchdog: if the subprocess produces no output for 5 minutes, it is
-        # almost certainly starved or dead (free-tier CPU / OOM). Kill it and
-        # fail the job honestly instead of hanging forever at "Queued...".
-        # 5 min because long connector batches can be quiet for minutes on the
-        # throttled free-tier CPU while still making real progress.
-        STALL_TIMEOUT = 300.0
+        # Watchdog. Silence alone is not evidence of a stall: the engine prints
+        # between steps, and the free tier's throttled CPU makes a long
+        # connector batch slow rather than silent — a 1-hop protein query can
+        # spend minutes inside one step and still be three minutes from a
+        # finished search. Killing on output alone threw those runs away. So
+        # CPU time is sampled too, and only a process that is both silent and
+        # no longer using any CPU is treated as stalled. An absolute ceiling
+        # still applies, because a process can spin forever without printing.
         stall_detected = False
+        output_generation = 0
 
         async def _read_output():
+            nonlocal output_generation
             async for raw_line in process.stdout:
+                output_generation += 1
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
                 state["log"].append(line)
                 _update_progress(state, line)
 
         read_task = asyncio.ensure_future(_read_output())
+        quiet_since = time.monotonic()
+        last_cpu = _process_cpu_seconds(process.pid)
+        seen_output = 0
         while not read_task.done():
-            try:
-                await asyncio.wait_for(asyncio.shield(read_task), timeout=STALL_TIMEOUT)
-            except asyncio.TimeoutError:
+            done, _ = await asyncio.wait({read_task}, timeout=STALL_POLL_SECONDS)
+            if done:
+                break
+            now = time.monotonic()
+            cpu = _process_cpu_seconds(process.pid)
+            saw_output = output_generation != seen_output
+            seen_output = output_generation
+            quiet_since = _quiet_since_update(quiet_since, cpu, last_cpu, now,
+                                              saw_output)
+            if cpu is not None:
+                last_cpu = cpu
+            if _is_stalled(now - quiet_since, now - started_monotonic):
                 stall_detected = True
                 break
 
         if stall_detected:
-            LOG.error("search subprocess stalled (no output for %.0fs) — killing pid=%s", STALL_TIMEOUT, process.pid)
+            quiet_for = time.monotonic() - quiet_since
+            LOG.error("search subprocess stalled (no output for %.0fs, no CPU "
+                      "advance, ran %.0fs) — killing pid=%s",
+                      quiet_for, time.monotonic() - started_monotonic, process.pid)
             try:
                 process.kill()
             except ProcessLookupError:
@@ -528,14 +620,18 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             read_task.cancel()
             state["status"] = "failed"
             state["error"] = (
-                "The free Render container ran out of CPU/memory while this search was running. "
-                "Just run it again — it usually succeeds on a fresh container (the same query completed "
-                "in ~30-60s in tests). If it keeps failing, the Render Starter plan (1GB) is the permanent fix."
+                "This search was stopped because the engine stopped making progress. "
+                f"It either printed nothing for {STALL_TIMEOUT / 60:g} minutes while using "
+                f"no CPU, or it ran past the {MAX_SEARCH_SECONDS / 60:g}-minute time limit "
+                "for a single query. That normally means the free container could not keep "
+                "up with this particular query rather than anything being broken. Running it "
+                "again often works; the Render Starter plan (1GB) is the permanent fix."
             )
             state["progress"] = "Failed: engine stalled"
             state["log"].append(
-                f"[engine] no output for {STALL_TIMEOUT:.0f}s — subprocess killed. "
-                "The free container ran out of resources mid-search; re-running usually works."
+                f"[engine] no output for {quiet_for:.0f}s with no CPU advance "
+                f"({time.monotonic() - started_monotonic:.0f}s total) — subprocess "
+                "killed. This was a slow query on a small container, not an engine fault."
             )
             state["elapsed_seconds"] = time.time() - start_time
             _save_search(state)

@@ -67,6 +67,37 @@ truth — the browser can never send an amount.
 | `PAID_SEARCHES_PER_IP_PER_HOUR` | no | The same ceiling for accounts on a paid plan, default `200`, so a shared campus/office NAT cannot lock out customers who have paid |
 | `SEARCH_ENRICH_IMAGES` | no | Download a 2D structure image per compound during enrichment. **Default `1`**. Set `0` on a memory-constrained host (the Render free tier's 512MB) to drop the thumbnails, which is the peak-memory step of a search; `enriched_data.xlsx` and every CSV are still produced |
 
+### The search stall watchdog
+
+A search runs as a subprocess (`api/scigraph.py`) and is abandoned if the engine
+stops making progress, which surfaces in the UI as `Failed: engine stalled`. The
+thresholds are module constants in `python-api/app.py`, not env vars, because a
+watchdog that can be switched off is not one:
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `STALL_POLL_SECONDS` | `10` | How often the engine is sampled for both signs of life (CPU time from `/proc`, and printed output) |
+| `STALL_TIMEOUT` | `900` (15 min) | Seconds a search must be silent **and** idle before it is killed |
+| `MAX_SEARCH_SECONDS` | `3000` (50 min) | Hard ceiling for one search, however busy it is |
+
+Silence alone is never enough. The engine prints between steps, and a long
+connector batch on the throttled free tier is slow rather than silent — a 1-hop
+protein query can sit inside one step for minutes and still be minutes from
+finishing. The watchdog therefore tracks two independent signs of life and
+resets its quiet timer on either: the subprocess's CPU time advancing
+(`/proc`), or the engine printing a line. A stall means silent **and** using no
+CPU. Either signal alone would kill a live search — a busy-but-quiet engine
+looks dead to an output-only watchdog, and an engine parked on a slow connector
+request looks dead to a CPU-only one. If CPU time cannot be read at all, that
+counts as unknown rather than as idle: unknown is not idle.
+
+The 50-minute ceiling is unconditional, because a process can spin without ever
+printing and a search must not hold the single search slot for ever.
+
+Both limits are deliberately generous. On the 512MB free tier a large query is
+slow rather than hung, so a premature kill throws away real work; a genuinely
+dead process is rare, and the ceiling is what guarantees the slot is released.
+
 ### Why there is a per-IP limit at all
 
 Account creation is a `supabase.auth.signUp()` call made **in the browser**, so it
