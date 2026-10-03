@@ -178,6 +178,38 @@ class AccessControl(SecurityBase):
                 self.assertEqual(res.status_code, 401)
 
 
+class SearchHistoryLeak(SecurityBase):
+    """/api/searches answered any caller — even signed out — with every
+    account's queries. The individual endpoints are owner-scoped, so this
+    listing was the one place history leaked across accounts."""
+
+    def test_signed_out_caller_sees_nothing(self):
+        res = self.anon.get("/api/searches")
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json(), [],
+                         "an anonymous caller was shown other accounts' searches")
+
+    def test_history_is_scoped_to_the_caller(self):
+        mine = self.start()
+        self.assertEqual(mine.status_code, 200, mine.text)
+
+        other = SupabaseStub(email="nosy@example.com").install(self)
+        other.account()
+        intruder = TestClient(engine_app.app, headers=AUTH_HEADERS)
+        res = intruder.get("/api/searches")
+        self.assertEqual(res.status_code, 200, res.text)
+        ids = [row["search_id"] for row in res.json()]
+        self.assertNotIn(mine.json()["search_id"], ids,
+                         "another account saw this account's search in the history list")
+
+    def test_the_owner_still_sees_their_own_history(self):
+        res = self.start()
+        self.assertEqual(res.status_code, 200, res.text)
+        rows = self.client.get("/api/searches").json()
+        self.assertIn(res.json()["search_id"], [r["search_id"] for r in rows],
+                      "an owner lost their own search from their history")
+
+
 # ── Information disclosure ───────────────────────────────────────────────────
 
 class Disclosure(SecurityBase):

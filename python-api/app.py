@@ -896,15 +896,48 @@ async def download_export(filename: str, search_id: Optional[str] = Query(None))
 
 
 @app.get("/api/searches")
-async def list_searches(limit: int = Query(20, ge=1, le=100)):
-    """List recent searches."""
+async def list_searches(limit: int = Query(20, ge=1, le=100),
+                        http_request: Request = None):
+    """List the caller's own recent searches.
+
+    The individual search endpoints are owner-scoped, but this listing was not:
+    it answered any caller — including a signed-out one — with every account's
+    queries and ids. Queries are customer data and ids are enumerable, so this
+    now answers with the caller's own history and nothing else.
+    """
+    try:
+        user = _billing.auth.current_user_optional(http_request) if _billing else None
+    except Exception:
+        user = None
+    if user is None:
+        return []
+
     rows = sorted(
         searches.values(),
         key=lambda s: s.get("created_at", "") or "",
         reverse=True,
     )
-    return [
-        {
+    mine = []
+    for s in rows:
+        if len(mine) >= limit:
+            break
+        owner_id = s.get("owner_user_id")
+        if owner_id is None:
+            # Rows reloaded from SQLite after a restart carry no in-memory owner.
+            try:
+                owner_id = billing_store.get_search_owner(s["search_id"])
+            except Exception as exc:
+                LOG.warning("Ownership lookup failed for %s: %s",
+                            s["search_id"], exc.__class__.__name__)
+                owner_id = None
+        if owner_id is None:
+            continue
+        try:
+            if int(owner_id) != int(user["id"]):
+                continue
+        except (TypeError, ValueError):
+            continue
+        mine.append({
             "search_id": s["search_id"],
             "query": s["query"],
             "status": s["status"],
@@ -912,9 +945,8 @@ async def list_searches(limit: int = Query(20, ge=1, le=100)):
             "created_at": s["created_at"],
             "elapsed_seconds": s["elapsed_seconds"],
             "file_count": len(s.get("export_files", [])) if isinstance(s.get("export_files"), list) else 0,
-        }
-        for s in rows[:limit]
-    ]
+        })
+    return mine
 
 
 @app.on_event("startup")
