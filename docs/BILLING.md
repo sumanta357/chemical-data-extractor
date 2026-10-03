@@ -65,6 +65,7 @@ truth — the browser can never send an amount.
 | `ACADEMIC_REQUIRE_MAILBOX_PROOF` | no | Set once SMTP is configured; tells the UI to promise a confirmation email |
 | `SEARCHES_PER_IP_HOUR` | no | Searches one IP address may start per hour, default `30`. Bounds account-farming: sign-up happens against Supabase from the browser, so the server cannot rate-limit account creation — this limits the work an address can obtain |
 | `PAID_SEARCHES_PER_IP_PER_HOUR` | no | The same ceiling for accounts on a paid plan, default `200`, so a shared campus/office NAT cannot lock out customers who have paid |
+| `SEARCH_ENRICH_IMAGES` | no | Download a 2D structure image per compound during enrichment. **Default `1`**. Set `0` on a memory-constrained host (the Render free tier's 512MB) to drop the thumbnails, which is the peak-memory step of a search; `enriched_data.xlsx` and every CSV are still produced |
 
 ### Why there is a per-IP limit at all
 

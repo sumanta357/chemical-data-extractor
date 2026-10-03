@@ -555,17 +555,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             state["log"].append("═" * 60)
             enrichment_start = time.time()
             try:
-                enrich_cmd = [
-                    sys.executable,
-                    str(ENGINE_DIR / "enrich_exports.py"),
-                    "--export-dir", export_dir,
-                ]
-                # Downloading a structure image per compound is the peak-memory
-                # step of a search. On a 512MB container that is what gets the
-                # process OOM-killed mid-run, so it can be turned off while
-                # keeping the enriched multi-sheet workbook.
-                if not ENRICH_IMAGES:
-                    enrich_cmd.append("--skip-images")
+                enrich_cmd = _enrich_command(export_dir)
                 enrich_proc = await asyncio.create_subprocess_exec(
                     *enrich_cmd,
                     stdout=asyncio.subprocess.PIPE,
@@ -2317,6 +2307,25 @@ MAX_STORAGE_MB = int(os.environ.get("MAX_STORAGE_MB", "500"))
 MAX_LOG_LINES_COMPLETED = 100  # Keep only last 100 log lines for completed searches
 EXPORT_MAX_AGE_MINUTES = 30  # Auto-delete exports older than 30 minutes
 CLEANUP_INTERVAL_SECONDS = 1800  # Run cleanup every 30 minutes
+
+def _enrich_command(export_dir: str) -> list:
+    """The argv for the enrichment subprocess.
+
+    Downloading a structure image per compound is the peak-memory step of a
+    search. On a 512MB container that is what gets the process OOM-killed
+    mid-run, so SEARCH_ENRICH_IMAGES=0 drops the thumbnails while keeping the
+    enriched multi-sheet workbook. Built here rather than inline so the switch
+    is covered by a test instead of being trusted on faith.
+    """
+    cmd = [
+        sys.executable,
+        str(ENGINE_DIR / "enrich_exports.py"),
+        "--export-dir", export_dir,
+    ]
+    if not ENRICH_IMAGES:
+        cmd.append("--skip-images")
+    return cmd
+
 
 def _discard_failed_export(export_dir: str) -> None:
     """Delete a failed search's export directory immediately.
