@@ -286,6 +286,18 @@ def entitlement_for(user: Optional[dict]) -> dict:
 
     user = billing_store.reset_period_if_due(user)
     plan = PLANS.get(user["plan"], PLANS["free"])
+
+    # Searches in flight count against the allowance. They are only added to
+    # `searches_used` on completion, so without this a user could start far
+    # more than their quota in parallel and the cap would never fire. Fail open
+    # on a database problem: an accounting hiccup must not block the product.
+    inflight = 0
+    try:
+        inflight = billing_store.count_inflight_searches(user["id"], user.get("period_start"))
+    except Exception as exc:
+        LOG.warning("In-flight search count failed for user %s: %s",
+                    user["id"], exc.__class__.__name__)
+    searches_used = user["searches_used"] + inflight
     return {
         "signed_in": True,
         "user_id": user["id"],
@@ -296,8 +308,8 @@ def entitlement_for(user: Optional[dict]) -> dict:
         "plan_name": plan["name"],
         "plan_status": user["plan_status"],
         "searches_limit": plan["searches"],
-        "searches_used": user["searches_used"],
-        "searches_remaining": max(0, plan["searches"] - user["searches_used"]),
+        "searches_used": searches_used,
+        "searches_remaining": max(0, plan["searches"] - searches_used),
         "analyst_limit": plan["analyst_messages"],
         "analyst_used": user["analyst_used"],
         "analyst_remaining": max(0, plan["analyst_messages"] - user["analyst_used"]),

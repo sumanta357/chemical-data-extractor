@@ -436,6 +436,62 @@ class AccessControl(AcademicTestCase):
                 self.assertEqual(res.status_code, 402, res.text)
                 self.assertEqual(res.json()["detail"]["code"], "quota_reached")
 
+    def test_parallel_searches_cannot_exceed_the_free_allowance(self):
+        """Reproduces the bypass: usage was only counted on completion, so a
+        free user could open many searches at once and the cap never fired."""
+        async def noop(*args, **kwargs):
+            return None
+        original = engine_app.run_search_in_background
+        engine_app.run_search_in_background = noop
+        try:
+            self.assertEqual(self.client.get("/api/account/me").json()
+                             ["entitlement"]["searches_limit"], 3)
+            statuses = [
+                self.client.post("/api/search",
+                                 json={"query": f"aspirin{i}", "query_type": "ligand"}).status_code
+                for i in range(5)
+            ]
+            self.assertEqual(statuses, [200, 200, 200, 402, 402], statuses)
+            ent = self.client.get("/api/account/me").json()["entitlement"]
+            self.assertEqual(ent["searches_used"], 3)
+            self.assertEqual(ent["searches_remaining"], 0)
+        finally:
+            engine_app.run_search_in_background = original
+
+    def test_a_completed_search_frees_its_slot_exactly_once(self):
+        """Finishing a job moves it from in-flight to counted — the total must
+        not double-count or drift."""
+        async def noop(*args, **kwargs):
+            return None
+        original = engine_app.run_search_in_background
+        engine_app.run_search_in_background = noop
+        try:
+            res = self.client.post("/api/search",
+                                   json={"query": "aspirin", "query_type": "ligand"})
+            self.assertEqual(res.status_code, 200, res.text)
+            search_id = res.json()["search_id"]
+            before = self.client.get("/api/account/me").json()["entitlement"]["searches_used"]
+            self.assertEqual(before, 1, "an in-flight search must occupy a slot")
+
+            billing.record_search_usage(search_id)
+            after = self.client.get("/api/account/me").json()["entitlement"]["searches_used"]
+            self.assertEqual(after, 1, "completing must not double-count")
+
+            # Replaying the completion must not inflate usage either.
+            billing.record_search_usage(search_id)
+            self.assertEqual(
+                self.client.get("/api/account/me").json()["entitlement"]["searches_used"], 1)
+        finally:
+            engine_app.run_search_in_background = original
+
+    def test_stale_in_flight_searches_do_not_consume_a_new_period(self):
+        """A job left running across a plan upgrade must not eat the new quota."""
+        billing_store.set_search_owner("stale_search_id", self.account["id"])
+        billing_store.set_plan(self.account["id"], "starter")
+        ent = self.client.get("/api/account/me").json()["entitlement"]
+        self.assertEqual(ent["searches_used"], 0)
+        self.assertEqual(ent["searches_remaining"], 50)
+
     def test_forged_token_cannot_spend_someone_elses_quota(self):
         anon = TestClient(engine_app.app)
         res = anon.post("/api/search", json={"query": "aspirin", "query_type": "ligand"})

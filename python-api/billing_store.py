@@ -165,6 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_users_academician_type ON users(academician_type)
 CREATE INDEX IF NOT EXISTS idx_users_academic_email ON users(academic_email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_supabase ON users(supabase_user_id);
+CREATE INDEX IF NOT EXISTS idx_search_owners_user ON search_owners(user_id, counted);
 """
 
 # Identical shape; Postgres needs a sequence-backed identity instead of
@@ -620,6 +621,31 @@ def claim_search_owner(search_id: str) -> Optional[int]:
         return None
     row = db.query_one("SELECT user_id FROM search_owners WHERE search_id = ?", (search_id,))
     return int(row["user_id"]) if row else None
+
+
+def count_inflight_searches(user_id: int, since_iso: Optional[str] = None) -> int:
+    """Searches this user owns that have not been counted yet.
+
+    A search is only added to `searches_used` when it *completes*, so between
+    starting a job and it finishing the user could otherwise open an unbounded
+    number of parallel searches and never trip the quota. Counting in-flight
+    work makes the limit reflect what has actually been started.
+
+    Bounded to the current period so a job left over from a previous cycle (or
+    from before a plan upgrade) cannot consume the new allowance.
+    """
+    if since_iso:
+        row = db.query_one(
+            """SELECT COUNT(*) AS n FROM search_owners
+                WHERE user_id = ? AND counted = 0 AND created_at >= ?""",
+            (user_id, since_iso),
+        )
+    else:
+        row = db.query_one(
+            "SELECT COUNT(*) AS n FROM search_owners WHERE user_id = ? AND counted = 0",
+            (user_id,),
+        )
+    return int(row["n"]) if row else 0
 
 
 def delete_expired_search_owners(days: int = 7) -> None:
