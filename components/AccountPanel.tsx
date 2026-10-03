@@ -322,27 +322,52 @@ export default function AccountPanel({
     });
   }
 
-  async function runAcademicVerification(e?: FormEvent) {
+  async function runAcademicVerification(e?: FormEvent, emailOverride?: string) {
     e?.preventDefault();
+    const email = (emailOverride ?? profile.academic_email ?? '').trim();
+    if (!email) {
+      setAcademicError('Enter your institutional email address.');
+      return;
+    }
     setAcademicBusy(true);
     setAcademicError(null);
     setAcademicNotice(null);
     try {
       const result = await verifyAcademic({
-        academic_email: profile.academic_email || '',
+        academic_email: email,
         institute_name: profile.institute_name || undefined,
         institute_id: profile.institute_id || undefined,
         academician_type: profile.academician_type || undefined,
       });
       setAcademic(result.verification);
       setAcademicToken(result.token);
+      setProfile((p) => ({ ...p, academic_email: email }));
       setCheckout({ phase: 'idle' });
       setAcademicNotice(result.message);
     } catch (err: any) {
+      // A refused address must not leave a stale token behind, or the user
+      // would reach a payment screen the server will reject anyway.
       setAcademicToken(null);
       setAcademicError(err?.message || 'Could not verify that academic email.');
     } finally {
       setAcademicBusy(false);
+    }
+  }
+
+  /** Enter the verification step, pre-filling the account address and checking
+   * it straight away so a recognised institutional domain is approved without
+   * the visitor typing anything. */
+  function beginAcademicVerification() {
+    setCheckout({ phase: 'idle' });
+    setAcademicError(null);
+    setAcademicNotice(null);
+    setView('academic');
+    const accountEmail = entitlement?.email || '';
+    if (!profile.academic_email && accountEmail) {
+      setProfile((p) => ({ ...p, academic_email: accountEmail }));
+    }
+    if (academic?.status !== 'verified' && accountEmail) {
+      void runAcademicVerification(undefined, accountEmail);
     }
   }
 
@@ -518,13 +543,19 @@ export default function AccountPanel({
                       key={plan.id}
                       type="button"
                       onClick={() => {
+                        if (!signedIn) {
+                          // Verification is tied to an account, so send signed-out
+                          // visitors to sign in rather than to a view that would
+                          // have nothing to show them.
+                          setCheckout({ phase: 'idle' });
+                          setView('account');
+                          setError('Create an account or sign in to verify an academic email.');
+                          return;
+                        }
                         if (plan.id === 'academic' && !academicVerified) {
                           // Academic must be verified server-side before money
                           // moves; show the verification step instead of checkout.
-                          setCheckout({ phase: 'idle' });
-                          setAcademicError(null);
-                          setAcademicNotice(null);
-                          setView('academic');
+                          beginAcademicVerification();
                           return;
                         }
                         startCheckout(plan, plan.id === 'academic' ? academicToken : null);
@@ -591,6 +622,23 @@ export default function AccountPanel({
                 Back to sign in
               </button>
             </form>
+          )}
+
+          {view === 'academic' && !signedIn && (
+            <div className="space-y-3 max-w-sm">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Academic eligibility is tied to your account. Sign in (or create a
+                free account) and we will check your institutional email before
+                you pay.
+              </p>
+              <button
+                type="button"
+                onClick={() => setView('account')}
+                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-sm py-2"
+              >
+                Sign in or create an account
+              </button>
+            </div>
           )}
 
           {view === 'academic' && signedIn && (
