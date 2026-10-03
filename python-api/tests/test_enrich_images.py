@@ -101,8 +101,10 @@ class SettingParsing(unittest.TestCase):
     """What the operator actually types has to land in the right state."""
 
     def _parse(self, raw: str) -> bool:
-        """The expression from app.py, evaluated against `raw`."""
-        return raw.strip().lower() not in ("0", "false", "no", "off")
+        """The production parser, not a copy of it — a copy would keep
+        passing after the real one changed, which is how a stale test hides a
+        regression."""
+        return engine_app._parse_flag(raw)
 
     def test_zero_and_its_spellings_all_turn_images_off(self):
         for raw in ("0", "false", "FALSE", "no", "off", " Off "):
@@ -110,10 +112,51 @@ class SettingParsing(unittest.TestCase):
                 self.assertFalse(self._parse(raw),
                                  f"SEARCH_ENRICH_IMAGES={raw!r} did not turn images off")
 
+    def test_quoted_values_still_turn_images_off(self):
+        """Render's environment fields take whatever is pasted in, and a
+        quoted value is the obvious paste accident. It has to mean the same
+        thing as the bare value, or the switch silently does nothing — which is
+        exactly the failure this whole switch exists to prevent."""
+        for raw in ('"0"', "'0'", ' "false" ', "'OFF'", '""0""'):
+            with self.subTest(value=raw):
+                self.assertFalse(
+                    self._parse(raw),
+                    f"SEARCH_ENRICH_IMAGES={raw!r} was not read as off")
+
     def test_anything_else_keeps_images_on(self):
         for raw in ("1", "true", "yes", "on", ""):
             with self.subTest(value=raw):
                 self.assertTrue(self._parse(raw))
+
+
+class HealthReportsEffectiveSettings(unittest.TestCase):
+    """The values live in a dashboard, so the running container has to be able
+    to say what it actually resolved them to."""
+
+    def _health(self) -> dict:
+        """Call the real endpoint, so these tests cover the shipped response."""
+        import asyncio
+        return asyncio.run(engine_app.health())
+
+    def test_health_exposes_the_image_switch(self):
+        result = self._health()
+        self.assertIn("enrich_images", result)
+        self.assertIsInstance(result["enrich_images"], bool)
+
+    def test_health_exposes_the_watchdog_limits(self):
+        """Lets a deployment be confirmed without waiting for a search to fail
+        the old way."""
+        watchdog = self._health()["watchdog"]
+        self.assertEqual(watchdog["stall_timeout"], engine_app.STALL_TIMEOUT)
+        self.assertEqual(
+            watchdog["max_search_seconds"], engine_app.MAX_SEARCH_SECONDS)
+
+    def test_health_reports_the_switch_as_the_container_resolved_it(self):
+        self._original = engine_app.ENRICH_IMAGES
+        self.addCleanup(
+            lambda: setattr(engine_app, "ENRICH_IMAGES", self._original))
+        engine_app.ENRICH_IMAGES = False
+        self.assertFalse(self._health()["enrich_images"])
 
 
 if __name__ == "__main__":

@@ -234,12 +234,28 @@ _shutdown = asyncio.Event()
 # OOM-kills the container (Render free tier = 512MB shared with Node).
 _search_slots = asyncio.Semaphore(int(os.environ.get("MAX_CONCURRENT_SEARCHES", "1")))
 
+def _parse_flag(raw: str) -> bool:
+    """Read a boolean the way an operator types it into a dashboard.
+
+    Deliberately forgiving, because these values are set by hand in Render's
+    environment fields where nothing validates them and a misread value is
+    silent: the search still runs, it just quietly keeps doing the expensive
+    thing the operator asked it to stop. So quotes that survive a copy-paste
+    (`SEARCH_ENRICH_IMAGES="0"`) are stripped, surrounding whitespace is
+    ignored, and case does not matter. A value that is none of the recognised
+    false spellings keeps the feature on, which is the safe direction: the
+    default behaviour is unchanged, and only an explicit switch turns a feature
+    off.
+    """
+    value = raw.strip().strip("\"'").strip().lower()
+    return value not in ("0", "false", "no", "off")
+
+
 # Download 2D structure images during enrichment? On by default. Set
 # SEARCH_ENRICH_IMAGES=0 on a memory-constrained host (Render free tier) to cut
 # the peak footprint of a search; the enriched Excel workbook is still produced.
-ENRICH_IMAGES = os.environ.get("SEARCH_ENRICH_IMAGES", "1").strip().lower() not in (
-    "0", "false", "no", "off",
-)
+ENRICH_IMAGES = _parse_flag(os.environ.get("SEARCH_ENRICH_IMAGES", "1"))
+
 
 # ── Per-IP search rate limit ────────────────────────────────────────────────
 # Account creation happens in the browser against Supabase directly, so this
@@ -759,6 +775,17 @@ async def health():
         "exports_dir": str(EXPORTS_DIR),
         "workspace_dir": str(WORKSPACE_DIR),
         "search_db": str(SEARCH_DB),
+        # Effective settings, not the raw environment. Both of these are set in
+        # the dashboard rather than in the repository, so a search that still
+        # downloads images — or one that still dies at the old 5-minute stall —
+        # is otherwise impossible to explain without running a search and
+        # reading its log. One request answers it.
+        "enrich_images": ENRICH_IMAGES,
+        "watchdog": {
+            "poll_seconds": STALL_POLL_SECONDS,
+            "stall_timeout": STALL_TIMEOUT,
+            "max_search_seconds": MAX_SEARCH_SECONDS,
+        },
     }
 
 
