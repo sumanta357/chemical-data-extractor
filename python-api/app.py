@@ -234,6 +234,69 @@ _shutdown = asyncio.Event()
 # OOM-kills the container (Render free tier = 512MB shared with Node).
 _search_slots = asyncio.Semaphore(int(os.environ.get("MAX_CONCURRENT_SEARCHES", "1")))
 
+# ── Per-IP search rate limit ────────────────────────────────────────────────
+# Account creation happens in the browser against Supabase directly, so this
+# server never observes a sign-up and cannot rate-limit one. Anyone can mint
+# unlimited throwaway accounts, each arriving with a fresh free-plan
+# allowance. The enforceable chokepoint is the search itself: cap how many
+# searches one address can start, which bounds cost regardless of how many
+# accounts exist. Lower these with env vars if the container is tight.
+IP_SEARCHES_PER_HOUR = int(os.environ.get("SEARCHES_PER_IP_PER_HOUR", "30"))
+IP_SEARCHES_PER_HOUR_PAID = int(os.environ.get("PAID_SEARCHES_PER_IP_PER_HOUR", "200"))
+_IP_WINDOW_SECONDS = 3600
+
+
+def _client_ip(http_request) -> str:
+    """Best-effort caller IP. Render sets X-Forwarded-For on every request."""
+    if http_request is None:
+        return "unknown"
+    forwarded = http_request.headers.get("x-forwarded-for", "") or ""
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real = http_request.headers.get("x-real-ip", "") or ""
+    if real.strip():
+        return real.strip()
+    client = getattr(http_request, "client", None)
+    return getattr(client, "host", "") or "unknown"
+
+
+def _consume_ip_allowance(ip: str, allowance: int) -> bool:
+    """Charge one search against this address's hourly budget.
+
+    Returns True when the search may proceed. Fails open on a database
+    problem: a broken counter must not take search down, and the per-account
+    plan quota is still enforced independently.
+    """
+    try:
+        with sqlite3.connect(str(SEARCH_DB), timeout=10) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ip_search_window (
+                    ip TEXT PRIMARY KEY,
+                    window_start REAL NOT NULL,
+                    count INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            now = time.time()
+            row = conn.execute(
+                "SELECT window_start, count FROM ip_search_window WHERE ip = ?", (ip,)
+            ).fetchone()
+            if row is None or (now - row[0]) >= _IP_WINDOW_SECONDS:
+                conn.execute(
+                    "INSERT INTO ip_search_window (ip, window_start, count) VALUES (?, ?, 1) "
+                    "ON CONFLICT(ip) DO UPDATE SET window_start = excluded.window_start, count = 1",
+                    (ip, now),
+                )
+                return True
+            if row[1] >= allowance:
+                return False
+            conn.execute(
+                "UPDATE ip_search_window SET count = count + 1 WHERE ip = ?", (ip,)
+            )
+            return True
+    except Exception:
+        LOG.warning("IP rate-limit check failed; allowing the search", exc_info=True)
+        return True
+
 
 def _mark_interrupted(reason: str):
     """Fail any job stuck in queued/running.
@@ -614,6 +677,24 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
         raise HTTPException(status_code=400, detail="query_type must be protein, ligand, or auto")
 
     user, entitlement = _entitlement_for_request(http_request)
+
+    # Bound work per address. Paid plans get a much larger ceiling so a shared
+    # office or campus NAT cannot lock out customers who have already paid.
+    plan = (entitlement or {}).get("plan") or "free"
+    allowance = IP_SEARCHES_PER_HOUR_PAID if plan != "free" else IP_SEARCHES_PER_HOUR
+    ip = _client_ip(http_request)
+    if not _consume_ip_allowance(ip, allowance):
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "rate_limited",
+                "message": (
+                    f"Too many searches from this network. This service allows "
+                    f"{allowance} searches per hour per address. Please try again later."
+                ),
+            },
+            headers={"Retry-After": str(_IP_WINDOW_SECONDS)},
+        )
 
     search_id = str(uuid.uuid4())[:8]
     clean_q = re.sub(r"[^a-zA-Z0-9_\-]", "_", request.query.strip())[:30]

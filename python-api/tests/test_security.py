@@ -36,6 +36,7 @@ from support import AUTH_HEADERS, SupabaseStub  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import billing  # noqa: E402
+import billing_store  # noqa: E402
 import app as engine_app  # noqa: E402
 
 
@@ -220,6 +221,75 @@ class InputValidation(SecurityBase):
     def test_non_string_query_is_rejected(self):
         res = self.client.post("/api/search", json={"query": {"$ne": None}})
         self.assertIn(res.status_code, (400, 422))
+
+
+# ── Account farming via unlimited throwaway sign-ups ────────────────────────
+
+class SignupFarming(SecurityBase):
+    """Supabase is called straight from the browser, so this server never sees
+    a sign-up and cannot rate-limit one. Anyone can mint unlimited throwaway
+    accounts, each arriving with a fresh free-plan allowance. The bound that
+    can actually be enforced is work per address."""
+
+    def _with_allowance(self, n):
+        original = engine_app.IP_SEARCHES_PER_HOUR
+        engine_app.IP_SEARCHES_PER_HOUR = n
+        self.addCleanup(
+            lambda: setattr(engine_app, "IP_SEARCHES_PER_HOUR", original))
+
+    def _search_from(self, ip, client=None):
+        """POST /api/search as though the caller sat at `ip`.
+
+        Deliberately not self.start(): that helper folds every keyword into the
+        JSON body, so a headers= argument would silently become a request field
+        instead of an HTTP header and every call would share one bucket.
+        """
+        return (client or self.client).post(
+            "/api/search",
+            json={"query": "aspirin", "query_type": "ligand", "hops": 1},
+            headers={"X-Forwarded-For": ip},
+        )
+
+    def test_one_address_cannot_start_unlimited_searches(self):
+        # Kept below the free plan's own 3-search quota: whichever ceiling is
+        # reached first wins, so a limit at 3 would be masked by the 402.
+        self._with_allowance(2)
+        codes = [self._search_from("203.0.113.7").status_code for _ in range(4)]
+        self.assertEqual(codes, [200, 200, 429, 429], codes)
+
+    def test_the_allowance_is_per_address_not_global(self):
+        self._with_allowance(2)
+        a = [self._search_from("198.51.100.1").status_code for _ in range(3)]
+        b = self._search_from("198.51.100.2").status_code
+        self.assertEqual(a, [200, 200, 429], a)
+        self.assertEqual(b, 200, "one address exhausted another address's allowance")
+
+    def test_a_fresh_account_on_the_same_address_does_not_reset_the_budget(self):
+        """The actual exploit: spend the free tier, make a new account, repeat."""
+        self._with_allowance(2)
+        self.assertEqual(self._search_from("198.51.100.55").status_code, 200)
+        self.assertEqual(self._search_from("198.51.100.55").status_code, 200)
+
+        # A brand-new account, same machine — nothing about the address changed.
+        farmed = SupabaseStub(email="throwaway@example.com").install(self)
+        farmed.account()
+        res = self._search_from(
+            "198.51.100.55", TestClient(engine_app.app, headers=AUTH_HEADERS))
+        self.assertEqual(
+            res.status_code, 429,
+            "a new account on an exhausted address bypassed the per-address limit")
+
+    def test_a_paid_account_gets_a_larger_allowance(self):
+        self._with_allowance(1)
+        self.assertEqual(self._search_from("198.51.100.9").status_code, 200)
+        self.assertEqual(self._search_from("198.51.100.9").status_code, 429)
+
+        paid = SupabaseStub(email="paying@example.com").install(self)
+        billing_store.set_plan(paid.account()["id"], "starter")
+        res = self._search_from(
+            "198.51.100.9", TestClient(engine_app.app, headers=AUTH_HEADERS))
+        self.assertEqual(res.status_code, 200,
+                         "a paying customer was blocked behind the free-tier ceiling")
 
 
 if __name__ == "__main__":

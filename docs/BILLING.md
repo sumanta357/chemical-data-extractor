@@ -63,6 +63,27 @@ truth — the browser can never send an amount.
 | `ACADEMIC_TOKEN_TTL_SECONDS` | no | Attestation lifetime, default `1800` |
 | `ACADEMIC_MAX_ATTEMPTS_PER_HOUR` | no | Verification attempts per account per hour, default `5` |
 | `ACADEMIC_REQUIRE_MAILBOX_PROOF` | no | Set once SMTP is configured; tells the UI to promise a confirmation email |
+| `SEARCHES_PER_IP_HOUR` | no | Searches one IP address may start per hour, default `30`. Bounds account-farming: sign-up happens against Supabase from the browser, so the server cannot rate-limit account creation — this limits the work an address can obtain |
+| `PAID_SEARCHES_PER_IP_PER_HOUR` | no | The same ceiling for accounts on a paid plan, default `200`, so a shared campus/office NAT cannot lock out customers who have paid |
+
+### Why there is a per-IP limit at all
+
+Account creation is a `supabase.auth.signUp()` call made **in the browser**, so it
+never reaches this server and cannot be rate-limited here. Combined with Supabase's
+`mailer_autoconfirm` setting (which returns a session immediately, with no email to
+prove), anyone can mint unlimited throwaway accounts and spend a fresh free-plan
+allowance on each.
+
+The enforceable chokepoint is the search. `POST /api/search` charges every start
+against a per-address hourly budget, returning `429` with `code: "rate_limited"`
+once it is spent. Paid plans get a much larger ceiling, and the per-account plan
+quota still applies independently — whichever ceiling is reached first wins.
+
+The durable fix is email confirmation: configure SMTP in Supabase and turn
+**Confirm email** on, so a sign-up yields no session until the address is proven.
+That is a dashboard change, not a code change. Until then this limit raises the
+cost of farming rather than eliminating it — a determined attacker with many IP
+addresses can still exceed it.
 
 ---
 
