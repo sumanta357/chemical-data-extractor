@@ -78,13 +78,20 @@ export default function HomePage() {
 
     pollingRef.current = setInterval(async () => {
       try {
+        // A search belongs to the account that started it, so a poll that does
+        // not say who it is gets a 404 — which the branch below would report as
+        // "the engine restarted". Every poll therefore carries the caller's
+        // Supabase token, exactly as the submit that created the search did.
         const [statusRes, logRes] = await Promise.all([
-          fetch(`/api/search/${searchId}`),
-          fetch(`/api/search/${searchId}/log?offset=${offset}`),
+          fetch(`/api/search/${searchId}`, { headers: await authHeaders() }),
+          fetch(`/api/search/${searchId}/log?offset=${offset}`, {
+            headers: await authHeaders(),
+          }),
         ]);
 
         if (statusRes.status === 404) {
-          // The engine lost this job (restart / OOM / free-tier recycle).
+          // The engine no longer has this job: the container was replaced while
+          // it ran (deploy, free-tier recycle) or it was dropped for memory.
           // Fail honestly instead of freezing at "Queued..." forever.
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
@@ -94,7 +101,7 @@ export default function HomePage() {
                   ...prev,
                   status: 'failed',
                   error:
-                    'The search engine restarted while this search was running (it sleeps when idle and can be recycled under memory pressure). Please run the search again.',
+                    'This search was lost because the server it was running on was restarted or recycled. Free-tier instances are replaced after a deploy or after idling, and a running search does not survive. Please run the search again.',
                   progress: 'Search lost — engine restarted',
                 }
               : prev
@@ -159,8 +166,10 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleViewSearch = useCallback((searchId: string) => {
-    fetch(`/api/search/${searchId}`)
+  const handleViewSearch = useCallback(async (searchId: string) => {
+    // Owner-scoped like the poll: without the token this 404s and the history
+    // click-through silently loads nothing.
+    fetch(`/api/search/${searchId}`, { headers: await authHeaders() })
       .then((res) => res.json())
       .then((data) => {
         setSearch(data);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { authHeaders } from '@/lib/billing';
 import type { SearchState, SearchSummary } from '@/lib/types';
 
 interface Props {
@@ -17,19 +18,47 @@ const statusStyles: Record<string, { color: string; label: string }> = {
 export default function HistoryPanel({ onViewSearch }: Props) {
   const [searches, setSearches] = useState<SearchSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch('/api/searches?limit=20')
-      .then((res) => res.json())
-      .then((data) => setSearches(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    // The list is scoped to the caller's account, so it must carry their token.
+    // Without it the engine answers [] and every signed-in user's history is
+    // silently replaced by "No searches yet".
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/searches?limit=20', {
+          headers: await authHeaders(),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setSearches(data);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="animate-spin h-6 w-6 border-2 border-cyan-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-lg text-red-400">Could not load your search history</p>
+        <p className="text-sm mt-1 text-gray-500">
+          The server did not answer. If you are signed in, reload the page.
+        </p>
       </div>
     );
   }
