@@ -362,6 +362,67 @@ class PaymentIntegrity(AcademicTestCase):
         self.assertEqual(self.client.get("/api/account/me").json()["entitlement"]["plan"],
                          "academic")
 
+    def test_partial_payment_does_not_activate_the_plan(self):
+        """Razorpay can settle less than the order total. A ₹1 payment must
+        not open a ₹249 Academic plan."""
+        order_id = self._order()
+        payment = self.rzp.capture(order_id, amount=100)
+        sig = hmac.new(b"rzp_test_key_secret",
+                       f"{order_id}|{payment['id']}".encode(), hashlib.sha256).hexdigest()
+        res = self.client.post("/api/billing/verify-payment", json={
+            "razorpay_order_id": order_id, "razorpay_payment_id": payment["id"],
+            "razorpay_signature": sig})
+        self.assertEqual(res.status_code, 400, res.text)
+        me = self.client.get("/api/account/me").json()
+        self.assertEqual(me["entitlement"]["plan"], "free")
+        self.assertEqual(me["entitlement"]["plan_name"], "Free")
+        record = billing_store.get_payment(payment["id"])
+        self.assertEqual(record["status"], "captured_amount_mismatch")
+
+    def test_wrong_currency_does_not_activate_the_plan(self):
+        order_id = self._order()
+        payment = self.rzp.capture(order_id)
+        payment["currency"] = "USD"
+        sig = hmac.new(b"rzp_test_key_secret",
+                       f"{order_id}|{payment['id']}".encode(), hashlib.sha256).hexdigest()
+        res = self.client.post("/api/billing/verify-payment", json={
+            "razorpay_order_id": order_id, "razorpay_payment_id": payment["id"],
+            "razorpay_signature": sig})
+        self.assertEqual(res.status_code, 400, res.text)
+        self.assertEqual(self.client.get("/api/account/me").json()["entitlement"]["plan"], "free")
+
+    def test_a_short_payment_cannot_activate_via_the_webhook(self):
+        """The webhook never goes through the checkout signature check, so the
+        amount comparison has to hold on this path too."""
+        order_id = self._order()
+        payment = self.rzp.capture(order_id, amount=1)
+        raw, sig = self.rzp.webhook_body("payment.captured", payment)
+        self.client.post("/api/billing/webhook", content=raw,
+                         headers={"x-razorpay-signature": sig})
+        self.assertEqual(self.client.get("/api/account/me").json()["entitlement"]["plan"], "free")
+        self.assertEqual(billing_store.get_payment(payment["id"])["status"],
+                         "captured_amount_mismatch")
+
+    def test_a_short_payment_cannot_activate_via_reconciliation(self):
+        order_id = self._order()
+        payment = self.rzp.capture(order_id, amount=100)
+        res = self.client.get(f"/api/billing/payment-status/{payment['id']}")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self.client.get("/api/account/me").json()["entitlement"]["plan"], "free")
+
+    def test_exact_amount_still_activates(self):
+        """Guard against the fix being over-eager: the correct price must work."""
+        order_id = self._order()
+        payment = self.rzp.capture(order_id, amount=24900)
+        sig = hmac.new(b"rzp_test_key_secret",
+                       f"{order_id}|{payment['id']}".encode(), hashlib.sha256).hexdigest()
+        res = self.client.post("/api/billing/verify-payment", json={
+            "razorpay_order_id": order_id, "razorpay_payment_id": payment["id"],
+            "razorpay_signature": sig})
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(self.client.get("/api/account/me").json()["entitlement"]["plan"],
+                         "academic")
+
     def test_forged_webhook_is_rejected(self):
         raw, _ = self.rzp.webhook_body("payment.captured", {"id": "pay_forged"})
         res = self.client.post("/api/billing/webhook", content=raw,

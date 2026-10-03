@@ -447,6 +447,34 @@ def academic_purchase_allowed(user: dict, token: Optional[str] = None) -> tuple[
     return True, "verified"
 
 
+def payment_matches_order(order: dict, payment: dict) -> tuple[bool, str]:
+    """Does the provider's own record agree with what we ordered and charged?
+
+    Razorpay can settle a *partial* amount (some methods and payment links let
+    the payer choose less than the order total). Without this check a ₹1
+    payment would activate a ₹249 plan, so the captured amount and currency
+    are compared against the order we stored — never against anything the
+    browser sent.
+    """
+    try:
+        expected = int(order.get("amount_paise") or 0)
+        paid_raw = payment.get("amount")
+        if paid_raw is not None and expected:
+            if int(paid_raw) != expected:
+                return False, f"amount mismatch (paid {paid_raw}, expected {expected})"
+        elif paid_raw is None and expected:
+            # No amount reported at all: cannot prove the right money arrived.
+            return False, "payment did not report an amount"
+    except (TypeError, ValueError):
+        return False, "payment reported an unusable amount"
+
+    paid_currency = str(payment.get("currency") or "INR").upper()
+    order_currency = str(order.get("currency") or "INR").upper()
+    if paid_currency != order_currency:
+        return False, f"currency mismatch (paid {paid_currency}, expected {order_currency})"
+    return True, "ok"
+
+
 def activate_for_payment(payment: dict) -> Optional[dict]:
     """Activate the plan tied to a captured payment. Idempotent.
 
@@ -464,6 +492,21 @@ def activate_for_payment(payment: dict) -> Optional[dict]:
     order, user = found
 
     plan = PLANS.get(order["plan"], PLANS["free"])
+
+    # Amount and currency are checked here, at the one place every activation
+    # path passes through — the browser's verify call, the webhook and the
+    # reconcile sweep. A short or wrong-currency payment is recorded for
+    # reconciliation but never grants a plan.
+    matches, why = payment_matches_order(order, payment)
+    if not matches:
+        LOG.warning("Refusing activation for payment %s on order %s: %s",
+                    payment_id, order_id, why)
+        billing_store.record_payment(
+            payment_id, order_id, user["id"], order["plan"],
+            payment.get("amount"), "captured_amount_mismatch", payment.get("method"),
+            captured=True,
+        )
+        return None
 
     # Academic entitlement is re-checked here, not just at checkout. Reaching
     # this function through the webhook or the reconcile path means no
@@ -524,7 +567,27 @@ def confirm_captured_payment(order_id: str, payment_id: str) -> Optional[dict]:
     status = (payment.get("status") or "").lower()
     if status not in ("captured", "authorized"):
         raise RazorpayError(f"Payment is not completed (status: {status or 'unknown'})", 400)
-    return activate_for_payment(payment)
+    order = billing_store.get_order(order_id)
+    if order:
+        matches, why = payment_matches_order(order, payment)
+        if not matches:
+            # Record the short payment before refusing, so there is the same
+            # audit trail here as on the webhook path. The money is real and
+            # support needs to see it even though no plan is granted.
+            LOG.warning("Checkout payment %s does not match order %s: %s",
+                        payment_id, order_id, why)
+            billing_store.record_payment(
+                payment_id, order_id, order["user_id"], order["plan"],
+                payment.get("amount"), "captured_amount_mismatch",
+                payment.get("method"), captured=True,
+            )
+            # Tell the buyer plainly rather than leaving them on a plan that
+            # was never paid for.
+            raise RazorpayError("The payment amount does not match the plan price", 400)
+    activated = activate_for_payment(payment)
+    if activated is None and billing_store.get_payment(payment_id) is None:
+        raise RazorpayError("Could not match this payment to a plan", 400)
+    return activated
 
 
 def reconcile_captured_payment(payment_id: str,
