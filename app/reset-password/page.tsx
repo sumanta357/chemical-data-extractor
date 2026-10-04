@@ -8,12 +8,17 @@
  * about the session is handled here.
  */
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
+import { AlertIcon, CheckIcon, SpinnerIcon } from '@/components/icons';
+import { btnPrimary, btnSecondary, note } from '@/components/ui';
 import { authErrorMessage, getSupabase } from '@/lib/supabase';
 
 export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -38,6 +43,10 @@ export default function ResetPasswordPage() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (password !== confirm) {
+      setError('The two passwords do not match.');
+      return;
+    }
     const supabase = getSupabase();
     if (!supabase) return;
     setBusy(true);
@@ -54,47 +63,95 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#050912] text-gray-300 px-4 py-16">
-      <div className="max-w-sm mx-auto space-y-4">
-        <h1 className="text-lg font-semibold text-gray-100">Choose a new password</h1>
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader current="app" />
 
-        {done ? (
-          <>
-            <p className="text-sm text-cyan-400">Your password has been updated.</p>
-            <a
-              href="/"
-              className="inline-block text-sm px-4 py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10"
+      <main className="flex flex-1 items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm">
+          <h1 className="text-xl font-semibold tracking-tight text-fg">
+            Choose a new password
+          </h1>
+
+          {done ? (
+            <div className="panel mt-4 p-5">
+              <p className="flex items-start gap-2 text-sm leading-relaxed text-fg">
+                <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                Your password has been updated. You can sign in with it now.
+              </p>
+              <Link href="/" className={`${btnPrimary} mt-4 w-full`}>
+                Back to the app
+              </Link>
+            </div>
+          ) : !ready ? (
+            <p
+              className="mt-4 flex items-center gap-2 text-sm text-fg-muted"
+              role="status"
             >
-              Back to the app
-            </a>
-          </>
-        ) : !ready ? (
-          <p className="text-sm text-gray-500">Loading…</p>
-        ) : (
-          <form onSubmit={submit} className="space-y-3">
-            <p className="text-sm text-gray-500">
-              Open this page from the link in your password-reset email.
+              <SpinnerIcon className="h-4 w-4 animate-spin-slow" />
+              Checking your reset link…
             </p>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="New password"
-              className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
-            />
-            {error && <p className="text-xs text-amber-400">{error}</p>}
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full text-sm font-medium py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 disabled:opacity-50"
-            >
-              {busy ? 'Saving…' : 'Set new password'}
-            </button>
-          </form>
-        )}
-      </div>
-    </main>
+          ) : (
+            <form onSubmit={submit} className="panel mt-4 space-y-4 p-5">
+              <p className="text-sm leading-relaxed text-fg-muted">
+                Open this page from the link in your password-reset email. The
+                link signs you in just long enough to set a new password.
+              </p>
+
+              <div>
+                <label htmlFor="new-password" className="label">
+                  New password
+                </label>
+                <input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className="field"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="confirm-password" className="label">
+                  Confirm new password
+                </label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  className="field"
+                />
+              </div>
+
+              {error && (
+                <p className={note('danger')} role="alert">
+                  <span className="inline-flex items-start gap-1.5">
+                    <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                    {error}
+                  </span>
+                </p>
+              )}
+
+              <button type="submit" disabled={busy} className={`${btnPrimary} w-full`}>
+                {busy ? 'Saving…' : 'Set new password'}
+              </button>
+
+              <Link href="/" className={`${btnSecondary} w-full`}>
+                Cancel
+              </Link>
+            </form>
+          )}
+        </div>
+      </main>
+
+      <SiteFooter />
+    </div>
   );
 }

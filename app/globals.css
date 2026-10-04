@@ -2,382 +2,305 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground: 229 231 235;
-  --background: 3 7 18;
-  --muted: 107 114 128;
-  --accent: 34 211 238;
-  --accent-dim: 8 145 178;
+/* ═══════════════════════════════════════════════════════════════════════════
+   Theme tokens
+
+   Every colour in the product comes from one of these variables. Components
+   never hardcode a hex value, so Light and Dark are two deliberately designed
+   palettes rather than one palette inverted.
+
+   Values are raw "R G B" triplets so Tailwind can apply opacity modifiers
+   (bg-accent/10) on top of them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+html.light {
+  /* Canvas and surfaces — near-white, faintly cool so the teal accent stays
+     legible without the page reading as a blue wash. */
+  --bg: 255 255 255;
+  --bg-sunken: 244 246 249;
+  --surface: 255 255 255;
+  --surface-2: 247 249 251;
+  --surface-3: 238 242 246;
+
+  /* Hairlines. Two weights: the default rule, and the stronger one for the
+     edge of an input or a pressed control. */
+  --line: 223 228 234;
+  --line-strong: 186 195 206;
+
+  /* Text. --fg is body copy, --fg-muted is secondary, --fg-subtle is for
+     metadata that must still clear 4.5:1. */
+  --fg: 17 24 32;
+  --fg-muted: 82 94 108;
+  --fg-subtle: 96 108 122;
+
+  /* Accent: a deep teal that passes AA for text and for white label text. */
+  --accent: 13 116 138;
+  --accent-hover: 10 99 119;
+  --accent-solid: 12 106 128;
+  --accent-on-solid: 255 255 255;
+  --accent-soft: 224 243 246;
+  --accent-line: 138 197 210;
+
+  /* Status. Each has a text tone and a tinted background so alerts read the
+     same in both themes. */
+  --danger: 185 28 28;
+  --danger-soft: 254 242 242;
+  --danger-line: 254 202 202;
+  --success: 4 108 78;
+  --success-soft: 236 249 243;
+  --success-line: 173 226 205;
+  --warning: 146 88 8;
+  --warning-soft: 254 247 232;
+  --warning-line: 240 214 158;
+  --info: 30 79 140;
+  --info-soft: 238 244 253;
+  --info-line: 186 208 240;
+
+  --ring: 13 116 138;
+  --overlay: 15 23 32;
+
+  --shadow-sm: 0 1px 2px rgb(17 24 32 / 0.06);
+  --shadow-md: 0 4px 14px rgb(17 24 32 / 0.08);
+  --shadow-lg: 0 18px 44px rgb(17 24 32 / 0.14);
+
+  color-scheme: light;
+}
+
+html.dark {
+  /* Canvas is near-black, not navy. Surfaces step up in small, even
+     increments so nesting still reads without glowing borders. */
+  --bg: 8 10 14;
+  --bg-sunken: 5 6 9;
+  --surface: 15 18 24;
+  --surface-2: 21 25 32;
+  --surface-3: 30 35 44;
+
+  --line: 37 43 53;
+  --line-strong: 56 65 79;
+
+  --fg: 232 237 243;
+  --fg-muted: 161 171 186;
+  --fg-subtle: 133 144 159;
+
+  /* Lighter teal than Light mode: the accent has to carry on a black canvas,
+     and the button fill uses dark ink so the label stays high contrast. */
+  --accent: 56 205 226;
+  --accent-hover: 92 220 236;
+  --accent-solid: 45 190 212;
+  --accent-on-solid: 4 30 38;
+  --accent-soft: 12 45 54;
+  --accent-line: 27 92 105;
+
+  --danger: 252 129 129;
+  --danger-soft: 43 20 22;
+  --danger-line: 110 40 43;
+  --success: 78 214 155;
+  --success-soft: 12 42 33;
+  --success-line: 30 100 74;
+  --warning: 245 193 92;
+  --warning-soft: 45 34 13;
+  --warning-line: 110 83 28;
+  --info: 128 176 255;
+  --info-soft: 16 33 55;
+  --info-line: 40 78 128;
+
+  --ring: 56 205 226;
+  --overlay: 0 0 0;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 20px 48px rgb(0 0 0 / 0.65);
+
+  color-scheme: dark;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+* {
+  border-color: rgb(var(--line));
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  color: rgb(var(--foreground));
-  background: rgb(var(--background));
+  color: rgb(var(--fg));
+  background-color: rgb(var(--bg));
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Respect users who prefer reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .animate-indeterminate,
-  .animate-line-in {
-    animation: none !important;
+/* One visible focus treatment everywhere, keyboard-only. */
+:focus-visible {
+  outline: 2px solid rgb(var(--ring));
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Numeric columns line up in tables and counters. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selects inherit the surface rather than the OS default, so a form looks the
+   same in both themes. */
+select option {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--fg));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Components
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Panel — the single container style used by every block in the app. */
+  .panel {
+    background-color: rgb(var(--surface));
+    border: 1px solid rgb(var(--line));
+    border-radius: 10px;
+  }
+
+  /* Inputs: one height, one radius, one focus ring. */
+  .field {
+    display: block;
+    width: 100%;
+    background-color: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--line-strong));
+    border-radius: 7px;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: rgb(var(--fg));
+    transition: border-color 120ms ease, box-shadow 120ms ease,
+      background-color 120ms ease;
+  }
+  .field::placeholder {
+    color: rgb(var(--fg-subtle));
+  }
+  .field:hover:not(:disabled) {
+    border-color: rgb(var(--fg-subtle));
+  }
+  .field:focus {
+    outline: none;
+    background-color: rgb(var(--surface));
+    border-color: rgb(var(--accent));
+    box-shadow: 0 0 0 3px rgb(var(--accent) / 0.16);
+  }
+  .field:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgb(var(--fg-muted));
+  }
+
+  /* Section label: the small uppercase caption used above panel content. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgb(var(--fg-subtle));
+  }
+
+  .link {
+    color: rgb(var(--accent));
+    text-decoration: underline;
+    text-decoration-color: rgb(var(--accent) / 0.4);
+    text-underline-offset: 3px;
+  }
+  .link:hover {
+    text-decoration-color: rgb(var(--accent));
+  }
+
+  .mono {
+    font-family: theme('fontFamily.mono');
   }
 }
 
-/* ── Grid overlay ── */
-.grid-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background-image:
-    linear-gradient(rgba(6,182,212,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(6,182,212,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   Scrollbars
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line-strong)) transparent;
+}
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgb(55 65 81);
-  border-radius: 3px;
+  background: rgb(var(--line-strong));
+  border: 3px solid rgb(var(--bg));
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(75 85 99);
+  background: rgb(var(--fg-subtle));
 }
 
-/* Glow border utility */
-.glow-border {
-  position: relative;
+/* ═══════════════════════════════════════════════════════════════════════════
+   Motion — functional only
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
-.glow-border::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(
-    135deg,
-    rgba(6,182,212,0.3) 0%,
-    transparent 40%,
-    transparent 60%,
-    rgba(139,92,246,0.15) 100%
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+.animate-spin-slow {
+  animation: spin 700ms linear infinite;
 }
 
-/* Gradient text (static gradient — no animated loop) */
-.gradient-text {
-  background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 50%, #a78bfa 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Fade in up */
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.fade-in-up {
-  animation: fadeInUp 0.6s ease forwards;
-}
-.fade-in-up-delay-1 { animation-delay: 0.1s; }
-.fade-in-up-delay-2 { animation-delay: 0.2s; }
-.fade-in-up-delay-3 { animation-delay: 0.3s; }
-
-/* Shimmer progress bar */
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(400%); }
-}
-
-/* Glass card */
-.glass-card {
-  background: rgba(17,24,39,0.6);
-  border: 1px solid rgba(55,65,81,0.5);
-  border-radius: 16px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-.glass-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(6,182,212,0.3), transparent);
-}
-.glass-card:hover {
-  border-color: rgba(6,182,212,0.2);
-  box-shadow: 0 8px 32px rgba(6,182,212,0.05);
-}
-
-/* Search button shimmer */
-.search-shimmer {
-  position: relative;
-  overflow: hidden;
-}
-.search-shimmer::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
-  transform: translateX(-100%);
-  transition: transform 0.6s ease;
-}
-.search-shimmer:hover::before {
-  transform: translateX(100%);
-}
-
-/* Transitions — scoped to interactive elements, not every node */
-a,
-button,
-input,
-textarea,
-select,
-summary,
-[role="button"],
-.glass-card,
-.ai-chip {
-  transition-property: background-color, border-color, color, box-shadow, transform;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ── Progress & log micro-animations ── */
+/* Indeterminate progress rail for a running search. */
 @keyframes indeterminate {
-  0% { transform: translateX(-110%); }
-  100% { transform: translateX(410%); }
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(410%);
+  }
 }
 .animate-indeterminate {
   animation: indeterminate 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-@media (prefers-reduced-motion: reduce) {
-  .animate-indeterminate { animation: none; opacity: 0.5; }
-}
 
+/* One new log line, one soft fade. Nothing else animates on its own. */
 @keyframes lineIn {
-  from { opacity: 0; transform: translateY(2px); }
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
 }
 .animate-line-in {
   animation: lineIn 160ms ease-out;
 }
 
-/* ── AI Analyst panel — distinct indigo surface, same glass language ── */
-.ai-panel {
-  position: relative;
-  overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid rgba(99,102,241,0.25);
-  background: linear-gradient(180deg, rgba(30,32,62,0.85) 0%, rgba(15,16,28,0.9) 100%);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  display: flex;
-  flex-direction: column;
-  min-height: 380px;
-}
-.ai-panel::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(129,140,248,0.4), transparent);
-}
-
-.ai-panel__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(99,102,241,0.18);
-}
-
-.ai-panel__badge {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(129,140,248,0.25), rgba(99,102,241,0.1));
-  border: 1px solid rgba(129,140,248,0.3);
-  color: #a5b4fc;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.ai-panel__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #6ee7b7;
-}
-.ai-panel__status::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #34d399;
-  box-shadow: 0 0 6px rgba(52,211,153,0.6);
-  animation: status-pulse 2s ease-in-out infinite;
-}
-@keyframes status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.ai-panel__thread {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.ai-panel__empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-}
-
-.ai-msg {
-  max-width: 88%;
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-size: 13px;
-  line-height: 1.55;
-}
-.ai-msg--user {
-  align-self: flex-end;
-  background: rgba(6,182,212,0.15);
-  border: 1px solid rgba(6,182,212,0.3);
-  color: #a5f3fc;
-}
-.ai-msg--bot {
-  align-self: flex-start;
-  background: rgba(99,102,241,0.12);
-  border: 1px solid rgba(99,102,241,0.22);
-  color: #e0e7ff;
-}
-
-.ai-panel__quick {
-  display: flex;
-  gap: 6px;
-  padding: 0 16px 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.ai-panel__quick::-webkit-scrollbar {
-  display: none;
-}
-
-.ai-chip {
-  font-size: 11px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(99,102,241,0.3);
-  background: rgba(99,102,241,0.08);
-  color: #c7d2fe;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-.ai-chip:hover {
-  background: rgba(99,102,241,0.18);
-  border-color: rgba(99,102,241,0.5);
-}
-.ai-chip:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.ai-panel__form {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px 14px;
-  border-top: 1px solid rgba(99,102,241,0.18);
-}
-
-.ai-panel__input {
-  flex: 1;
-  min-width: 0;
-  background: rgba(2,4,10,0.6);
-  border: 1px solid rgba(99,102,241,0.25);
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-size: 13px;
-  color: #e5e7eb;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.ai-panel__input::placeholder {
-  color: rgb(90 100 130);
-}
-.ai-panel__input:focus {
-  border-color: rgba(129,140,248,0.6);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
-}
-.ai-panel__input:disabled {
-  opacity: 0.6;
-}
-
-.ai-panel__send {
-  padding: 0 16px;
-  flex-shrink: 0;
-  border-radius: 10px;
-  border: none;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: filter 0.2s ease, opacity 0.2s ease;
-}
-.ai-panel__send:hover:not(:disabled) {
-  filter: brightness(1.15);
-}
-.ai-panel__send:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.ai-typing {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px 2px;
-}
-.ai-typing i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #a5b4fc;
-  animation: typing-bounce 1.2s ease-in-out infinite;
-}
-.ai-typing i:nth-child(2) { animation-delay: 0.15s; }
-.ai-typing i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes typing-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-  30% { transform: translateY(-4px); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-indeterminate {
+    animation: none !important;
+    opacity: 0.6;
+  }
 }

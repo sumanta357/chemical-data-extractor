@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AcademicProfile,
@@ -23,6 +23,23 @@ import {
   verifyAcademic,
   type AcademicVerification,
 } from '@/lib/billing';
+import {
+  AlertIcon,
+  ArrowRightIcon,
+  CheckIcon,
+  CloseIcon,
+  SpinnerIcon,
+  UserIcon,
+} from '@/components/icons';
+import {
+  btnGhost,
+  btnPrimary,
+  btnSecondary,
+  cx,
+  note,
+  segmentItemClass,
+  segmentWrap,
+} from '@/components/ui';
 
 type View = 'account' | 'plans' | 'academic';
 type AuthView = 'form' | 'forgot';
@@ -46,6 +63,7 @@ const EMPTY_PROFILE: AcademicProfile = {
   phone: '',
   academician_type: '',
 };
+
 function GoogleMark() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
@@ -101,6 +119,7 @@ export default function AccountPanel({
   const [authView, setAuthView] = useState<AuthView>('form');
   const [profile, setProfile] = useState<AcademicProfile>(EMPTY_PROFILE);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
+  const [profileErr, setProfileErr] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<CheckoutState>({ phase: 'idle' });
   const [academic, setAcademic] = useState<AcademicVerification | null>(null);
   const [academicToken, setAcademicToken] = useState<string | null>(null);
@@ -108,6 +127,7 @@ export default function AccountPanel({
   const [academicError, setAcademicError] = useState<string | null>(null);
   const [academicNotice, setAcademicNotice] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
   // The host page owns `open`; the emailed-link pages own `opened`.
   const isPanelOpen = hideTrigger ? opened : open;
 
@@ -202,6 +222,30 @@ export default function AccountPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Dialog behaviour: Escape closes, the page behind cannot scroll, and focus
+  // moves into the dialog so a keyboard user is never left on the trigger.
+  // The effect is keyed on the open state only — `onClose` is a fresh closure
+  // on every parent render, and depending on it would re-run this effect (and
+  // pull focus out of whatever field is being typed into) once per poll tick.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  useEffect(() => {
+    if (!isPanelOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isPanelOpen]);
+
   async function submitAuth(event: React.FormEvent) {
     event.preventDefault();
     if (!supabase) {
@@ -292,12 +336,13 @@ export default function AccountPanel({
     event.preventDefault();
     setBusy(true);
     setProfileMsg(null);
+    setProfileErr(null);
     try {
       const { profile: saved } = await updateProfile(profile);
       setProfile({ ...EMPTY_PROFILE, ...saved });
       setProfileMsg('Profile saved.');
     } catch (err: any) {
-      setProfileMsg(err.message || 'Could not save your profile');
+      setProfileErr(err.message || 'Could not save your profile');
     } finally {
       setBusy(false);
     }
@@ -355,8 +400,8 @@ export default function AccountPanel({
   }
 
   /** Enter the verification step, pre-filling the account address and checking
-   * it straight away so a recognised institutional domain is approved without
-   * the visitor typing anything. */
+   *  it straight away so a recognised institutional domain is approved without
+   *  the visitor typing anything. */
   function beginAcademicVerification() {
     setCheckout({ phase: 'idle' });
     setAcademicError(null);
@@ -447,7 +492,7 @@ export default function AccountPanel({
               resolve();
             },
           },
-          theme: { color: '#22d3ee' },
+          theme: { color: '#0c6a80' },
         });
         setCheckout({ phase: 'awaiting' });
         instance.open();
@@ -479,85 +524,138 @@ export default function AccountPanel({
     onOpen();
   };
 
+  const busyLabel =
+    checkout.phase === 'preparing'
+      ? 'Preparing secure checkout…'
+      : checkout.phase === 'awaiting'
+      ? 'Waiting for payment…'
+      : checkout.phase === 'verifying'
+      ? 'Verifying payment…'
+      : null;
+
   /* Signing in and buying are separate intentions. One button labelled
      "Pricing" that opened the plan grid left a visitor who only wanted to
      sign in guessing at checkout, so each now gets its own control. */
   const trigger = hideTrigger ? null : signedIn ? (
     <button
       onClick={() => openAt('account')}
-      className="px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-cyan-400 border border-gray-800 hover:border-cyan-700 transition-colors"
+      className={cx(btnSecondary, 'shrink-0 whitespace-nowrap')}
+      aria-label={`Account: ${entitlement?.plan_name}, ${used} of ${limit || 'unlimited'} searches used`}
     >
-      {entitlement?.plan_name} · {used}/{limit || '—'}
+      <UserIcon className="h-4 w-4" />
+      <span className="tabular-nums">
+        {entitlement?.plan_name} · {used}/{limit || '—'}
+      </span>
     </button>
   ) : (
     <>
-      <button
-        onClick={() => openAt('account')}
-        className="px-3 py-1.5 text-sm font-medium text-cyan-400 hover:text-cyan-300 border border-cyan-700 hover:bg-cyan-500/10 transition-colors"
-      >
+      <button onClick={() => openAt('account')} className={cx(btnSecondary, 'shrink-0')}>
         Sign in
       </button>
-      <button
-        onClick={() => openAt('plans')}
-        className="px-3 py-1.5 text-sm font-medium text-gray-300 hover:text-cyan-400 border border-gray-800 hover:border-cyan-700 transition-colors"
-      >
+      <button onClick={() => openAt('plans')} className={cx(btnGhost, 'hidden shrink-0 sm:inline-flex')}>
         Pricing
       </button>
     </>
   );
 
+  const titles: Record<View, string> = {
+    account: 'Your account',
+    plans: 'Plans and pricing',
+    academic: 'Academic verification',
+  };
+
+  const subtitles: Record<View, string> = {
+    account: signedIn
+      ? entitlement?.email ?? ''
+      : 'Create a free account to run searches and track usage.',
+    plans: 'Pay securely by card, UPI or netbanking.',
+    academic: 'Confirm your institutional email to unlock the Academic plan.',
+  };
+
   const modal = isPanelOpen ? (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm px-4 py-10">
-      <div className="glass-card w-full max-w-2xl p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800/60">
-          <div>
-            <h3 className="text-base font-semibold text-gray-100">
-              {view === 'plans' ? 'Plans' : view === 'academic' ? 'Academic verification' : 'Your account'}
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {view === 'plans'
-                ? 'Pay securely by card, UPI or netbanking.'
-                : signedIn
-                ? entitlement?.email
-                : 'Create a free account to run searches and track usage.'}
-            </p>
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-overlay/70 px-4 py-6 sm:py-12"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={titles[view]}
+        tabIndex={-1}
+        className="panel w-full max-w-2xl overflow-hidden shadow-overlay outline-none"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {view !== 'account' && (
+                <button
+                  type="button"
+                  onClick={() => openAt('account')}
+                  className="-ml-1.5 rounded p-1 text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+                  aria-label="Back to your account"
+                >
+                  <ArrowRightIcon className="h-4 w-4 rotate-180" />
+                </button>
+              )}
+              <h2 className="text-base font-semibold text-fg">{titles[view]}</h2>
+            </div>
+            <p className="mt-0.5 truncate text-xs text-fg-subtle">{subtitles[view]}</p>
           </div>
-          <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-300 px-2 py-1">
-            Close
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-1.5 -mt-1 shrink-0 rounded-md p-1.5 text-fg-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+          >
+            <CloseIcon className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
-          {notice && (
-            <div className="mb-4 text-xs border border-cyan-900 text-cyan-300 rounded px-3 py-2">
-              {notice}
-            </div>
-          )}
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-5">
+          {notice && <p className={cx(note('info'), 'mb-4')}>{notice}</p>}
 
           {view === 'plans' && (
             <div className="space-y-4">
-              {checkout.phase !== 'idle' && (
-                <div className="text-xs border border-gray-800 rounded px-3 py-2">
-                  {checkout.phase === 'preparing' && 'Preparing secure checkout…'}
-                  {checkout.phase === 'awaiting' && 'Waiting for payment…'}
-                  {checkout.phase === 'verifying' && 'Verifying payment…'}
-                  {checkout.phase === 'done' && <span className="text-cyan-400">{checkout.message}</span>}
-                  {checkout.phase === 'cancelled' && 'Payment cancelled. Nothing was charged.'}
-                  {checkout.phase === 'error' && <span className="text-amber-400">{checkout.message}</span>}
-                </div>
+              {busyLabel && (
+                <p className="flex items-center gap-2" role="status">
+                  <SpinnerIcon className="h-3.5 w-3.5 animate-spin-slow text-accent" />
+                  <span className="text-xs text-fg-muted">{busyLabel}</span>
+                </p>
+              )}
+              {checkout.phase === 'done' && (
+                <p className={note('success')} role="status">
+                  <span className="inline-flex items-center gap-1.5">
+                    <CheckIcon className="h-3.5 w-3.5" />
+                    {checkout.message}
+                  </span>
+                </p>
+              )}
+              {checkout.phase === 'cancelled' && (
+                <p className={note('info')}>Payment cancelled. Nothing was charged.</p>
+              )}
+              {checkout.phase === 'error' && (
+                <p className={note('danger')} role="alert">
+                  <span className="inline-flex items-start gap-1.5">
+                    <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                    {checkout.message}
+                  </span>
+                </p>
               )}
 
               {/* Reaching the plan grid signed out used to be a dead end:
                   nothing there said how to actually buy anything. */}
               {!signedIn && (
-                <div className="flex items-center justify-between gap-3 border border-cyan-900/60 bg-cyan-950/30 px-3 py-2">
-                  <p className="text-xs text-cyan-200/90">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent-line bg-accent-soft px-3 py-2.5">
+                  <p className="text-xs text-fg">
                     Sign in or create a free account to buy a plan.
                   </p>
                   <button
                     type="button"
                     onClick={() => openAt('account')}
-                    className="shrink-0 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium px-3 py-1.5"
+                    className={cx(btnPrimary, 'shrink-0 px-3 py-1.5 text-xs')}
                   >
                     Sign in
                   </button>
@@ -565,12 +663,12 @@ export default function AccountPanel({
               )}
 
               {plans.filter((p) => p.price_inr > 0).length === 0 && (
-                <p className="text-xs text-gray-500">
+                <p className={note('warning')}>
                   Plans could not be loaded. Please close this and try again.
                 </p>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {plans
                   .filter((p) => p.price_inr > 0)
                   .map((plan) => (
@@ -599,53 +697,67 @@ export default function AccountPanel({
                       }}
                       disabled={checkoutBusy}
                       aria-busy={checkout.phase === 'preparing'}
-                      className="text-left border border-gray-800 rounded p-4 flex flex-col hover:border-cyan-700 hover:bg-cyan-500/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-800 disabled:hover:bg-transparent focus:outline-none focus-visible:border-cyan-600"
+                      className="flex flex-col rounded-lg border border-line bg-surface-2 p-4 text-left transition-colors hover:border-accent-line hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-55"
                     >
-                      <span className="flex items-baseline justify-between">
-                        <span className="text-sm font-semibold text-gray-100">{plan.name}</span>
-                        <span className="text-sm tabular-nums text-cyan-400">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-semibold text-fg">{plan.name}</span>
+                        <span className="whitespace-nowrap text-sm tabular-nums text-fg">
                           ₹{plan.price_inr.toLocaleString('en-IN')}
-                          <span className="text-gray-500 text-xs">/mo</span>
+                          <span className="text-xs font-normal text-fg-subtle">/mo</span>
                         </span>
                       </span>
-                      {plan.tag && <span className="block text-xs text-gray-500 mt-1">{plan.tag}</span>}
-                      <span className="mt-3 space-y-1 text-xs text-gray-400 flex-1 block">
+                      {plan.tag && (
+                        <span className="mt-1 block text-xs text-fg-subtle">{plan.tag}</span>
+                      )}
+                      <ul className="mt-3 flex-1 space-y-1">
                         {plan.features.map((f) => (
-                          <span key={f} className="block">{f}</span>
+                          <li key={f} className="flex gap-1.5 text-xs text-fg-muted">
+                            <CheckIcon className="mt-px h-3.5 w-3.5 shrink-0 text-accent" />
+                            {f}
+                          </li>
                         ))}
-                      </span>
-                      <span className="mt-4 w-full block text-center text-sm font-medium py-2 border border-cyan-600 text-cyan-400">
-                        {checkoutBusy ? 'Opening checkout…' : `Pay ₹${plan.price_inr.toLocaleString('en-IN')}`}
+                      </ul>
+                      <span
+                        className={cx(
+                          'mt-4 block w-full rounded-md border py-2 text-center text-sm font-medium',
+                          checkoutBusy
+                            ? 'border-line text-fg-subtle'
+                            : 'border-accent text-accent'
+                        )}
+                      >
+                        {checkoutBusy
+                          ? 'Opening checkout…'
+                          : `Pay ₹${plan.price_inr.toLocaleString('en-IN')}`}
                       </span>
                     </button>
                   ))}
               </div>
 
-              {error && <p className="text-xs text-amber-400">{error}</p>}
+              {error && <p className={note('warning')}>{error}</p>}
             </div>
           )}
 
           {view === 'account' && !signedIn && authView === 'forgot' && (
-            <form onSubmit={submitForgot} className="space-y-3 max-w-sm">
-              <p className="text-xs text-gray-400">
+            <form onSubmit={submitForgot} className="max-w-sm space-y-4">
+              <p className="text-sm leading-relaxed text-fg-muted">
                 Enter your email and we will send you a link to choose a new password.
               </p>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Email</label>
+                <label htmlFor="forgot-email" className="label">
+                  Email
+                </label>
                 <input
+                  id="forgot-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                  className="field"
                 />
               </div>
-              {error && <p className="text-xs text-amber-400">{error}</p>}
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full text-sm font-medium py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
-              >
+              {error && <p className={note('warning')}>{error}</p>}
+              <button type="submit" disabled={busy} className={cx(btnPrimary, 'w-full')}>
                 {busy ? 'Sending…' : 'Send reset link'}
               </button>
               <button
@@ -654,7 +766,7 @@ export default function AccountPanel({
                   setAuthView('form');
                   setError(null);
                 }}
-                className="text-xs text-gray-500 hover:text-gray-300"
+                className="text-xs text-fg-muted transition-colors hover:text-fg"
               >
                 Back to sign in
               </button>
@@ -662,8 +774,8 @@ export default function AccountPanel({
           )}
 
           {view === 'academic' && !signedIn && (
-            <div className="space-y-3 max-w-sm">
-              <p className="text-xs text-gray-500 leading-relaxed">
+            <div className="max-w-sm space-y-4">
+              <p className="text-sm leading-relaxed text-fg-muted">
                 Academic eligibility is tied to your account. Sign in (or create a
                 free account) and we will check your institutional email before
                 you pay.
@@ -671,7 +783,7 @@ export default function AccountPanel({
               <button
                 type="button"
                 onClick={() => setView('account')}
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-sm py-2"
+                className={cx(btnPrimary, 'w-full')}
               >
                 Sign in or create an account
               </button>
@@ -679,47 +791,57 @@ export default function AccountPanel({
           )}
 
           {view === 'academic' && signedIn && (
-            <form onSubmit={runAcademicVerification} className="space-y-3 max-w-sm">
-              <p className="text-xs text-gray-500 leading-relaxed">
+            <form onSubmit={runAcademicVerification} className="max-w-sm space-y-4">
+              <p className="text-sm leading-relaxed text-fg-muted">
                 The Academic plan is for students and academic labs. Enter your
                 institutional email and we will check it against the recognised
                 academic domains before you pay.
               </p>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Academic email</label>
+                <label htmlFor="academic-email" className="label">
+                  Academic email
+                </label>
                 <input
+                  id="academic-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={profile.academic_email || ''}
                   onChange={(e) =>
                     setProfile((p) => ({ ...p, academic_email: e.target.value }))
                   }
                   placeholder="you@university.edu"
-                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                  className="field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Institution</label>
+                <label htmlFor="academic-institute" className="label">
+                  Institution
+                </label>
                 <input
+                  id="academic-institute"
                   type="text"
                   value={profile.institute_name || ''}
                   onChange={(e) =>
                     setProfile((p) => ({ ...p, institute_name: e.target.value }))
                   }
-                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                  className="field"
                 />
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Your role</label>
+                <label htmlFor="academic-role" className="label">
+                  Your role
+                </label>
                 <select
+                  id="academic-role"
                   value={profile.academician_type || ''}
                   onChange={(e) =>
                     setProfile((p) => ({ ...p, academician_type: e.target.value }))
                   }
-                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                  className="field"
                 >
                   <option value="">Select…</option>
                   {ACADEMICIAN_TYPES.map((t) => (
@@ -730,16 +852,14 @@ export default function AccountPanel({
                 </select>
               </div>
 
-              {academicNotice && (
-                <p className="text-xs text-emerald-400">{academicNotice}</p>
+              {academicNotice && <p className={note('success')}>{academicNotice}</p>}
+              {academicError && (
+                <p className={note('danger')} role="alert">
+                  {academicError}
+                </p>
               )}
-              {academicError && <p className="text-xs text-red-400">{academicError}</p>}
 
-              <button
-                type="submit"
-                disabled={academicBusy}
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-sm py-2 disabled:opacity-50"
-              >
+              <button type="submit" disabled={academicBusy} className={cx(btnPrimary, 'w-full')}>
                 {academicBusy ? 'Checking…' : 'Verify academic email'}
               </button>
 
@@ -751,202 +871,270 @@ export default function AccountPanel({
                     if (plan) startCheckout(plan, academicToken);
                   }}
                   disabled={checkoutBusy || !academicToken}
-                  className="w-full border border-cyan-700 hover:bg-cyan-500/10 text-cyan-300 text-sm py-2 disabled:opacity-50"
+                  className={cx(btnSecondary, 'w-full')}
                 >
                   Continue to payment — ₹249
                 </button>
               )}
 
-              <p className="text-[11px] text-gray-600">
+              <p className="text-[11px] leading-relaxed text-fg-subtle">
                 {academicVerified
                   ? `Verified as ${academic?.verified_email}. The verification is checked again on the server when the payment is made.`
                   : academic?.mailbox_proof_required
-                    ? 'We will email a confirmation link to the address you enter.'
-                    : 'We currently confirm that the domain belongs to an academic institution.'}
+                  ? 'We will email a confirmation link to the address you enter.'
+                  : 'We currently confirm that the domain belongs to an academic institution.'}
               </p>
             </form>
           )}
 
           {view === 'account' && !signedIn && authView === 'form' && (
-            <form onSubmit={submitAuth} className="space-y-3 max-w-sm">
+            <form onSubmit={submitAuth} className="max-w-sm space-y-4">
               {config?.auth_required && (
-                <div className="border border-cyan-900/60 bg-cyan-950/30 px-3 py-2 text-xs text-cyan-200/90">
+                <p className={note('info')}>
                   {mode === 'signup'
                     ? 'Create a free account to start searching — it takes a few seconds and your 3 free searches are waiting.'
-                    : 'Sign in to search. New here? Tap “Create one” below for 3 free searches.'}
-                </div>
+                    : 'Sign in to search. New here? Choose “Create account” below for 3 free searches.'}
+                </p>
               )}
+
               {mode === 'signin' && supabase && googleEnabled && (
                 <div className="pb-1">
                   <button
                     type="button"
                     onClick={signInWithGoogle}
                     disabled={busy}
-                    className="w-full flex items-center justify-center gap-3 border border-gray-700 hover:border-gray-500 text-gray-200 text-sm py-2 transition-colors disabled:opacity-50"
+                    className={cx(btnSecondary, 'w-full gap-2.5')}
                   >
                     <GoogleMark />
                     Continue with Google
                   </button>
-                  <div className="flex items-center gap-3 my-4">
-                    <span className="h-px flex-1 bg-gray-800" />
-                    <span className="text-[10px] uppercase tracking-widest text-gray-600">
+                  <div className="my-4 flex items-center gap-3">
+                    <span aria-hidden className="h-px flex-1 bg-line" />
+                    <span className="text-[10px] uppercase tracking-widest text-fg-subtle">
                       or
                     </span>
-                    <span className="h-px flex-1 bg-gray-800" />
+                    <span aria-hidden className="h-px flex-1 bg-line" />
                   </div>
                 </div>
               )}
+
               {mode === 'signup' && (
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Name</label>
+                  <label htmlFor="signup-name" className="label">
+                    Name
+                  </label>
                   <input
+                    id="signup-name"
                     type="text"
+                    autoComplete="name"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                    className="field"
                   />
                 </div>
               )}
+
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Email</label>
+                <label htmlFor="auth-email" className="label">
+                  Email
+                </label>
                 <input
+                  id="auth-email"
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                  className="field"
                 />
               </div>
+
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Password</label>
+                <label htmlFor="auth-password" className="label">
+                  Password
+                </label>
                 <input
+                  id="auth-password"
                   type="password"
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                   required
                   minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-transparent border border-gray-800 px-3 py-2 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                  className="field"
                 />
+                <p className="mt-1.5 text-[11px] text-fg-subtle">At least 8 characters.</p>
               </div>
-              {error && <p className="text-xs text-amber-400">{error}</p>}
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full text-sm font-medium py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
-              >
-                {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+
+              {error && (
+                <p className={note('danger')} role="alert">
+                  <span className="inline-flex items-start gap-1.5">
+                    <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                    {error}
+                  </span>
+                </p>
+              )}
+
+              <div className={segmentWrap} role="group" aria-label="Sign in or create an account">
+                {(
+                  [
+                    ['signin', 'Sign in'],
+                    ['signup', 'Create account'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={mode === value}
+                    onClick={() => setMode(value)}
+                    className={segmentItemClass(mode === value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <button type="submit" disabled={busy} className={cx(btnPrimary, 'w-full')}>
+                {busy
+                  ? 'Working…'
+                  : mode === 'signin'
+                  ? 'Sign in'
+                  : 'Create account'}
               </button>
-              <div className="flex items-center justify-between pt-1">
+
+              <div className="flex items-center justify-between gap-3 pt-1">
                 <button
                   type="button"
-                  onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                  className="text-xs text-gray-500 hover:text-gray-300"
+                  onClick={() => {
+                    setAuthView('forgot');
+                    setError(null);
+                    setNotice(null);
+                  }}
+                  className="text-xs text-fg-muted transition-colors hover:text-accent"
                 >
-                  {mode === 'signin' ? 'Need an account? Create one' : 'Already have an account? Sign in'}
+                  Forgot password?
                 </button>
-                {mode === 'signin' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthView('forgot');
-                      setError(null);
-                      setNotice(null);
-                    }}
-                    className="text-xs text-gray-500 hover:text-cyan-400"
-                  >
-                    Forgot password?
-                  </button>
-                )}
               </div>
+
               {!config?.billing_enabled && (
-                <p className="text-xs text-gray-600">
-                  Billing is not enabled on this deployment — your free account still works.
+                <p className="text-xs text-fg-subtle">
+                  Billing is not enabled on this deployment — your free account
+                  still works.
                 </p>
               )}
             </form>
           )}
 
           {view === 'account' && signedIn && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="border border-gray-800 p-4">
-                  <div className="text-xs text-gray-500">Plan</div>
-                  <div className="text-lg font-semibold text-gray-100">{entitlement?.plan_name}</div>
-                  <div className="text-xs text-gray-500 mt-1 tabular-nums">
+            <div className="space-y-5">
+              <dl className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-line bg-surface-2 px-4 py-3">
+                  <dt className="text-xs text-fg-subtle">Plan</dt>
+                  <dd className="mt-0.5 text-base font-semibold text-fg">
+                    {entitlement?.plan_name}
+                  </dd>
+                  <dd className="mt-1 text-xs text-fg-muted tabular-nums">
                     {used} of {limit || '∞'} searches used
-                  </div>
+                  </dd>
                 </div>
-                <div className="border border-gray-800 p-4">
-                  <div className="text-xs text-gray-500">AI analyst</div>
-                  <div className="text-lg font-semibold text-gray-100 tabular-nums">
+                <div className="rounded-lg border border-line bg-surface-2 px-4 py-3">
+                  <dt className="text-xs text-fg-subtle">AI analyst</dt>
+                  <dd className="mt-0.5 text-base font-semibold text-fg tabular-nums">
                     {entitlement?.analyst_used ?? 0}
-                    <span className="text-sm text-gray-500"> / {entitlement?.analyst_limit || '∞'}</span>
-                  </div>
+                    <span className="text-sm font-normal text-fg-subtle">
+                      {' '}
+                      / {entitlement?.analyst_limit || '∞'}
+                    </span>
+                  </dd>
                   {entitlement?.period_end && (
-                    <div className="text-xs text-gray-500 mt-1">
+                    <dd className="mt-1 text-xs text-fg-muted">
                       Renews {new Date(entitlement.period_end).toLocaleDateString()}
-                    </div>
+                    </dd>
                   )}
                 </div>
-              </div>
+              </dl>
 
               {entitlement?.email_verified === false && (
-                <div className="border border-amber-900/70 text-amber-300/90 text-xs rounded px-3 py-2">
-                  Your email address has not been confirmed yet. Check your inbox, or sign out
-                  and in again after confirming.
-                </div>
+                <p className={note('warning')}>
+                  Your email address has not been confirmed yet. Check your inbox,
+                  or sign out and in again after confirming.
+                </p>
               )}
 
-              <form onSubmit={saveProfile} className="space-y-3 border border-gray-800 p-4">
+              <form onSubmit={saveProfile} className="space-y-4 rounded-lg border border-line p-4">
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-100">Academic profile</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Shared with the lab so we can filter and sort our academic customers.
+                  <h3 className="text-sm font-semibold text-fg">Academic profile</h3>
+                  <p className="mt-0.5 text-xs text-fg-muted">
+                    Shared with the lab so we can filter and sort our academic
+                    customers.
                   </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Academic email</label>
+                    <label htmlFor="profile-academic-email" className="label">
+                      Academic email
+                    </label>
                     <input
+                      id="profile-academic-email"
                       type="email"
                       value={profile.academic_email || ''}
-                      onChange={(e) => setProfile({ ...profile, academic_email: e.target.value })}
-                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                      onChange={(e) =>
+                        setProfile({ ...profile, academic_email: e.target.value })
+                      }
+                      className="field"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Institute / University</label>
+                    <label htmlFor="profile-institute" className="label">
+                      Institute / University
+                    </label>
                     <input
+                      id="profile-institute"
                       type="text"
                       value={profile.institute_name || ''}
-                      onChange={(e) => setProfile({ ...profile, institute_name: e.target.value })}
-                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                      onChange={(e) =>
+                        setProfile({ ...profile, institute_name: e.target.value })
+                      }
+                      className="field"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Institute ID</label>
+                    <label htmlFor="profile-institute-id" className="label">
+                      Institute ID
+                    </label>
                     <input
+                      id="profile-institute-id"
                       type="text"
                       value={profile.institute_id || ''}
-                      onChange={(e) => setProfile({ ...profile, institute_id: e.target.value })}
-                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                      onChange={(e) =>
+                        setProfile({ ...profile, institute_id: e.target.value })
+                      }
+                      className="field"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                    <label htmlFor="profile-phone" className="label">
+                      Phone
+                    </label>
                     <input
+                      id="profile-phone"
                       type="tel"
                       value={profile.phone || ''}
                       onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                      className="w-full bg-transparent border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                      className="field"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Type of academician</label>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="profile-type" className="label">
+                      Type of academician
+                    </label>
                     <select
+                      id="profile-type"
                       value={profile.academician_type || ''}
-                      onChange={(e) => setProfile({ ...profile, academician_type: e.target.value })}
-                      className="w-full bg-gray-900 border border-gray-800 px-3 py-1.5 text-sm text-gray-200 focus:border-cyan-600 focus:outline-none"
+                      onChange={(e) =>
+                        setProfile({ ...profile, academician_type: e.target.value })
+                      }
+                      className="field"
                     >
                       <option value="">Not set</option>
                       {ACADEMICIAN_TYPES.map((t) => (
@@ -957,39 +1145,33 @@ export default function AccountPanel({
                     </select>
                   </div>
                 </div>
-                {profileMsg && (
-                  <p className={`text-xs ${profileMsg.endsWith('.') ? 'text-cyan-400' : 'text-amber-400'}`}>
-                    {profileMsg}
+                {profileMsg && <p className={note('success')}>{profileMsg}</p>}
+                {profileErr && (
+                  <p className={note('danger')} role="alert">
+                    {profileErr}
                   </p>
                 )}
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="text-sm px-4 py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
-                >
+                <button type="submit" disabled={busy} className={btnSecondary}>
                   {busy ? 'Saving…' : 'Save profile'}
                 </button>
               </form>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => {
                     setView('plans');
                     setCheckout({ phase: 'idle' });
                   }}
-                  className="text-sm px-4 py-2 border border-cyan-600 text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                  className={btnPrimary}
                 >
                   Upgrade plan
                 </button>
-                <button
-                  onClick={signOut}
-                  className="text-sm px-4 py-2 border border-gray-800 text-gray-400 hover:text-gray-200 transition-colors"
-                >
+                <button onClick={signOut} className={btnSecondary}>
                   Sign out
                 </button>
               </div>
 
-              {error && <p className="text-xs text-amber-400">{error}</p>}
+              {error && <p className={note('warning')}>{error}</p>}
             </div>
           )}
         </div>

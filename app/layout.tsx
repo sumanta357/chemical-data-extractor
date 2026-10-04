@@ -4,8 +4,24 @@ import './globals.css';
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5,
+  colorScheme: 'light dark',
 };
+
+/**
+ * Applied before first paint so a dark-mode visitor never sees a white flash
+ * and a light-mode visitor never sees a black one. It reads the stored
+ * preference, falls back to the operating system, and writes the resolved
+ * theme onto <html> as both a class and a data attribute.
+ */
+const THEME_BOOTSTRAP = `(function(){try{
+var k='cde-theme';var s=localStorage.getItem(k);
+var m=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+var t=(s==='light'||s==='dark')?s:m;
+document.documentElement.classList.remove('light','dark');
+document.documentElement.classList.add(t);
+document.documentElement.setAttribute('data-theme',t);
+document.documentElement.style.colorScheme=t;
+}catch(e){document.documentElement.classList.add('dark')}})();`;
 
 export const metadata: Metadata = {
   title: 'Chemical Data Extractor — Scientific Knowledge Graph Platform',
@@ -19,11 +35,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
+    // `dark` is the server-rendered default; the script below corrects it
+    // before paint if the visitor prefers light.
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
-      <body className="min-h-screen bg-[rgb(3,7,18)] text-gray-200 antialiased">
+      <body className="min-h-screen bg-canvas font-sans text-fg antialiased">
         {children}
       </body>
     </html>

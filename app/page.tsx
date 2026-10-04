@@ -7,8 +7,16 @@ import ResultsView from '@/components/ResultsView';
 import HistoryPanel from '@/components/HistoryPanel';
 import AIAssistant from '@/components/AIAssistant';
 import AccountPanel from '@/components/AccountPanel';
+import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
+import { HistoryIcon, SearchIcon } from '@/components/icons';
 import { getMe, authHeaders, type Entitlement } from '@/lib/billing';
 import type { SearchState } from '@/lib/types';
+
+const SOURCES = [
+  { title: 'Proteins', detail: 'UniProt, PDB, AlphaFold' },
+  { title: 'Compounds', detail: 'PubChem, ChEMBL, ChEBI' },
+  { title: 'Pathways', detail: 'KEGG, Reactome, Gene Ontology' },
+];
 
 export default function HomePage() {
   const [search, setSearch] = useState<SearchState | null>(null);
@@ -179,162 +187,137 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
+  const tabs = (
+    <>
+      {(
+        [
+          { id: 'search', label: 'Search', Icon: SearchIcon },
+          { id: 'history', label: 'History', Icon: HistoryIcon },
+        ] as const
+      ).map(({ id, label, Icon }) => {
+        const active = activeTab === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id)}
+            aria-current={active ? 'page' : undefined}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
+              active
+                ? 'bg-surface-3 text-fg'
+                : 'text-fg-muted hover:bg-surface-2 hover:text-fg'
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        );
+      })}
+    </>
+  );
+
+  const hasResults = search?.status === 'completed' && search.export_files.length > 0;
+
   return (
-    <div className="min-h-screen flex flex-col relative">
-      {/* Grid overlay */}
-      <div className="grid-overlay" />
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader
+        current="app"
+        nav={tabs}
+        accountSlot={
+          <AccountPanel
+            open={accountOpen}
+            onOpen={() => setAccountOpen(true)}
+            onClose={() => setAccountOpen(false)}
+            onChange={setEntitlement}
+          />
+        }
+      />
 
-      {/* Header */}
-      <header className="border-b border-gray-800/50 bg-[rgb(3,7,18)]/85 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Text wordmark — no logo mark */}
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-white">
-                Chemical Data Extractor
-              </h1>
-              <p className="text-xs text-cyan-400/70 -mt-0.5 font-medium">
-                Knowledge Graph Platform v3.2
-              </p>
-            </div>
-          </div>
-          <nav className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('search')}
-              className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'search'
-                  ? 'text-cyan-400 border-cyan-500'
-                  : 'text-gray-400 border-transparent hover:text-gray-200'
-              }`}
-            >
-              Search
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'history'
-                  ? 'text-cyan-400 border-cyan-500'
-                  : 'text-gray-400 border-transparent hover:text-gray-200'
-              }`}
-            >
-              History
-            </button>
-            <span className="w-px bg-gray-800 self-stretch mx-1" />
-            <AccountPanel
-              open={accountOpen}
-              onOpen={() => setAccountOpen(true)}
-              onClose={() => setAccountOpen(false)}
-              onChange={setEntitlement}
-            />
-          </nav>
+      <main className="mx-auto w-full max-w-content flex-1 px-4 py-7 sm:px-6 sm:py-9">
+        {/* Page introduction. Left-aligned and short: this is a tool, so the
+            query box stays within one screen of the top. */}
+        <div className="max-w-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-fg sm:text-[28px] sm:leading-[1.2]">
+            Build a multi-hop knowledge graph from any protein or compound
+          </h1>
+          <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
+            Chemical Data Extractor traverses 19 public chemistry, proteomics and
+            pathway databases from a single query, then exports the assembled
+            graph as a workbook, CSV, GraphML, Cypher and more.
+          </p>
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
+            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
+              19 databases
+            </span>
+            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
+              Up to 4 hops
+            </span>
+            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
+              15 export files
+            </span>
+            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
+              7 formats
+            </span>
+          </p>
         </div>
-      </header>
 
-      {/* Hero */}
-      <div className="relative z-10 text-center py-12 px-4">
-        <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-gray-100">
-          Chemical Data Extractor
-        </h2>
-        <p className="text-gray-400 text-lg max-w-xl mx-auto leading-relaxed">
-          Multi-hop automated discovery engine. Extract chemical compounds,
-          bioactivities, protein targets, and biological pathways from 19+ scientific databases.
-        </p>
-
-        {/* Stats */}
-        <div className="flex gap-6 justify-center flex-wrap mt-8 relative">
-          {[
-            { num: '19+', label: 'Databases' },
-            { num: '4', label: 'Hop Depth' },
-            { num: '7+', label: 'Export Formats' },
-            { num: '15', label: 'Export Files' },
-          ].map((stat, i) => (
-            <div
-              key={stat.label}
-              className="glass-card px-6 py-4 text-center min-w-[100px] fade-in-up"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            >
-              <div className="text-2xl font-extrabold text-cyan-400 tabular-nums">{stat.num}</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-[0.08em] font-semibold mt-1">
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Main */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 relative z-10">
         {activeTab === 'search' && (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Left: Search form */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="mt-7 grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+            {/* Query + assistant column */}
+            <div className="space-y-5 lg:col-span-5 xl:col-span-4">
               <SearchForm onSearch={handleSearch} isRunning={isRunning} />
-
-              {/* AI analyst — distinct indigo panel below the form */}
               <AIAssistant
                 searchId={search && search.search_id !== 'error' ? search.search_id : null}
                 query={search?.query ?? null}
               />
-
-              {search?.status === 'completed' &&
-                search.export_files.length > 0 && (
-                  <ResultsView search={search} />
-                )}
             </div>
 
-            {/* Right: Progress / Log */}
-            <div className="lg:col-span-3">
+            {/* Output column */}
+            <div className="space-y-5 lg:col-span-7 xl:col-span-8">
+              {hasResults && <ResultsView search={search!} />}
               {search ? (
                 <ProgressView search={search} logLines={logLines} />
               ) : (
-                <>
-                  <div className="glass-card flex items-center justify-center py-16">
-                    <div className="text-center">
-                      <p className="text-lg font-semibold text-gray-300">
-                        Enter a query to start searching
-                      </p>
-                      <p className="text-sm mt-2 text-gray-500 leading-relaxed max-w-sm mx-auto">
-                        Extract chemical compounds, bioactivities, protein targets,
-                        3D structures, and biological pathways from 19+ scientific databases.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 mt-6">
-                    {[
-                      { title: 'Proteins', desc: 'UniProt, PDB, AlphaFold' },
-                      { title: 'Compounds', desc: 'PubChem, ChEMBL, ChEBI' },
-                      { title: 'Pathways', desc: 'KEGG, Reactome, GO' },
-                    ].map((card) => (
-                      <div
-                        key={card.title}
-                        className="glass-card p-4 text-center"
-                      >
-                        <div className="text-sm font-semibold text-cyan-400 uppercase tracking-wider">{card.title}</div>
-                        <div className="text-xs text-gray-500 mt-1">{card.desc}</div>
+                <div className="panel px-5 py-8 sm:px-7 sm:py-10">
+                  <h2 className="text-base font-semibold text-fg">
+                    Ready when you are
+                  </h2>
+                  <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-fg-muted">
+                    Enter a protein or compound on the left and run a search. The
+                    engine expands the query across every connected database and
+                    streams its progress here, then lists the files you can
+                    download.
+                  </p>
+                  <dl className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
+                    {SOURCES.map((source) => (
+                      <div key={source.title} className="bg-surface px-4 py-3">
+                        <dt className="text-xs font-semibold text-fg">
+                          {source.title}
+                        </dt>
+                        <dd className="mt-0.5 text-xs text-fg-subtle">
+                          {source.detail}
+                        </dd>
                       </div>
                     ))}
-                  </div>
-                </>
+                  </dl>
+                  <p className="mt-5 text-xs text-fg-subtle">
+                    One search runs at a time on the current plan. If another is
+                    already running, yours is queued and starts automatically.
+                  </p>
+                </div>
               )}
             </div>
           </div>
         )}
 
         {activeTab === 'history' && (
-          <HistoryPanel onViewSearch={handleViewSearch} />
+          <div className="mt-7">
+            <HistoryPanel onViewSearch={handleViewSearch} />
+          </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800/50 py-5 text-center text-xs text-gray-600 relative z-10 bg-[rgb(3,7,18)]/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4">
-          <p className="font-semibold text-gray-400 text-sm">Chemical Data Extractor</p>
-          <p className="mt-1">19 database connectors · Multi-hop graph traversal · Enrichment pipeline</p>
-          <p className="mt-2 text-gray-500">
-            Built by <span className="text-cyan-400 font-semibold">Sumanta</span>
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

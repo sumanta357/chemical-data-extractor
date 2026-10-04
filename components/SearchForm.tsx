@@ -1,11 +1,35 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { ChevronIcon, SearchIcon, SpinnerIcon } from '@/components/icons';
+import {
+  btnPrimary,
+  cx,
+  segmentItemClass,
+  segmentWrap,
+} from '@/components/ui';
 
 interface Props {
   onSearch: (query: string, queryType: string, hops: number) => void;
   isRunning: boolean;
 }
+
+const QUERY_TYPES = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'protein', label: 'Protein' },
+  { value: 'ligand', label: 'Ligand' },
+] as const;
+
+const HOPS = [1, 2, 3, 4] as const;
+
+/* What one more hop buys you. Shown as the helper under the depth control
+   because it is the only genuinely non-obvious choice on this screen. */
+const HOP_NOTES: Record<number, string> = {
+  1: 'Direct relationships only — e.g. Aspirin → COX-1. Fastest.',
+  2: 'One step further — e.g. Aspirin → COX-1 → prostaglandin pathway.',
+  3: 'Deep network — e.g. adds pathway-associated diseases.',
+  4: 'Maximum depth across all databases. Broadest and slowest.',
+};
 
 export default function SearchForm({ onSearch, isRunning }: Props) {
   const [query, setQuery] = useState('');
@@ -19,161 +43,146 @@ export default function SearchForm({ onSearch, isRunning }: Props) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4 glow-border"
-    >
-      <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-        New Search
-      </h2>
+    <form onSubmit={handleSubmit} className="panel p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold text-fg">New search</h2>
+        <span className="text-[11px] text-fg-subtle">
+          {isRunning ? 'A search is running' : 'Ready'}
+        </span>
+      </div>
 
-      {/* Instructions & hop reference — collapsed by default to reclaim
-          vertical space; content is reference material, not primary action */}
-      <details className="bg-gray-950/70 border border-gray-800 rounded-lg group">
-        <summary className="flex items-center justify-between px-4 py-3 cursor-pointer select-none">
-          <h3 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">
-            How it works & what are hops?
-          </h3>
-          <span
-            className="text-xs text-gray-500 group-open:hidden"
-            aria-hidden="true"
-          >
-            +
-          </span>
-          <span className="text-xs text-gray-500 hidden group-open:inline" aria-hidden="true">
-            −
-          </span>
+      {/* Reference material, collapsed by default: it explains the two controls
+          below rather than being part of running a search. */}
+      <details className="group mt-3 rounded-lg border border-line bg-surface-2">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-fg-muted transition-colors hover:text-fg">
+          How it works, and what a hop is
+          <ChevronIcon className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
         </summary>
-        <div className="px-4 pb-4 space-y-4">
-          <ol className="text-xs text-gray-400 space-y-2">
+        <div className="border-t border-line px-3 py-3">
+          <ol className="space-y-2 text-xs leading-relaxed text-fg-muted">
             <li className="flex gap-2">
-              <span className="text-cyan-500 font-bold shrink-0">1.</span>
-              <span>Enter a <strong className="text-gray-300">protein</strong> (e.g. "tubulin", "EGFR") or <strong className="text-gray-300">compound</strong> (e.g. "Aspirin", "Ibuprofen")</span>
+              <span className="font-semibold text-accent">1.</span>
+              <span>
+                Enter a <strong className="font-medium text-fg">protein</strong>{' '}
+                (for example &ldquo;tubulin&rdquo; or &ldquo;EGFR&rdquo;) or a{' '}
+                <strong className="font-medium text-fg">compound</strong> (for
+                example &ldquo;Aspirin&rdquo;).
+              </span>
             </li>
             <li className="flex gap-2">
-              <span className="text-cyan-500 font-bold shrink-0">2.</span>
-              <span>Choose <strong className="text-gray-300">Auto</strong> to detect, or pick <strong className="text-gray-300">Protein/Ligand</strong> manually</span>
+              <span className="font-semibold text-accent">2.</span>
+              <span>
+                Leave the type on <strong className="font-medium text-fg">Auto</strong>{' '}
+                to let the engine detect it, or set it yourself.
+              </span>
             </li>
             <li className="flex gap-2">
-              <span className="text-cyan-500 font-bold shrink-0">3.</span>
-              <span>Select <strong className="text-gray-300">hops</strong> — how many connection steps to explore</span>
+              <span className="font-semibold text-accent">3.</span>
+              <span>
+                Choose an <strong className="font-medium text-fg">expansion depth</strong>{' '}
+                — how many relationship steps to follow.
+              </span>
             </li>
             <li className="flex gap-2">
-              <span className="text-cyan-500 font-bold shrink-0">4.</span>
-              <span>Click <strong className="text-gray-300">Run Search</strong> and watch the extraction in real-time</span>
+              <span className="font-semibold text-accent">4.</span>
+              <span>
+                Run the search and watch the live log; download the exports when
+                it finishes.
+              </span>
             </li>
           </ol>
-          <div className="border-t border-gray-800 pt-3 space-y-1.5">
-            <div className="flex items-start gap-2">
-              <span className="text-green-400 font-mono font-bold shrink-0">1-hop</span>
-              <span>Direct connections only (e.g., Aspirin → COX-1 enzyme)</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-cyan-400 font-mono font-bold shrink-0">2-hop</span>
-              <span>Follow one more step (e.g., Aspirin → COX-1 → Prostaglandin pathway)</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-purple-400 font-mono font-bold shrink-0">3-hop</span>
-              <span>Deeper network (e.g., Aspirin → COX-1 → Pathway → Related diseases)</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-orange-400 font-mono font-bold shrink-0">4-hop</span>
-              <span>Maximum depth — comprehensive knowledge graph (slower)</span>
-            </div>
-          </div>
+          <dl className="mt-3 space-y-1.5 border-t border-line pt-3">
+            {HOPS.map((h) => (
+              <div key={h} className="flex gap-2.5 text-xs">
+                <dt className="w-14 shrink-0 font-mono text-[11px] font-medium text-accent">
+                  {h}-hop
+                </dt>
+                <dd className="leading-relaxed text-fg-muted">{HOP_NOTES[h]}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </details>
 
-      {/* Query input */}
-      <div>
-        <label className="block text-xs text-gray-500 mb-1.5">Query</label>
+      <div className="mt-5">
+        <label htmlFor="search-query" className="label">
+          Query
+        </label>
         <input
+          id="search-query"
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder='e.g. "tubulin", "Aspirin", "EGFR"'
-          className="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/50 transition-colors"
+          placeholder="tubulin, Aspirin, EGFR…"
+          autoComplete="off"
+          spellCheck={false}
           disabled={isRunning}
+          className="field"
         />
       </div>
 
-      {/* Query Type */}
-      <div>
-        <label className="block text-xs text-gray-500 mb-1.5">Query Type</label>
-        <div className="flex gap-2">
-          {(['auto', 'protein', 'ligand'] as const).map((t) => (
+      <div className="mt-4">
+        <span id="query-type-label" className="label">
+          Query type
+        </span>
+        <div
+          role="group"
+          aria-labelledby="query-type-label"
+          className={segmentWrap}
+        >
+          {QUERY_TYPES.map((t) => (
             <button
-              key={t}
+              key={t.value}
               type="button"
-              onClick={() => setQueryType(t)}
+              aria-pressed={queryType === t.value}
+              onClick={() => setQueryType(t.value)}
               disabled={isRunning}
-              className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                queryType === t
-                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700'
-                  : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-600'
-              }`}
+              className={segmentItemClass(queryType === t.value)}
             >
-              {t === 'auto' ? 'Auto' : t === 'protein' ? 'Protein' : 'Ligand'}
+              {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Hops */}
-      <div>
-        <label className="block text-xs text-gray-500 mb-1.5">
-          Expansion Depth (Hops)
-        </label>
-        <div className="flex gap-2">
-          {[1, 2, 3, 4].map((h) => (
+      <div className="mt-4">
+        <span id="hops-label" className="label">
+          Expansion depth
+        </span>
+        <div role="group" aria-labelledby="hops-label" className={segmentWrap}>
+          {HOPS.map((h) => (
             <button
               key={h}
               type="button"
+              aria-pressed={hops === h}
               onClick={() => setHops(h)}
               disabled={isRunning}
-              className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                hops === h
-                  ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-700'
-                  : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-600'
-              }`}
+              className={segmentItemClass(hops === h)}
             >
-              {h}-Hop
+              {h}
             </button>
           ))}
         </div>
+        <p className="mt-2 text-xs leading-relaxed text-fg-subtle">
+          {HOP_NOTES[hops]}
+        </p>
       </div>
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={!query.trim() || isRunning}
-        className="w-full py-2.5 rounded-lg font-semibold text-sm transition-all bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-cyan-600"
+        className={cx(btnPrimary, 'mt-5 w-full')}
       >
         {isRunning ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg
-              className="animate-spin h-4 w-4"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            Running...
-          </span>
+          <>
+            <SpinnerIcon className="h-4 w-4 animate-spin-slow" />
+            Running…
+          </>
         ) : (
-          'Run Search'
+          <>
+            <SearchIcon className="h-4 w-4" />
+            Run search
+          </>
         )}
       </button>
     </form>

@@ -25,9 +25,12 @@ RUN npm ci --no-audit --no-fund
 # Copy UI sources and build (NEXT_STATIC_EXPORT=1 → static export in out/).
 # The app/api route handlers are removed for the export — the Python engine
 # implements the same endpoints (search, status, log, exports, health, analyze).
+# public/ carries the static assets (documentation PDFs, the batch template)
+# that the /resources page links to; Next copies it into the export.
 COPY app ./app
 COPY components ./components
 COPY lib ./lib
+COPY public ./public
 COPY next.config.js tailwind.config.js postcss.config.js tsconfig.json ./
 RUN rm -rf app/api
 ENV NEXT_STATIC_EXPORT=1

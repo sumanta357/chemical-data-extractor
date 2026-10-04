@@ -88,23 +88,73 @@ In the sandbox/preview, if `SEARCH_ENGINE_URL` is unset, the Next.js app runs `p
 
 ```
 ├── app/                    # Next.js App Router (frontend + API)
-│   ├── api/                # Route handlers (search, health, exports)
-│   ├── page.tsx            # Main search page
-│   └── layout.tsx          # Root layout
+│   ├── api/                # Route handlers (search, health, exports) — local dev only
+│   ├── page.tsx            # Search workspace
+│   ├── resources/          # Documentation and downloads page
+│   ├── reset-password/     # Password-reset landing page
+│   ├── admin/academics/    # Academic customers directory
+│   └── layout.tsx          # Root layout, theme bootstrap
 ├── components/             # React components (SearchForm, ProgressView, etc.)
+│   ├── ui.tsx              # Button/field/pill class specifications
+│   ├── icons.tsx           # Inline SVG icon set
+│   ├── SiteChrome.tsx      # Shared header and footer
+│   └── ThemeToggle.tsx     # Light/dark switcher
 ├── lib/                    # TypeScript library
 │   ├── types.ts            # Type definitions
+│   ├── theme.ts            # Theme state, persistence and events
 │   └── search-engine.ts    # Python subprocess manager
 ├── api/scigraph.py         # Python CLI engine
 ├── api/enrich_exports.py   # Enrichment pipeline (PubChem SMILES + CrossRef)
 ├── python-api/             # Hosted Python service (Render blueprint)
 │   ├── app.py              # FastAPI backend (search + enrichment + exports)
 │   └── requirements.txt    # Python dependencies for the hosted service
+├── docs/tutorial/          # Markdown source of the downloadable documentation
+├── scripts/                # Documentation build + UI verification tools
+├── public/downloads/       # Committed PDFs and templates served by /resources
 ├── render.yaml             # Render blueprint (deploys python-api/)
 ├── requirements.txt        # Python dependencies (CLI)
-├── lib/search-engine.ts    # Node runner: spawns python3 locally OR proxies to SEARCH_ENGINE_URL
 ├── package.json            # Next.js + React dependencies
 ├── next.config.js          # Next.js configuration
-├── tailwind.config.js      # Tailwind CSS theme
+├── tailwind.config.js      # Tailwind CSS theme tokens
 └── server.sh               # Freebuff entry point
 ```
+
+## 🎨 Interface
+
+### Design system
+
+Every colour, control and label comes from one place.
+
+- **Colour tokens** live in `app/globals.css` as `R G B` triplets and are mapped
+  into Tailwind in `tailwind.config.js` (`bg-surface`, `text-fg-muted`,
+  `border-line`, `bg-accent-solid`, …). No component hardcodes a hex value, so
+  both themes come from the same markup.
+- **Light and Dark are designed separately.** Dark is a near-black canvas
+  (`#080a0e`) with layered surfaces; Light is white with tinted surfaces. Both
+  pass WCAG AA — verify with `python3 scripts/check_contrast.py`.
+- **Controls are specified once** in `components/ui.tsx`: one button height, one
+  radius, one focus ring, one segmented control, one status pill, one note style.
+- **Icons** are inline SVG on one 24×24 grid in `components/icons.tsx`
+  (`currentColor`, 1.6px stroke), so there is no icon-library dependency.
+- **Theme choice** is written to `localStorage` under `cde-theme` and applied
+  before first paint by the inline bootstrap in `app/layout.tsx`, so there is no
+  flash of the wrong theme. With no stored choice the OS preference is used.
+
+### Documentation pipeline
+
+The PDFs on the `/resources` page are build-time assets, committed to
+`public/downloads/` so the runtime container stays Python-only.
+
+```bash
+pip install reportlab
+python3 scripts/build_resource_pdfs.py     # docs/tutorial/*.md -> public/downloads/*.pdf
+python3 scripts/check_figures.py           # figures stay inside their frames
+python3 scripts/check_contrast.py          # both themes pass WCAG AA
+```
+
+Edit `docs/tutorial/*.md` and re-run the build to keep the PDFs in step with the
+interface. The illustrations are vector recreations of the live UI rather than
+screenshots, so they stay sharp and never go stale in layout.
+
+> `public/` is copied into the UI build stage of the `Dockerfile`; if you add a
+> new directory of static assets, add it there too or it will not ship.

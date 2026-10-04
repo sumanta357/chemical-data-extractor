@@ -2,6 +2,8 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 import { authHeaders } from '@/lib/billing';
+import { AlertIcon, ArrowRightIcon, EllipsisIcon, SpinnerIcon } from '@/components/icons';
+import { btnPrimary, cx } from '@/components/ui';
 
 interface Props {
   searchId?: string | null;
@@ -54,10 +56,7 @@ export default function AIAssistant({ searchId, query }: Props) {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.analysis) {
-        setTurns([
-          ...nextTurns,
-          { role: 'assistant', text: data.analysis },
-        ]);
+        setTurns([...nextTurns, { role: 'assistant', text: data.analysis }]);
       } else {
         // The engine answers 401/402 with {message, code}; a bare string is
         // used for unconfigured providers. Never render the object itself.
@@ -67,14 +66,7 @@ export default function AIAssistant({ searchId, query }: Props) {
             ? detail
             : detail?.message ||
               'AI analysis is temporarily unavailable — please try again shortly.';
-        setTurns([
-          ...nextTurns,
-          {
-            role: 'assistant',
-            text,
-            error: true,
-          },
-        ]);
+        setTurns([...nextTurns, { role: 'assistant', text, error: true }]);
       }
     } catch {
       setTurns([
@@ -88,7 +80,10 @@ export default function AIAssistant({ searchId, query }: Props) {
     } finally {
       setBusy(false);
       requestAnimationFrame(() => {
-        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
       });
     }
   };
@@ -99,33 +94,36 @@ export default function AIAssistant({ searchId, query }: Props) {
   };
 
   return (
-    <section className="ai-panel">
-      {/* Header */}
-      <div className="ai-panel__head">
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Compact AI mark — text, not decoration */}
-          <span className="ai-panel__badge" aria-hidden="true">AI</span>
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white">
-              AI Analyst
-            </h2>
-            <p className="text-xs text-[rgb(120 130 160)] -mt-0.5 truncate">
-              {query ? `Context: ${query}` : 'Ask about chemistry, targets, or your results'}
-            </p>
-          </div>
+    <section className="panel flex min-h-[22rem] flex-col overflow-hidden">
+      <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-fg">AI analyst</h2>
+          <p className="mt-0.5 truncate text-xs text-fg-subtle">
+            {query
+              ? `Context: ${query}`
+              : 'Ask about chemistry, targets, or your results'}
+          </p>
         </div>
-        <span className="ai-panel__status" title="Provider falls back automatically">
-          online
+        <span className="mt-0.5 flex shrink-0 items-center gap-1.5 text-[11px] text-fg-subtle">
+          <span
+            aria-hidden
+            className="h-1.5 w-1.5 rounded-full bg-success"
+          />
+          Online
         </span>
       </div>
 
       {/* Conversation */}
-      <div className="ai-panel__thread" ref={scrollRef}>
+      <div
+        ref={scrollRef}
+        className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
+        aria-live="polite"
+      >
         {turns.length === 0 && (
-          <div className="ai-panel__empty">
-            <p className="text-[11px] text-[rgb(110 120 150)] leading-relaxed">
-              Ask anything about your search results — potency comparisons,
-              structural hints, or what to explore next.
+          <div className="flex flex-1 items-center justify-center">
+            <p className="max-w-[16rem] text-center text-xs leading-relaxed text-fg-subtle">
+              Ask anything about your results — potency comparisons, structural
+              hints, or what to explore next.
             </p>
           </div>
         )}
@@ -133,58 +131,85 @@ export default function AIAssistant({ searchId, query }: Props) {
         {turns.map((turn, i) => (
           <div
             key={i}
-            className={
-              turn.role === 'user' ? 'ai-msg ai-msg--user' : 'ai-msg ai-msg--bot'
-            }
+            className={cx(
+              'max-w-[92%] rounded-lg border px-3 py-2 text-[13px] leading-relaxed',
+              turn.role === 'user'
+                ? 'self-end border-accent-line bg-accent-soft text-fg'
+                : turn.error
+                ? 'self-start border-danger-line bg-danger-soft text-fg'
+                : 'self-start border-line bg-surface-2 text-fg'
+            )}
           >
-            <p className="whitespace-pre-wrap leading-relaxed">{turn.text}</p>
+            {turn.error && (
+              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-danger">
+                <AlertIcon className="h-3.5 w-3.5" />
+                Analyst unavailable
+              </span>
+            )}
+            <p className="whitespace-pre-wrap">{turn.text}</p>
           </div>
         ))}
 
         {busy && (
-          <div className="ai-msg ai-msg--bot">
-            <span className="ai-typing">
-              <i /><i /><i />
-            </span>
+          <div className="flex items-center gap-2 self-start rounded-lg border border-line bg-surface-2 px-3 py-2 text-xs text-fg-muted">
+            <SpinnerIcon className="h-3.5 w-3.5 animate-spin-slow" />
+            Reading your results…
           </div>
         )}
       </div>
 
       {/* Quick prompts — only shown before the first exchange */}
       {turns.length === 0 && !busy && (
-        <div className="ai-panel__quick">
+        <div className="flex flex-col gap-1.5 px-4 pb-3">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-fg-subtle">
+            Try asking
+          </span>
           {QUICK_PROMPTS.map((q) => (
             <button
               key={q}
               type="button"
               onClick={() => ask(q)}
               disabled={busy}
-              className="ai-chip shrink-0"
+              className="group flex items-center justify-between gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-left text-[11px] text-fg-muted transition-colors hover:border-accent-line hover:text-fg disabled:opacity-55"
             >
               {q}
+              <ArrowRightIcon className="h-3.5 w-3.5 shrink-0 text-fg-subtle group-hover:text-accent" />
             </button>
           ))}
         </div>
       )}
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="ai-panel__form">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask the analyst…"
-          disabled={busy}
-          className="ai-panel__input"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || busy}
-          className="ai-panel__send"
-          aria-label="Send"
-        >
-          Ask
-        </button>
+      <form onSubmit={handleSubmit} className="border-t border-line p-3">
+        <label htmlFor="analyst-input" className="sr-only">
+          Ask the AI analyst a question
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="analyst-input"
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask the analyst…"
+            disabled={busy}
+            className="field"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || busy}
+            className={cx(btnPrimary, 'shrink-0')}
+          >
+            {busy ? (
+              <EllipsisIcon className="h-4 w-4" />
+            ) : (
+              <ArrowRightIcon className="h-4 w-4" />
+            )}
+            <span className="sr-only">Send question</span>
+          </button>
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-fg-subtle">
+          Answers are generated from the current search context. Verify critical
+          values against the exported files before citing them.
+        </p>
       </form>
     </section>
   );
