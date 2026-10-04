@@ -3303,6 +3303,10 @@ class ChEMBLConnector(BaseConnector):
                     entities.append(target_ent)
 
                     act_url = f"https://www.ebi.ac.uk/chembl/api/data/activity.json?target_chembl_id={target_chembl_id}&limit=500"
+                    # Outside the pagination loop on purpose: a drug measured
+                    # in 400 nM and 1 uM assays often falls on two different
+                    # 500-row pages, and resetting per page re-added it.
+                    seen_molecules: Set[str] = set()
                     for offset in range(0, 3000, 500):
                         page_url = act_url + f"&offset={offset}"
                         act_data = await self._safe_get(session, page_url)
@@ -3314,43 +3318,51 @@ class ChEMBLConnector(BaseConnector):
                         for act in activities:
                             mol_id = act.get("molecule_chembl_id")
                             if not mol_id: continue
+                            # One entity per molecule, not per assay row: a
+                            # target's activity list repeats the same compound
+                            # across hundreds of assays, and appending all of
+                            # them filled the graph with duplicates of a handful
+                            # of drugs while starving the other connectors.
+                            if mol_id in seen_molecules: continue
+                            seen_molecules.add(mol_id)
                             std_type = act.get("standard_type") or "Activity"
                             std_val = str(act.get("standard_value", ""))
                             std_units = str(act.get("standard_units", ""))
                             pchembl = str(act.get("pchembl_value", ""))
                             assay_id = str(act.get("assay_chembl_id", ""))
+                            smiles = act.get("canonical_smiles", "")
 
-                        inhibitor_ent = Entity(
-                            uid=f"COMPOUND:{mol_id}",
-                            entity_type=EntityType.COMPOUND,
-                            preferred_name=f"Inhibitor/Ligand {mol_id}",
-                            canonical_id=mol_id,
-                            evidence=[Evidence(database=self.NAME, source_url=act_url)],
-                            attributes={
-                                "bioactivity_summary": f"{std_type}={std_val}{std_units} (pChEMBL: {pchembl})",
-                                "pchembl_value": pchembl,
-                                "smiles": act.get("canonical_smiles", "")
-                            }
-                        )
-                        inhibitor_ent.add_cross_ref(DatabaseSource.CHEMBL, mol_id)
-                        entities.append(inhibitor_ent)
+                            inhibitor_ent = Entity(
+                                uid=f"COMPOUND:{mol_id}",
+                                entity_type=EntityType.COMPOUND,
+                                preferred_name=f"Inhibitor/Ligand {mol_id}",
+                                canonical_id=mol_id,
+                                evidence=[Evidence(database=self.NAME, source_url=act_url)],
+                                attributes={
+                                    "bioactivity_summary": f"{std_type}={std_val}{std_units} (pChEMBL: {pchembl})",
+                                    "pchembl_value": pchembl,
+                                    "smiles": smiles
+                                }
+                            )
+                            inhibitor_ent.add_cross_ref(DatabaseSource.CHEMBL, mol_id)
+                            entities.append(inhibitor_ent)
 
-                        rel_pred = RelationType.INHIBITS if std_type in ["IC50", "Ki", "Kd", "Inhibition"] else RelationType.BINDS
-                        rel = Relation(
-                            source_uid=inhibitor_ent.uid,
-                            target_uid=target_ent.uid,
-                            relation_type=rel_pred,
-                            evidence=[Evidence(database=self.NAME, source_url=act_url, confidence_score=0.95)],
-                            attributes={
-                                "activity_type": std_type,
-                                "activity_value": std_val,
-                                "units": std_units,
-                                "pchembl_value": pchembl,
-                                "assay_id": assay_id,
-                                "mechanism_of_action": f"{std_type} {std_val} {std_units}"
-                            }
-                        )
-                        relations.append(rel)
+                            rel_pred = RelationType.INHIBITS if std_type in ["IC50", "Ki", "Kd", "Inhibition"] else RelationType.BINDS
+                            rel = Relation(
+                                source_uid=inhibitor_ent.uid,
+                                target_uid=target_ent.uid,
+                                relation_type=rel_pred,
+                                evidence=[Evidence(database=self.NAME, source_url=act_url, confidence_score=0.95)],
+                                attributes={
+                                    "activity_type": std_type,
+                                    "activity_value": std_val,
+                                    "units": std_units,
+                                    "pchembl_value": pchembl,
+                                    "assay_id": assay_id,
+                                    "mechanism_of_action": f"{std_type} {std_val} {std_units}"
+                                }
+                            )
+                            relations.append(rel)
 
         return entities, relations
 
@@ -3983,6 +3995,82 @@ class SearchLibraryBuilder:
 # 13. MULTI-HOP RECURSIVE GRAPH EXPANDER
 # ==============================================================================
 
+# A bare integer frontier candidate is almost always a PubChem CID belonging
+# to some ligand that happened to be adjacent in an activity table. Expanding
+# one drags an unrelated small molecule into the graph, so deeper hops ranked
+# these last instead of letting them crowd out real targets.
+_BARE_NUMBER_RE = re.compile(r"^\d+$")
+
+# Connectors emit one of these when a lookup found nothing: a link entity
+# whose name is a human sentence ("BindingDB Search: EGFR", "PubChem: No
+# CID found"). It is a real entity in the graph but it is not a query, so it
+# must never become a frontier candidate.
+_PLACEHOLDER_QUERY_RE = re.compile(
+    r"^(?:[A-Za-z0-9 ]+\s+)?Search\s*:|"
+    r"^SEARCH:|"
+    r"\bno (?:results?|records?|matches?|data)\b|"
+    r"\bnot found\b|"
+    r"^No (?:results?|records?|matches?)\b",
+    re.I,
+)
+
+
+def _frontier_rank(text: str) -> float:
+    """Lower sorts first. Used to pick which follow-ups a hop actually runs.
+
+    A candidate set has no inherent order, so slicing it took whichever ten
+    strings hashed first. Two identical runs then searched completely
+    different queries, and a hop that drew mostly bare CIDs returned almost
+    nothing — which is why 4-hop could come back thinner than 3-hop. Ranking
+    makes the choice deterministic and puts meaningful identifiers first.
+    """
+    q = (text or "").strip()
+    if not q:
+        return 4.0
+    # "Sorry, no records" placeholders are not database keys. Expanding one
+    # fed a string like "BindingDB Search: EGFR" back into every connector,
+    # which found nothing and pushed real targets out of the hop's budget.
+    if _PLACEHOLDER_QUERY_RE.search(q):
+        return 4.0
+    if _BARE_NUMBER_RE.match(q):
+        return 3.0
+    if q.isdigit():
+        return 3.0
+    # Prefixed accessions (P00533, CHEBI:100753, R-HSA-1996322) and PDB codes
+    # (1WT5) are real database keys and stay ahead of anything else.
+    if re.match(r"^[A-Za-z]{1,4}[:\-]", q) or re.match(r"^[0-9][A-Za-z0-9]{3}$", q):
+        return 1.0
+    if re.search(r"[A-Za-z]", q):
+        return 0.0
+    return 2.0
+
+
+def _offer(frontier: Dict[str, float], text: str) -> None:
+    """Record a follow-up candidate, keeping its best (lowest) rank."""
+    q = (text or "").strip()
+    if not q or len(q) > 200:
+        return
+    rank = _frontier_rank(q)
+    prev = frontier.get(q)
+    if prev is None or rank < prev:
+        frontier[q] = rank
+
+
+def _select_frontier(frontier: Dict[str, float], limit: int) -> List[str]:
+    """Deterministically pick the best `limit` follow-ups, ties broken by name.
+
+    Placeholder queries (rank 4.0) are dropped outright when there is anything
+    real to run: spending a hop's budget on "BindingDB Search: EGFR" searches
+    all 18 connectors for a phrase that matches no database and costs the real
+    targets their slot.
+    """
+    ranked = sorted(frontier.items(), key=lambda kv: (kv[1], kv[0]))
+    usable = [(q, r) for q, r in ranked if r < 4.0]
+    if usable:
+        return [q for q, _ in usable[:limit]]
+    return [q for q, _ in ranked[:limit]]
+
+
 class RecursiveGraphExpander:
     """Recursively traverses multi-hop cross-references to build dense knowledge subgraphs."""
 
@@ -4018,7 +4106,7 @@ class RecursiveGraphExpander:
                 print(f"  \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d")
                 logger.info(f"[GraphExpander] Executing Hop {hop+1}/{self.max_hops} for queries: {current_queries[:5]}")
 
-                next_queries = set()
+                next_queries: Dict[str, float] = {}
                 # Process queries in small batches so concurrent connector fan-out
                 # (and its memory footprint) stays bounded on small containers,
                 # and so log lines stream steadily instead of going silent.
@@ -4031,10 +4119,11 @@ class RecursiveGraphExpander:
                         found = await self._expand_query(q, session, qt, hop, next_queries)
                     print(f"    Batch progress: {len(next_queries)} follow-up candidates so far (hop {hop+1})")
 
-                # Bound concurrent load for the next hop.
-                current_queries = list(next_queries)[:self.max_entities_per_hop]
+                # Bound concurrent load for the next hop, keeping the most
+                # meaningful candidates rather than an arbitrary slice.
+                current_queries = _select_frontier(next_queries, self.max_entities_per_hop)
 
-    async def _expand_query(self, q: str, session: "aiohttp.ClientSession", qt: str, hop: int, next_queries: set) -> bool:
+    async def _expand_query(self, q: str, session: "aiohttp.ClientSession", qt: str, hop: int, next_queries: Dict[str, float]) -> bool:
         """Run one query through its routed connectors. Adds follow-up queries to next_queries."""
         q_start = time.time()
         target_names = QueryRouter.route(q)
@@ -4074,7 +4163,7 @@ class RecursiveGraphExpander:
                         self.resolver.resolve(e)
                         if e.entity_type in (EntityType.COMPOUND, EntityType.DRUG, EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME, EntityType.STRUCTURE):
                             for xr in e.cross_references:
-                                next_queries.add(xr.accession)
+                                _offer(next_queries, xr.accession)
                             # For protein/target/enzyme entities, also add the preferred name and canonical_id
                             # so PDBe-KB can search RCSB PDB by human-readable protein/gene name
                             if e.entity_type in (EntityType.PROTEIN, EntityType.TARGET, EntityType.ENZYME):
@@ -4102,9 +4191,9 @@ class RecursiveGraphExpander:
 
                                 if can_expand:
                                     if name and len(name) > 1 and not re.match(r"^CHEMBL\d+$", name, re.I):
-                                        next_queries.add(name)
+                                        _offer(next_queries, name)
                                     if cid and len(cid) > 1 and cid != name and not re.match(r"^CHEMBL\d+$", cid, re.I):
-                                        next_queries.add(cid)
+                                        _offer(next_queries, cid)
                 for r in rels:
                     self.resolver.add_relation(r)
 
