@@ -28,7 +28,22 @@ import { getSupabase } from '@/lib/supabase';
 
 type Phase = 'checking' | 'confirmed' | 'already' | 'error';
 
-export default function ConfirmEmailPanel() {
+interface Props {
+  /**
+   * Called when the link produced no session.
+   *
+   * Absence of a session is not evidence that the address is unverified: GoTrue
+   * can verify the token server-side and still fail to hand the browser a
+   * session it can keep -- a PKCE verifier from a different browser, cleared
+   * storage, or a link already used once. Telling someone their confirmation
+   * failed when it actually succeeded is worse than saying nothing, so the
+   * caller is given the chance to show them the ordinary page instead, where
+   * they can sign in.
+   */
+  onNoSession?: () => void;
+}
+
+export default function ConfirmEmailPanel({ onNoSession }: Props = {}) {
   const [phase, setPhase] = useState<Phase>('checking');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -56,6 +71,7 @@ export default function ConfirmEmailPanel() {
         setMessage(
           'Sign-in is not configured on this server, so this link cannot be checked.',
         );
+        onNoSession?.();
         return;
       }
 
@@ -85,13 +101,18 @@ export default function ConfirmEmailPanel() {
 
       setPhase('error');
       setMessage(
-        'This confirmation link is no longer valid. It may already have been used, or it may have expired.',
+        'We could not sign you in from this link. If you have just confirmed ' +
+          'your address, it is verified — sign in with your email and password below.',
       );
+      onNoSession?.();
     })();
 
     return () => {
       cancelled = true;
     };
+    // onNoSession is intentionally not a dependency: the parent passes an
+    // inline arrow, and re-running this on every render would re-read the URL
+    // the client has already stripped.
   }, []);
 
   const heading: Record<Phase, string> = {

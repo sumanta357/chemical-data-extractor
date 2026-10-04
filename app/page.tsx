@@ -41,6 +41,13 @@ export default function HomePage() {
     );
   });
 
+  // The callback URL is not proof that the confirmation failed. If the link
+  // yields no session -- a PKCE verifier from another browser, cleared storage,
+  // or a link already opened once -- drop through to the ordinary page rather
+  // than telling someone their verified address is invalid. They can sign in
+  // there, which is exactly what they were going to do next.
+  const [callbackUnusable, setCallbackUnusable] = useState(false);
+
   const handleSearch = useCallback(
     async (query: string, queryType: string, hops: number) => {
       setIsRunning(true);
@@ -235,13 +242,13 @@ export default function HomePage() {
   // Placed after every hook so none can be skipped by the early return. The
   // panel bootstraps the Supabase client itself, which is what lets it read
   // the session out of the confirmation link.
-  if (fromAuthCallback) {
+  if (fromAuthCallback && !callbackUnusable) {
     return (
       <div className="flex min-h-screen flex-col">
         <SiteHeader current="app" />
 
         <main className="flex flex-1 items-center justify-center px-4 py-12">
-          <ConfirmEmailPanel />
+          <ConfirmEmailPanel onNoSession={() => setCallbackUnusable(true)} />
         </main>
 
         <SiteFooter />
