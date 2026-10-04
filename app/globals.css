@@ -42,12 +42,10 @@ html.light {
   --accent-soft: 224 243 246;
   --accent-line: 138 197 210;
 
-  /* Logo: navy structure with a green data-growth trace. Kept as its own pair
-     so the mark holds the brand's two colours instead of inheriting the accent
-     teal. The mark itself is loaded from public/logo*.svg, which cannot read
-     these variables; they document the two brand colours for reference. */
-  --logo-ink: 26 58 107;
-  --logo-accent: 14 145 97;
+  /* Logo: the mark is loaded from public/logo*.png, which cannot read these
+     variables. They record the brand navy sampled from the supplied artwork,
+     for reference and for any future inline use. */
+  --logo-ink: 8 59 104;
 
   /* Status. Each has a text tone and a tinted background so alerts read the
      same in both themes. */
@@ -100,9 +98,8 @@ html.dark {
   --accent-line: 27 92 105;
 
   /* The navy of the mark is too dark to read on the dark canvas, so it is
-     lightened here; the green is already the light-theme value. */
+     lightened here to match public/logo-dark.png. */
   --logo-ink: 168 198 240;
-  --logo-accent: 52 211 158;
 
   --danger: 252 129 129;
   --danger-soft: 43 20 22;

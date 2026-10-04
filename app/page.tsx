@@ -7,7 +7,7 @@ import ResultsView from '@/components/ResultsView';
 import HistoryPanel from '@/components/HistoryPanel';
 import AIAssistant from '@/components/AIAssistant';
 import AccountPanel from '@/components/AccountPanel';
-import DataSourcePanel from '@/components/DataSourcePanel';
+
 import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import { HistoryIcon, SearchIcon } from '@/components/icons';
 import { getMe, authHeaders, type Entitlement } from '@/lib/billing';
@@ -237,7 +237,7 @@ export default function HomePage() {
           </h1>
           <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
             Chemical Data Extractor traverses public chemistry, proteomics and
-            pathway databases from a single query, then exports the assembled
+            pathway sources from a single query, then exports the assembled
             graph as a workbook, CSV, GraphML, Cypher and more.
           </p>
           <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
@@ -280,7 +280,6 @@ export default function HomePage() {
                     streams its progress here, then lists the files you can
                     download.
                   </p>
-                  <DataSourcePanel />
                   <p className="mt-5 text-xs text-fg-subtle">
                     One search runs at a time on the current plan. If another is
                     already running, yours is queued and starts automatically.

@@ -37,7 +37,8 @@ const RESOURCES: Resource[] = [
       'troubleshooting table for every message the app can show, and batch or command-line use.',
     when:
       'Read it once when you start, then keep it as the reference for anything the interface does ' +
-      'not explain in place. Includes the list of connected data sources and their current limits.',
+      'not explain in place. Covers searching, exports, search history, the AI analyst, plans and ' +
+      'payment, light and dark mode, and batch or command-line use.',
     primary: true,
   },
   {

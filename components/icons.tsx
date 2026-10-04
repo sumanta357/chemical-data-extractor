@@ -153,13 +153,12 @@ export function EllipsisIcon({ className }: IconProps) {
 }
 
 /**
- * Brand mark: a navy hexagonal cell holding an extraction arrow, with a green
- * circuit trace climbing out of it for the multi-hop growth the product does.
+ * Brand mark, cut from the supplied brand artwork: the navy hexagonal cell
+ * holding the extraction arrow.
  *
- * Loaded from public/logo.svg rather than inlined, so the artwork is a real
- * file that can be replaced, downloaded and reused elsewhere. Two variants are
- * shipped because an <img> cannot read the page's CSS variables: the navy is
- * lifted in the Dark file so it does not disappear against a near-black canvas.
+ * Two PNGs are shipped because an <img> is styled from outside its own
+ * document and so cannot read the page's CSS variables. The Dark file carries a
+ * lightened navy so the mark stays visible against the near-black canvas.
  *
  * The switch is driven by the `dark` class that app/layout.tsx writes onto
  * <html>, not a Tailwind `dark:` variant — this project's Tailwind config uses
@@ -169,17 +168,17 @@ export function LogoMark({ className = 'h-8 w-8' }: { className?: string }) {
   return (
     <>
       <img
-        src="/logo.svg"
+        src="/logo.png"
         alt=""
-        width={64}
-        height={64}
+        width={284}
+        height={322}
         className={`logo-art logo-art--light ${className}`}
       />
       <img
-        src="/logo-dark.svg"
+        src="/logo-dark.png"
         alt=""
-        width={64}
-        height={64}
+        width={284}
+        height={322}
         className={`logo-art logo-art--dark ${className}`}
       />
     </>
