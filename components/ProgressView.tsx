@@ -47,9 +47,9 @@ export default function ProgressView({ search, logLines }: Props) {
   const key = statusKey(search.status);
   const running = key === 'running' || key === 'queued';
 
-  /* True when this job is queued behind another search rather than waiting
+  /* True when this job is queued behind other searches rather than waiting
      for a cold container. The engine sets this exact wording in
-     python-api/app.py when the single search slot is already taken. */
+     python-api/app.py when every search slot is already taken. */
   const busyBehindOther =
     !!search.progress && /waiting for another search/i.test(search.progress);
 
@@ -125,15 +125,16 @@ export default function ProgressView({ search, logLines }: Props) {
         </div>
       )}
 
-      {/* The engine runs one job at a time, so "queued" has two very
-          different causes. Only the cold-start one is worth explaining
-          here — telling someone the engine is waking when it is awake and
-          busy sends them looking at the wrong problem. */}
+      {/* The engine runs several jobs at once but has a finite number of
+          slots, so "queued" has two very different causes. Only the
+          cold-start one is worth explaining here — telling someone the
+          engine is waking when it is awake and busy sends them looking at
+          the wrong problem. */}
       {search.progress && busyBehindOther && (
         <p className="mx-5 mt-3 text-xs leading-relaxed text-fg-muted">
-          The engine is awake and already running another search. Only one
-          search runs at a time, so this one starts as soon as that finishes —
-          the engine has not failed.
+          The engine is awake and already running other searches, and all of
+          its slots are taken. This one starts as soon as one frees up — the
+          engine has not failed.
         </p>
       )}
       {search.progress && coldStart && !busyBehindOther && (

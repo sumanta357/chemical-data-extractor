@@ -238,10 +238,15 @@ _cleanup_done: bool = False
 # Shutdown event for the periodic cleanup coroutine
 _shutdown = asyncio.Event()
 
-# One search at a time on small containers: each search spawns a Python
-# subprocess that fans out to 100+ database connectors; running two at once
-# OOM-kills the container (Render free tier = 512MB shared with Node).
-_search_slots = asyncio.Semaphore(int(os.environ.get("MAX_CONCURRENT_SEARCHES", "1")))
+# How many searches may run at once. Each search spawns a Python subprocess
+# that fans out to 100+ database connectors, so this is the memory knob on a
+# small container: the Render free tier is 512MB shared with Node, and a third
+# concurrent engine is what tips it into an OOM kill. Two keeps searches
+# genuinely parallel — a second user no longer waits behind a 20-minute first
+# search — while staying inside what 512MB survives. Raise it on a bigger plan
+# (Starter, 1GB+) with MAX_CONCURRENT_SEARCHES; 1 restores the old queue.
+MAX_CONCURRENT_SEARCHES = max(1, int(os.environ.get("MAX_CONCURRENT_SEARCHES", "2")))
+_search_slots = asyncio.Semaphore(MAX_CONCURRENT_SEARCHES)
 
 def _parse_flag(raw: str) -> bool:
     """Read a boolean the way an operator types it into a dashboard.
@@ -473,10 +478,10 @@ class SearchStatus(BaseModel):
 #
 # Both limits are set generously for the memory-constrained free tier, where a
 # large query is slow rather than hung and a premature kill throws away real
-# work: a genuinely dead process is rare, and the ceiling still guarantees the
-# single search slot is released.
+# work: a genuinely dead process is rare, and the ceiling still guarantees a
+# search slot is released.
 STALL_POLL_SECONDS = 10.0
-STALL_TIMEOUT = 900.0
+STALL_TIMEOUT = 1500.0
 MAX_SEARCH_SECONDS = 3000.0
 
 
@@ -528,8 +533,8 @@ def _is_stalled(quiet_for: float, running_for: float) -> bool:
     Called only after a sample that showed no output; the caller resets the
     quiet timer whenever the engine advances its CPU time, so a process that is
     still working never reaches the threshold. The ceiling is unconditional —
-    a process can spin without ever printing, and a search must not hold the
-    single search slot for ever.
+    a process can spin without ever printing, and a search must not hold a
+    search slot for ever.
     """
     if running_for >= MAX_SEARCH_SECONDS:
         return True
@@ -542,7 +547,8 @@ async def run_search_in_background(search_id: str, query: str, query_type: str, 
         LOG.error("Background runner: no in-memory state for search_id=%s", search_id)
         return
 
-    # Serialize searches on small containers (see _search_slots).
+    # Searches run in parallel up to MAX_CONCURRENT_SEARCHES (see
+    # _search_slots). Past that they queue, and only then is it worth saying so.
     if _search_slots.locked():
         state["progress"] = "Waiting for another search to finish..."
     async with _search_slots:
@@ -560,6 +566,17 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
     started_monotonic = time.monotonic()
     _save_search(state)
 
+    # Each search gets its own workspace directory. The engine opens
+    # graph.duckdb and cache.sqlite inside it, and DuckDB is a single-writer
+    # file: with searches now running in parallel, sharing one workspace made
+    # the second engine fail to lock the database and crash. The per-search
+    # subdirectory is also what _cleanup_old_exports already expects to find.
+    workspace_dir = WORKSPACE_DIR / search_id
+    try:
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        LOG.warning("Could not create workspace dir for %s: %s", search_id, e)
+
     # Build CLI command
     cmd = [
         sys.executable,
@@ -567,7 +584,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
         query,
         "--query-type", query_type,
         "--hops", str(hops),
-        "--workspace", str(WORKSPACE_DIR),
+        "--workspace", str(workspace_dir),
         "--export-dir", export_dir,
         # CLI enrichment is ON by default now; the web layer runs enrich_exports.py
         # itself after the engine so it can parse progress lines — skip it here.
@@ -790,6 +807,7 @@ async def health():
         # is otherwise impossible to explain without running a search and
         # reading its log. One request answers it.
         "enrich_images": ENRICH_IMAGES,
+        "max_concurrent_searches": MAX_CONCURRENT_SEARCHES,
         "watchdog": {
             "poll_seconds": STALL_POLL_SECONDS,
             "stall_timeout": STALL_TIMEOUT,

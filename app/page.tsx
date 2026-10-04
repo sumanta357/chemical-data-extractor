@@ -281,8 +281,8 @@ export default function HomePage() {
                     download.
                   </p>
                   <p className="mt-5 text-xs text-fg-subtle">
-                    One search runs at a time on the current plan. If another is
-                    already running, yours is queued and starts automatically.
+                    Searches run in parallel. If the engine is already at its
+                    concurrency limit, yours is queued and starts automatically.
                   </p>
                 </div>
               )}

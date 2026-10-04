@@ -9,6 +9,7 @@ time and only believes a stall when the process is silent *and* idle.
 Run:  cd python-api && python3 -m pytest tests/test_watchdog.py -q
 """
 
+import asyncio
 import os
 import sys
 import tempfile
@@ -83,7 +84,7 @@ class StallDecision(unittest.TestCase):
             lambda: setattr(engine_app, "MAX_SEARCH_SECONDS", self._ceiling))
 
     def test_a_silent_idle_engine_is_stalled(self):
-        self.assertTrue(engine_app._is_stalled(quiet_for=901, running_for=1000))
+        self.assertTrue(engine_app._is_stalled(quiet_for=1501, running_for=1600))
 
     def test_a_busy_engine_is_never_stalled_however_long_it_is_quiet(self):
         """The regression, at the point it actually happened.
@@ -145,11 +146,11 @@ reach the threshold no matter how long it stays quiet.
             self.assertEqual(quiet_since, now)
 
     def test_silence_shorter_than_the_timeout_is_tolerated(self):
-        self.assertFalse(engine_app._is_stalled(quiet_for=899, running_for=899))
+        self.assertFalse(engine_app._is_stalled(quiet_for=1499, running_for=1499))
         self.assertFalse(engine_app._is_stalled(quiet_for=600, running_for=600))
 
     def test_the_ceiling_applies_even_to_a_busy_engine(self):
-        """Otherwise a spinning process holds the one search slot for ever."""
+        """Otherwise a spinning process holds a search slot for ever."""
         self.assertTrue(engine_app._is_stalled(quiet_for=0, running_for=3000))
         self.assertTrue(engine_app._is_stalled(quiet_for=0, running_for=5000))
 
@@ -158,7 +159,7 @@ reach the threshold no matter how long it stays quiet.
         self.assertGreater(engine_app.MAX_SEARCH_SECONDS, engine_app.STALL_TIMEOUT)
 
     def test_the_thresholds_are_the_documented_ones(self):
-        self.assertEqual(engine_app.STALL_TIMEOUT, 900.0)
+        self.assertEqual(engine_app.STALL_TIMEOUT, 1500.0)
         self.assertEqual(engine_app.STALL_POLL_SECONDS, 10.0)
         self.assertEqual(engine_app.MAX_SEARCH_SECONDS, 3000.0)
         self.assertLess(
@@ -196,6 +197,76 @@ class FailureMessage(unittest.TestCase):
         # A literal number of minutes in the wording is exactly the drift this
         # guards against: the constants changed once already.
         self.assertNotRegex(text, r"\b\d+\s*minutes?\b")
+
+
+class Concurrency(unittest.IsolatedAsyncioTestCase):
+    """Searches must run in parallel, and each must own its own workspace.
+
+    Serialising them meant a second user waited behind a 20-minute first
+    search. Parallel engines cannot share one workspace directory, though:
+    DuckDB is a single-writer file, so the loser crashes on the lock instead of
+    searching. Both halves are asserted here rather than left to a live run.
+    """
+
+    async def test_the_default_allows_more_than_one_search(self):
+        self.assertGreater(
+            engine_app.MAX_CONCURRENT_SEARCHES, 1,
+            "searches are still queued one at a time by default")
+
+    async def test_searches_overlap_up_to_the_limit(self):
+        """Two searches must be inside the engine at the same time."""
+        running = 0
+        peak = 0
+        release = asyncio.Event()
+
+        async def fake_run(search_id, query, query_type, hops, export_dir):
+            nonlocal running, peak
+            running += 1
+            peak = max(peak, running)
+            await release.wait()
+            running -= 1
+
+        original_slots = engine_app._search_slots
+        original_run = engine_app._run_search_locked
+        engine_app._search_slots = asyncio.Semaphore(
+            engine_app.MAX_CONCURRENT_SEARCHES)
+        engine_app._run_search_locked = fake_run
+        self.addCleanup(lambda: setattr(engine_app, "_search_slots", original_slots))
+        self.addCleanup(lambda: setattr(engine_app, "_run_search_locked", original_run))
+
+        tasks = []
+        for i in range(engine_app.MAX_CONCURRENT_SEARCHES):
+            search_id = f"conc{i}"
+            engine_app.searches[search_id] = {"search_id": search_id}
+            tasks.append(asyncio.ensure_future(engine_app.run_search_in_background(
+                search_id, "EGFR", "protein", 1, "/tmp")))
+        await asyncio.sleep(0.05)
+        release.set()
+        await asyncio.gather(*tasks)
+        self.assertEqual(peak, engine_app.MAX_CONCURRENT_SEARCHES,
+                         "searches did not actually run in parallel")
+
+    async def test_each_search_gets_its_own_workspace(self):
+        """The engine opens graph.duckdb inside --workspace; a shared directory
+        means one engine's DuckDB lock kills the other's search."""
+        seen = []
+
+        async def fake_run(search_id, query, query_type, hops, export_dir):
+            seen.append(str(engine_app.WORKSPACE_DIR / search_id))
+
+        original_run = engine_app._run_search_locked
+        engine_app._run_search_locked = fake_run
+        original_slots = engine_app._search_slots
+        engine_app._search_slots = asyncio.Semaphore(4)
+        self.addCleanup(lambda: setattr(engine_app, "_run_search_locked", original_run))
+        self.addCleanup(lambda: setattr(engine_app, "_search_slots", original_slots))
+
+        for search_id in ("wsa", "wsb"):
+            engine_app.searches[search_id] = {"search_id": search_id}
+            await engine_app.run_search_in_background(
+                search_id, "EGFR", "protein", 1, "/tmp")
+
+        self.assertEqual(len(set(seen)), 2, f"workspace reused across searches: {seen}")
 
 
 if __name__ == "__main__":
