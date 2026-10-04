@@ -1658,7 +1658,14 @@ class BaseConnector(abc.ABC):
         self.translator = translator
         self.rate_limiter = TokenBucketRateLimiter(self.RATE_LIMIT_HZ)
 
-    async def _safe_get(self, session: aiohttp.ClientSession, url: str) -> Optional[Dict[str, Any]]:
+    async def _safe_get(self, session: aiohttp.ClientSession, url: str, timeout: float = 8.0) -> Optional[Dict[str, Any]]:
+        """GET JSON with caching and one retry.
+
+        `timeout` is per attempt. Endpoints that answer with a large payload
+        need more than the 8s default: BindingDB returns ~430 KB of affinities
+        for a single UniProt accession, which never fit and silently produced
+        zero results.
+        """
         cached, etag, last_mod = self.cache.get(url)
         if cached:
             try:
@@ -1677,7 +1684,7 @@ class BaseConnector(abc.ABC):
         for attempt in range(2):
             await self.rate_limiter.acquire()
             try:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
                     if resp.status == 304 and cached: return orjson.loads(cached)
                     if resp.status == 200:
                         data = await resp.text()
@@ -2092,6 +2099,11 @@ class PatentConnector(BaseConnector):
     """
     NAME = "Patents"
 
+    # Google Patents answers bursts of automated requests with a 503 bot check.
+    # Once seen, stop asking for a cooldown instead of paying the retry cost on
+    # every follow-up query of a multi-hop run.
+    _google_patents_cooldown_until: float = 0.0
+
     async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
         entities, relations = [], []
         q_clean = query.strip()
@@ -2166,7 +2178,22 @@ class PatentConnector(BaseConnector):
             except Exception:
                 pass
 
-        # Strategy 3: Google Patents search link (always generated as fallback)
+        # Strategy 3: direct Google Patents search. PubChem cross-references only
+        # exist for compounds, so without this every protein query fell through
+        # to a bare search link and the customer got no patent data at all.
+        # A PDB code is skipped: as patent text it is meaningless and matches
+        # documents about unrelated subjects, so a 2-hop run would import a
+        # block of irrelevant patents for every structure it expanded into.
+        is_structure_code = bool(re.match(r"^[0-9][A-Za-z0-9]{3}$", q_clean))
+        if not seen_patents and not is_structure_code:
+            found = await self._search_patents_by_keyword(session, q_clean, entities, relations)
+            for e in entities:
+                if e.entity_type == EntityType.PATENT:
+                    seen_patents.add(e.canonical_id)
+            if found:
+                return entities, relations
+
+        # Strategy 4: Google Patents search link (always generated as fallback)
         if not seen_patents:
             search_url = f"https://patents.google.com/?q={quote(q_clean)}&language=ENGLISH"
             search_ent = Entity(
@@ -2188,6 +2215,127 @@ class PatentConnector(BaseConnector):
             entities.append(search_ent)
 
         return entities, relations
+
+    async def _google_patents_records(self, session: aiohttp.ClientSession, query: str) -> List[Dict[str, Any]]:
+        """Fetch raw patent records from the public Google Patents XHR endpoint.
+
+        Returns an empty list when the endpoint is unavailable or rate-limiting,
+        so every caller can fall back rather than fail. The endpoint needs no API
+        key, but Google does intermittently answer automated requests with a 503
+        bot check, hence the single short retry.
+        """
+        norm = re.sub(r"[\s,\-/.]", "", query).upper()
+        url = f"https://patents.google.com/xhr/query?url=q%3D{quote(norm)}&exp="
+        if time.time() < self._google_patents_cooldown_until:
+            return []
+        try:
+            cached, etag, last_mod = self.cache.get(url)
+            payload = None
+            if cached:
+                try:
+                    payload = json.loads(cached)
+                except Exception:
+                    payload = None
+            if payload is None:
+                body = None
+                for attempt in range(2):
+                    await self.rate_limiter.acquire()
+                    async with session.get(
+                        url,
+                        headers={"User-Agent": "Mozilla/5.0 (compatible; SciGraphEnterprise/3.2)"},
+                        timeout=aiohttp.ClientTimeout(total=15),
+                    ) as resp:
+                        if resp.status == 200:
+                            body = await resp.text()
+                            break
+                        if resp.status in (429, 503) and attempt == 0:
+                            logger.info(f"[{self.NAME}] patent lookup rate-limited; retrying once")
+                            await asyncio.sleep(1.5)
+                            continue
+                        if resp.status in (429, 503):
+                            self._google_patents_cooldown_until = time.time() + 120
+                        logger.info(
+                            f"[{self.NAME}] patent lookup for {query} returned HTTP "
+                            f"{resp.status}; falling back to a search link"
+                        )
+                        return []
+                if body is None:
+                    return []
+                self.cache.set(url, body, 604800)
+                payload = json.loads(body)
+        except Exception as e:
+            logger.info(f"[{self.NAME}] patent lookup failed for {query}: {e}")
+            return []
+
+        records: List[Dict[str, Any]] = []
+        try:
+            for cluster in (payload.get("results") or {}).get("cluster") or []:
+                for item in cluster.get("result") or []:
+                    if item.get("patent"):
+                        records.append(item["patent"])
+        except Exception:
+            records = []
+        return records
+
+    async def _search_patents_by_keyword(self, session: aiohttp.ClientSession, query: str,
+                                         entities: List[Entity], relations: List[Relation],
+                                         limit: int = 10) -> int:
+        """Search Google Patents directly for an arbitrary term.
+
+        PubChem patent cross-references only exist for compounds, so a protein
+        query such as "EGFR" produced nothing but a search link. This asks
+        Google Patents for the term itself.
+
+        The records are attached as standalone entities rather than linked with
+        PATENTED_IN: a Google Patents hit means the term is *mentioned* in the
+        document, which is weaker than PubChem's compound cross-reference and
+        does not justify asserting the patent is on the query entity.
+        """
+        added = 0
+        seen: Set[str] = set()
+        for rec in (await self._google_patents_records(session, query))[:limit]:
+            pub = str(rec.get("publication_number") or "").strip().upper()
+            if not pub or pub in seen:
+                continue
+            seen.add(pub)
+            # Google highlights the matched term with markup in the title.
+            title = re.sub(r"<[^>]+>", "", str(rec.get("title") or "")).strip()
+            assignee = re.sub(r"<[^>]+>", "", str(rec.get("assignee") or "")).strip()
+            filing = str(rec.get("filing_date") or "").strip()
+            grant = str(rec.get("grant_date") or rec.get("publication_date") or "").strip()
+            year = ""
+            m = re.search(r"(\d{4})", filing or grant)
+            if m:
+                year = m.group(1)
+            patent_url = f"https://patents.google.com/patent/{pub}"
+            pat_ent = Entity(
+                uid=f"PATENT:{pub}",
+                entity_type=EntityType.PATENT,
+                preferred_name=title or f"Patent {pub}",
+                canonical_id=pub,
+                evidence=[Evidence(
+                    database=self.NAME,
+                    patent_number=pub,
+                    source_url=patent_url,
+                    evidence_type="Google Patents record",
+                )],
+                attributes={
+                    "title": title,
+                    "assignee": assignee,
+                    "publication_year": year,
+                    "filing_date": filing,
+                    "priority_date": str(rec.get("priority_date") or "").strip(),
+                    "jurisdiction": pub[:2],
+                    "queried_term": query,
+                    "patent_number": pub,
+                    "source": "Google Patents",
+                    "google_patents_url": patent_url,
+                },
+            )
+            pat_ent.add_cross_ref("GOOGLE_PATENTS", pub, url=patent_url)
+            entities.append(pat_ent)
+            added += 1
+        return added
 
     async def _search_patent_number(self, session: aiohttp.ClientSession, number: str,
                                     entities: List[Entity], relations: List[Relation]) -> int:
@@ -2446,20 +2594,59 @@ class NCBITaxonomyConnector(BaseConnector):
     async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
         if query_type == "ligand":
             pass  # Placeholder
-        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&term={quote(query)}&retmode=json&retmax=3"
-        data = await self._safe_get(session, url)
         entities, relations = [], []
-        if data and "esearchresult" in data and "idlist" in data["esearchresult"]:
-            for taxid in data["esearchresult"]["idlist"]:
+        q_clean = query.strip()
+
+        # A bare taxid must be resolved with esummary, not esearch: esearch
+        # treats "9606" as free text and returned 2184181 (Fusarium sinicum)
+        # instead of 9606 (Homo sapiens).
+        if re.match(r"^\d{1,9}$", q_clean):
+            summary = await self._safe_get(
+                session,
+                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={q_clean}&retmode=json",
+            )
+            record = ((summary or {}).get("result") or {}).get(q_clean)
+            if record and record.get("scientificname"):
                 ent = Entity(
-                    uid=f"ORGANISM:TAXID:{taxid}",
+                    uid=f"ORGANISM:TAXID:{q_clean}",
                     entity_type=EntityType.ORGANISM,
-                    preferred_name=query.title(),
-                    canonical_id=taxid,
-                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id={taxid}")]
+                    preferred_name=str(record["scientificname"]),
+                    canonical_id=q_clean,
+                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id={q_clean}")],
+                    attributes={"rank": str(record.get("rank", "")), "organism": str(record.get("organism", {}).get("scientificname", ""))},
                 )
-                ent.add_cross_ref(DatabaseSource.NCBI_TAXONOMY, taxid)
+                ent.add_cross_ref(DatabaseSource.NCBI_TAXONOMY, q_clean)
                 entities.append(ent)
+            return entities, relations
+
+        url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=taxonomy&term={quote(q_clean)}&retmode=json&retmax=3"
+        data = await self._safe_get(session, url)
+        taxids = []
+        if data and "esearchresult" in data and "idlist" in data["esearchresult"]:
+            taxids = list(data["esearchresult"]["idlist"])
+
+        # esearch returns ids only, so the name has to come from esummary; using
+        # the query text as the display name labelled every hit with the query.
+        names: Dict[str, str] = {}
+        if taxids:
+            summary = await self._safe_get(
+                session,
+                f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=taxonomy&id={','.join(taxids)}&retmode=json",
+            )
+            for taxid, record in ((summary or {}).get("result") or {}).items():
+                if taxid != "uids" and isinstance(record, dict) and record.get("scientificname"):
+                    names[taxid] = str(record["scientificname"])
+
+        for taxid in taxids:
+            ent = Entity(
+                uid=f"ORGANISM:TAXID:{taxid}",
+                entity_type=EntityType.ORGANISM,
+                preferred_name=names.get(taxid, q_clean.title()),
+                canonical_id=taxid,
+                evidence=[Evidence(database=self.NAME, source_url=f"https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id={taxid}")]
+            )
+            ent.add_cross_ref(DatabaseSource.NCBI_TAXONOMY, taxid)
+            entities.append(ent)
         return entities, relations
 
 
@@ -2484,7 +2671,9 @@ class BindingDBConnector(BaseConnector):
         # Strategy 1: If query looks like a UniProt ID, use getLigandsByUniprot REST API
         if re.match(r"^[A-Z0-9]{6,10}$", query, re.I):
             url = f"https://www.bindingdb.org/rest/getLigandsByUniprot?uniprot={q_upper}&response=application/json"
-            data = await self._safe_get(session, url)
+            # A well-studied target returns thousands of curated affinities, so
+            # this response is far larger than the 8s default allows.
+            data = await self._safe_get(session, url, timeout=30.0)
             if data and isinstance(data, dict):
                 # BindingDB wraps results in getLindsByUniprotResponse.bdb.affinities
                 resp = data.get("getLindsByUniprotResponse", {})

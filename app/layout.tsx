@@ -26,7 +26,7 @@ document.documentElement.style.colorScheme=t;
 export const metadata: Metadata = {
   title: 'Chemical Data Extractor — Scientific Knowledge Graph Platform',
   description:
-    'Multi-hop automated scientific discovery engine. Extract chemical compounds, bioactivities, protein targets, and pathways from 19+ databases.',
+    'Multi-hop automated scientific discovery engine. Extract chemical compounds, bioactivities, protein targets, and pathways from 18 verified data sources.',
 };
 
 export default function RootLayout({

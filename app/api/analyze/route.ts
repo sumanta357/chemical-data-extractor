@@ -78,7 +78,8 @@ function getProviders(): ProviderConfig[] {
   const ocKey = process.env.OPENCODE_API_KEY || DEFAULT_OPENCODE_KEY;
   if (ocKey) {
     const ocModels = [
-      process.env.OPENCODE_MODEL || 'nemotron-3-ultra-free',
+      process.env.OPENCODE_MODEL || 'space-bunny-free',
+      'nemotron-3-ultra-free',
       'nemotron-3.5-lightning-free',
       'deepseek-v4-flash-free',
     ];
