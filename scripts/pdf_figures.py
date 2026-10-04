@@ -584,28 +584,6 @@ def fig_themes(c, x, y, w, h):
     wire.text(x + half + gap + half / 2, y + panel_h + 8, "Dark mode", size=5.4, color=MUTED, align="c")
 
 
-def fig_batch(c, x, y, w, h):
-    wire = Wire(c, w, h)
-    wire.box(x, y, w, h, fill=colors.HexColor("#F7F8FA"), stroke=LINE, radius=5)
-    lines = (
-        ("# One query per line. Blank lines and # comments are ignored.", SUBTLE),
-        ("Aspirin", INK),
-        ("Ibuprofen", INK),
-        ("P23219", INK),
-        ("EGFR", INK),
-        ("# protein panel for a docking run", SUBTLE),
-        ("tubulin", INK),
-        ("COX-2", INK),
-    )
-    for idx, (text, tone) in enumerate(lines):
-        wire.text(x + 12, y + 12 + idx * 9, text, size=5.2, color=tone, font=wire.mono)
-
-    cy = y + h - 22
-    wire.box(x + 8, cy, w - 16, 16, fill=PAPER, stroke=LINE, radius=3)
-    wire.text(x + 14, cy + 5, "python api/scigraph.py --batch batch_queries.txt",
-              size=5.0, color=MUTED, font=wire.mono)
-
-
 FIGURES = {
     "hops": fig_hops,
     "searchform": fig_searchform,
@@ -615,7 +593,6 @@ FIGURES = {
     "analyst": fig_analyst,
     "history": fig_history,
     "themes": fig_themes,
-    "batch": fig_batch,
 }
 
 # (width, height) in points
@@ -628,5 +605,4 @@ FIGURE_SIZE = {
     "analyst": (460, 160),
     "history": (460, 124),
     "themes": (460, 150),
-    "batch": (460, 104),
 }

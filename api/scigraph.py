@@ -485,7 +485,18 @@ class MergePolicy(str, Enum):
 URL_REGEX = re.compile(r"^https?://[^\s/$.?#].[^\s]*$", re.IGNORECASE)
 DOI_REGEX = re.compile(r"^(https?://(?:dx\.)?doi\.org/)?(10\.\d{4,9}/[-._;()/:A-Za-z0-9]+)$")
 PMID_REGEX = re.compile(r"^\d+$")
-PATENT_REGEX = re.compile(r"^[A-Z]{2}\d+[A-Z0-9]*$", re.IGNORECASE)
+# Publication numbers come from several registries in several shapes: modern
+# ones are country + digits + kind code (US6280349B1), while legacy Japanese
+# numbers put a letter between the country code and the digits
+# (JPS63188694A, from "JP-S63188694-A"). The stricter former pattern rejected
+# every legacy number.
+PATENT_REGEX = re.compile(r"^[A-Z]{2}[A-Z]?\d+[A-Z0-9]*$", re.IGNORECASE)
+# A publication number with an optional kind code: US6280349, US 6,280,349 B1,
+# WO2004018667A1. Distinguishes "search this patent" from a compound name.
+PATENT_NUMBER_RE = re.compile(
+    r"^(?:US|EP|WO|CN|JP|KR|GB|DE|FR|CA|AU|IN|RU|BR|MX)\s?[\d][\d,\s]{3,12}\s?(?:[A-Z]\d?)?$",
+    re.IGNORECASE,
+)
 
 
 def validate_url(url: Optional[str]) -> Optional[str]:
@@ -1048,37 +1059,95 @@ def export_to_neo4j_cypher(entities: List[Entity], relations: List[Relation]) ->
     return "\n".join(statements)
 
 
+# Columns that have always been written, in this order. Existing consumers
+# (scripts, notebooks, importers) index or match on these names, so they are
+# never reordered or removed -- anything else an entity carries is appended
+# after them.
+NODE_BASE_COLUMNS = ["uid:ID", "name", ":LABEL", "canonical_id", "synonyms", "cross_references", "smiles", "formula", "molecular_weight", "bioactivity_summary"]
+NODE_BASE_ATTRS = {"smiles", "formula", "molecular_weight", "bioactivity_summary"}
+RELATION_BASE_COLUMNS = [":START_ID", ":END_ID", ":TYPE", "confidence", "activity_type", "activity_value", "units", "pchembl_value", "mechanism_of_action", "assay_id"]
+RELATION_BASE_ATTRS = {"activity_type", "activity_value", "units", "pchembl_value", "mechanism_of_action", "assay_id"}
+
+
+def _extra_attribute_columns(items: List[Any], base: set) -> List[str]:
+    """Every attribute present on any item that the base columns do not cover.
+
+    Without this, a patent's number and Google Patents link, a publication's
+    DOI, or a structure's PDB id were retrieved, held on the entity, and then
+    silently thrown away at export time -- the record existed in the graph but
+    the files a user actually downloads could not show it.
+    """
+    extras = set()
+    for item in items:
+        extras.update(getattr(item, "attributes", {}).keys())
+    return sorted(extras - base)
+
+
+def _pubchem_smiles(props: Dict[str, Any]) -> str:
+    """The SMILES string in a PubChem property record.
+
+    PubChem renamed ``CanonicalSMILES`` to ``ConnectivitySMILES``. A request for
+    the old name is still accepted -- the response simply comes back under the
+    new key -- so reading only the old name silently yields an empty string.
+    That is not cosmetic: BindingDB is queried by SMILES, and with an empty one
+    every compound-name lookup returned nothing. Read every spelling.
+    """
+    if not isinstance(props, dict):
+        return ""
+    for key in ("ConnectivitySMILES", "CanonicalSMILES", "SMILES", "IsomericSMILES"):
+        value = props.get(key)
+        if value:
+            return value
+    return ""
+
+
 def export_to_csv(entities: List[Entity], relations: List[Relation], entity_filepath: str, relation_filepath: str) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(entity_filepath)), exist_ok=True)
     os.makedirs(os.path.dirname(os.path.abspath(relation_filepath)), exist_ok=True)
-    
+
     try:
+        extra_node_columns = _extra_attribute_columns(entities, NODE_BASE_ATTRS)
         with open(entity_filepath, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow(["uid:ID", "name", ":LABEL", "canonical_id", "synonyms", "cross_references", "smiles", "formula", "molecular_weight", "bioactivity_summary"])
+            w.writerow(NODE_BASE_COLUMNS + extra_node_columns)
             for e in entities:
                 xr_str = "|".join([f"{xr.database}:{xr.accession}" for xr in e.cross_references])
-                smiles = e.attributes.get("smiles", "")
-                formula = e.attributes.get("formula", "")
-                mw = e.attributes.get("molecular_weight", "")
-                bio = e.attributes.get("bioactivity_summary", "")
-                w.writerow([e.uid, e.preferred_name, ";".join(e.node_labels()), e.canonical_id, "|".join(e.synonyms), xr_str, smiles, formula, mw, bio])
+                base_row = [
+                    e.uid,
+                    e.preferred_name,
+                    ";".join(e.node_labels()),
+                    e.canonical_id,
+                    "|".join(e.synonyms),
+                    xr_str,
+                    e.attributes.get("smiles", ""),
+                    e.attributes.get("formula", ""),
+                    e.attributes.get("molecular_weight", ""),
+                    e.attributes.get("bioactivity_summary", ""),
+                ]
+                w.writerow(base_row + [e.attributes.get(key, "") for key in extra_node_columns])
     except PermissionError:
         logger.warning(f"Permission denied writing to {entity_filepath}. File may be locked by an external program.")
 
     try:
+        extra_relation_columns = _extra_attribute_columns(relations, RELATION_BASE_ATTRS)
         with open(relation_filepath, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow([":START_ID", ":END_ID", ":TYPE", "confidence", "activity_type", "activity_value", "units", "pchembl_value", "mechanism_of_action", "assay_id"])
+            w.writerow(RELATION_BASE_COLUMNS + extra_relation_columns)
             for r in relations:
                 conf = r.evidence[0].confidence_score if r.evidence else 1.0
-                act_type = r.attributes.get("activity_type", "")
-                act_val = r.attributes.get("activity_value", "")
-                units = r.attributes.get("units", "")
-                pchembl = r.attributes.get("pchembl_value", "")
-                mech = r.attributes.get("mechanism_of_action", "")
-                assay = r.attributes.get("assay_id", "")
-                w.writerow([r.source_uid, r.target_uid, r.relationship_type(), conf, act_type, act_val, units, pchembl, mech, assay])
+                base_row = [
+                    r.source_uid,
+                    r.target_uid,
+                    r.relationship_type(),
+                    conf,
+                    r.attributes.get("activity_type", ""),
+                    r.attributes.get("activity_value", ""),
+                    r.attributes.get("units", ""),
+                    r.attributes.get("pchembl_value", ""),
+                    r.attributes.get("mechanism_of_action", ""),
+                    r.attributes.get("assay_id", ""),
+                ]
+                w.writerow(base_row + [r.attributes.get(key, "") for key in extra_relation_columns])
     except PermissionError:
         logger.warning(f"Permission denied writing to {relation_filepath}. File may be locked by an external program.")
 
@@ -1749,19 +1818,24 @@ class QueryRouter:
     PATTERNS = [
         (re.compile(r"^CHEMBL\d+$", re.I), ["ChEMBL", "PubChem", "BindingDB", "Guide to Pharmacology", "PDBe-KB"]),
         (re.compile(r"^(?:CID)?:?\d+$", re.I), ["PubChem", "ChEMBL", "BindingDB", "PDBe-KB"]),
-        (re.compile(r"^[A-Z0-9]{6,10}$", re.I), ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy", "PubMed"]),
         (re.compile(r"^GO:\d{7}$", re.I), ["GeneOntology"]),
-        (re.compile(r"^DB\d{5}$", re.I), ["DrugBank", "PubChem", "ChEMBL"]),
+        (re.compile(r"^DB\d{5}$", re.I), ["PubChem", "ChEMBL"]),
         (re.compile(r"^CHEBI:\d+$", re.I), ["ChEBI", "PubChem", "ChEMBL"]),
         (re.compile(r"^C\d{5}$", re.I), ["KEGG", "PubChem", "ChEBI", "ChEMBL"]),
-        (re.compile(r"^R\d{5}$", re.I), ["KEGG", "Rhea", "Reactome"]),
+        (re.compile(r"^R\d{5}$", re.I), ["KEGG", "Reactome"]),
         (re.compile(r"^R-[A-Z]{3}-\d+(-\d+)?$"), ["Reactome", "UniProt"]),
-        (re.compile(r"^10\.\d{4,9}/[-._;()/:A-Za-z0-9]+$", re.I), ["CrossRef", "EuropePMC", "OpenAlex"]),
-        (re.compile(r"^(?:PMID:?)?\d{7,9}$", re.I), ["PubMed", "EuropePMC", "OpenAlex"]),
-        (re.compile(r"^EC:\d+\.\d+\.\d+\.\d+$", re.I), ["BRENDA", "ChEMBL", "Rhea", "KEGG", "BindingDB"]),
-        (re.compile(r"^NCT\d{8}$", re.I), ["ClinicalTrials"]),
-        (re.compile(r"^(?:US|EP|WO)\d+[A-Z0-9]*$", re.I), ["PatentsView", "LensPatent"]),
-        (re.compile(r"^rs\d+$", re.I), ["dbSNP", "ClinVar"]),
+        (re.compile(r"^10\.\d{4,9}/[-._;()/:A-Za-z0-9]+$", re.I), ["EuropePMC", "OpenAlex"]),
+        (re.compile(r"^(?:PMID:?)?\d{7,9}$", re.I), ["EuropePMC", "OpenAlex"]),
+        (re.compile(r"^EC:\d+\.\d+\.\d+\.\d+$", re.I), ["BRENDA", "ChEMBL", "KEGG", "BindingDB"]),
+        (re.compile(r"^NCT\d{8}$", re.I), ["PubChem"]),
+        # Patent numbers must be tested before the generic accession pattern:
+        # "US6280349" matches ^[A-Z0-9]{6,10}$ and was previously fanned out as
+        # if it were a chemical accession. The targets are the implemented
+        # connector -- "PatentsView"/"LensPatent" are not registered, so this
+        # route used to resolve to nothing at all.
+        (PATENT_NUMBER_RE, ["Patents", "PubChem"]),
+        (re.compile(r"^[A-Z0-9]{6,10}$", re.I), ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy"]),
+        (re.compile(r"^rs\d+$", re.I), ["NCBI Gene"]),
     ]
 
     @classmethod
@@ -2027,6 +2101,18 @@ class PatentConnector(BaseConnector):
         if q_upper.startswith("EC:") or q_upper.startswith("RHEA:") or q_upper.startswith("REACTOME:"):
             return entities, relations
 
+        # A publication number ("US6280349", "WO2004018667 A1") is a lookup in
+        # its own right. It was previously treated as a compound name, so it
+        # resolved to nothing except a generic search link.
+        if PATENT_NUMBER_RE.match(q_clean):
+            found = await self._search_patent_number(session, q_clean, entities, relations)
+            if found:
+                return entities, relations
+            # No verified record for this publication number. Fall through to
+            # the search link, which is honest: the number may not exist, or the
+            # public endpoint may be rate-limiting us. Either way we do not
+            # present an unrelated patent as the answer.
+
         seen_patents: Set[str] = set()
         names_to_try = [q_clean]
 
@@ -2056,8 +2142,14 @@ class PatentConnector(BaseConnector):
                         for pid in all_pats:
                             pid_clean = pid.strip().upper()
                             if pid_clean and pid_clean not in seen_patents:
-                                seen_patents.add(pid_clean)
-                                self._create_patent_entities(pid_clean, name, entities, relations)
+                                # One unparseable number must not abandon the rest
+                                # of the batch: an exception here used to abort the
+                                # loop and silently truncate the patent results.
+                                try:
+                                    self._create_patent_entities(pid_clean, name, entities, relations)
+                                    seen_patents.add(pid_clean)
+                                except Exception as e:
+                                    logger.debug(f"[{self.NAME}] skipped patent {pid_clean}: {e}")
                     if seen_patents:
                         break
             except Exception:
@@ -2097,6 +2189,118 @@ class PatentConnector(BaseConnector):
 
         return entities, relations
 
+    async def _search_patent_number(self, session: aiohttp.ClientSession, number: str,
+                                    entities: List[Entity], relations: List[Relation]) -> int:
+        """Resolve one publication number to a real patent record.
+
+        Uses the public Google Patents search endpoint, which needs no API key.
+        Returns the number of records added.
+        """
+        norm = re.sub(r"[\s,\-/.]", "", number).upper()
+        want_country = re.match(r"^([A-Z]{2})", norm).group(1) if re.match(r"^([A-Z]{2})", norm) else ""
+        want_digits = re.sub(r"^[A-Z]{2}", "", re.sub(r"[A-Z]\d?$", "", norm))
+        url = f"https://patents.google.com/xhr/query?url=q%3D{quote(norm)}&exp="
+        try:
+            cached, etag, last_mod = self.cache.get(url)
+            payload = None
+            if cached:
+                try:
+                    payload = json.loads(cached)
+                except Exception:
+                    payload = None
+            if payload is None:
+                body = None
+                # Google Patents intermittently answers automated requests with
+                # a 503 bot-check page. One short retry absorbs most of it; when
+                # it still fails the caller emits a search link instead.
+                for attempt in range(2):
+                    await self.rate_limiter.acquire()
+                    async with session.get(
+                        url,
+                        headers={"User-Agent": "Mozilla/5.0 (compatible; SciGraphEnterprise/3.2)"},
+                        timeout=aiohttp.ClientTimeout(total=15),
+                    ) as resp:
+                        if resp.status == 200:
+                            body = await resp.text()
+                            break
+                        if resp.status in (429, 503) and attempt == 0:
+                            logger.info(f"[{self.NAME}] patent lookup rate-limited; retrying once")
+                            await asyncio.sleep(1.5)
+                            continue
+                        logger.info(
+                            f"[{self.NAME}] patent lookup for {number} returned HTTP "
+                            f"{resp.status}; falling back to a search link"
+                        )
+                        return 0
+                if body is None:
+                    return 0
+                self.cache.set(url, body, 604800)
+                payload = json.loads(body)
+        except Exception as e:
+            logger.info(f"[{self.NAME}] patent number lookup failed for {number}: {e}")
+            return 0
+
+        results: List[Dict[str, Any]] = []
+        try:
+            for cluster in (payload.get("results") or {}).get("cluster") or []:
+                for item in cluster.get("result") or []:
+                    if item.get("patent"):
+                        results.append(item["patent"])
+        except Exception:
+            results = []
+
+        added = 0
+        seen: Set[str] = set()
+        for rec in results[:10]:
+            pub = str(rec.get("publication_number") or "").upper()
+            # Google Patents answers with fuzzy and family matches, so a record
+            # is only accepted when it is the patent that was actually asked
+            # for. Otherwise the caller falls back to an honest search link
+            # rather than being handed an unrelated patent.
+            cand_digits = re.sub(r"^[A-Z]{2}", "", re.sub(r"[A-Z]\d?$", "", pub))
+            if not pub or not want_digits or cand_digits != want_digits:
+                continue
+            if want_country and not pub.startswith(want_country):
+                continue
+            if pub in seen:
+                continue
+            seen.add(pub)
+            title = (rec.get("title") or "").strip()
+            assignee = (rec.get("assignee") or "").strip()
+            filing = (rec.get("filing_date") or "").strip()
+            year = ""
+            m = re.search(r"(\d{4})", filing)
+            if m:
+                year = m.group(1)
+            patent_url = f"https://patents.google.com/patent/{pub}"
+            pat_ent = Entity(
+                uid=f"PATENT:{pub}",
+                entity_type=EntityType.PATENT,
+                preferred_name=title or f"Patent {pub}",
+                canonical_id=pub,
+                evidence=[Evidence(
+                    database=self.NAME,
+                    patent_number=pub,
+                    source_url=patent_url,
+                    evidence_type="Google Patents record",
+                )],
+                attributes={
+                    "title": title,
+                    "assignee": assignee,
+                    "publication_year": year,
+                    "filing_date": filing,
+                    "priority_date": (rec.get("priority_date") or "").strip(),
+                    "jurisdiction": pub[:2],
+                    "queried_compound": number,
+                    "source": "Google Patents",
+                    "google_patents_url": patent_url,
+                },
+            )
+            pat_ent.add_cross_ref("GOOGLE_PATENTS", pub, url=patent_url)
+            entities.append(pat_ent)
+            added += 1
+        return added
+
     def _create_patent_entities(self, pid_clean: str, compound_name: str,
                                 entities: List[Entity], relations: List[Relation]) -> None:
         """Create patent entity and PATENTED_IN relation for a single patent ID."""
@@ -2131,6 +2335,10 @@ class PatentConnector(BaseConnector):
             preferred_name=compound_name.title(),
             canonical_id=compound_name.upper()
         )
+        # The relation below points at this compound, so the node has to exist;
+        # otherwise the export carries an edge whose end is missing.
+        if not any(e.uid == comp_uid for e in entities):
+            entities.append(comp_ent)
         rel = Relation(
             source_uid=comp_uid,
             target_uid=pat_ent.uid,
@@ -2331,9 +2539,11 @@ class BindingDBConnector(BaseConnector):
                     prop_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/CanonicalSMILES/JSON"
                     prop_data = await self._safe_get(session, prop_url)
                     if prop_data and "PropertyTable" in prop_data and "Properties" in prop_data["PropertyTable"]:
-                        smiles = prop_data["PropertyTable"]["Properties"][0].get("CanonicalSMILES", "")
+                        properties = prop_data["PropertyTable"]["Properties"]
+                        props_row = properties[0] if isinstance(properties, list) and properties else {}
+                        smiles = _pubchem_smiles(props_row)
                         if smiles:
-                            bdb_url = f"https://www.bindingdb.org/rest/getTargetByCompound?smiles={urllib.parse.quote(smiles)}&cutoff=1.0&response=application/json"
+                            bdb_url = f"https://www.bindingdb.org/rest/getTargetByCompound?smiles={quote(smiles)}&cutoff=1.0&response=application/json"
                             bdb_data = await self._safe_get(session, bdb_url)
                             if bdb_data and isinstance(bdb_data, dict):
                                 bdb_resp = bdb_data.get("getLindsByUniprotResponse", {})
@@ -2694,7 +2904,7 @@ class GeneOntologyConnector(BaseConnector):
     async def search(self, session: aiohttp.ClientSession, query: str, query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
         if query_type == "ligand":
             pass  # Placeholder
-        url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/find?query={quote(query)}&limit=3"
+        url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/search?query={quote(query)}&limit=3"
         data = await self._safe_get(session, url)
         entities, relations = [], []
         if data and "results" in data:
@@ -2740,7 +2950,7 @@ class PubChemConnector(BaseConnector):
         elif is_smiles:
             # SMILES search - use POST for proper encoding
             try:
-                post_data = f"smiles={urllib.parse.quote(q_clean)}"
+                post_data = f"smiles={quote(q_clean)}"
                 async with session.post(
                     "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/property/CanonicalSMILES,InChIKey,IUPACName,MolecularWeight,MolecularFormula/JSON",
                     data=post_data,
@@ -2781,7 +2991,7 @@ class PubChemConnector(BaseConnector):
                 cid = str(p.get("CID"))
                 inchikey = p.get("InChIKey")
                 name = p.get("IUPACName", p.get("Title", q_clean))
-                smiles = p.get("CanonicalSMILES", p.get("IsomericSMILES", ""))
+                smiles = _pubchem_smiles(p)
                 
                 ent = Entity(
                     uid=f"COMPOUND:{inchikey or cid}",
@@ -3007,7 +3217,7 @@ class BRENDAConnector(BaseConnector):
         ec_match = re.match(r"^EC:(\d+\.\d+\.\d+\.\d+)$", q_clean, re.I)
         if ec_match:
             ec_number = ec_match.group(1)
-            url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/find?query={quote(ec_number)}"
+            url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/search?query={quote(ec_number)}"
             data = await self._safe_get(session, url)
             if data and "results" in data:
                 for item in data["results"][:3]:
@@ -3025,7 +3235,7 @@ class BRENDAConnector(BaseConnector):
             return entities, relations
 
         # Strategy 2: Keyword search via QuickGO with enzyme filtering
-        url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/find?query={quote(q_clean)}"
+        url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/search?query={quote(q_clean)}"
         data = await self._safe_get(session, url)
         if data and "results" in data:
             for item in data["results"][:5]:
@@ -3101,11 +3311,14 @@ class KEGGConnector(BaseConnector):
         is_pathway = bool(re.match(r"^(map|hsa|eco|mmu)\d{5}$", q_clean, re.I))
 
         if is_kegg_compound or is_kegg_reaction:
-            url = f"{base}/get/{q_clean}/json"
-            data = await self._safe_get(session, url)
-            if data:
-                name = str(data.get("name", q_clean)).split(";")[0].strip()
-                formula = data.get("formula", "")
+            # KEGG REST serves flat text for /get (there is no JSON flavour:
+            # appending /json returns HTTP 400 with an empty body), so the entry
+            # is parsed from its key/value lines.
+            txt = await self._raw_get(session, f"{base}/get/{q_clean}")
+            fields = self._parse_kegg_entry(txt)
+            if fields:
+                name = str(fields.get("NAME", q_clean)).split(";")[0].strip()
+                formula = fields.get("FORMULA", "")
                 ent = Entity(
                     uid=f"COMPOUND:KEGG:{q_clean}" if is_kegg_compound else f"REACTION:KEGG:{q_clean}",
                     entity_type=EntityType.COMPOUND if is_kegg_compound else EntityType.REACTION,
@@ -3117,21 +3330,22 @@ class KEGGConnector(BaseConnector):
                 ent.add_cross_ref(DatabaseSource.KEGG, q_clean)
                 entities.append(ent)
         elif is_pathway:
-            url = f"{base}/find/pathway/{q_clean}/"
-            txt = await self._raw_get(session, url)
-            if txt:
-                for line in txt.strip().split("\n")[:3]:
-                    parts = line.split("\t")
-                    if len(parts) >= 2:
-                        ent = Entity(
-                            uid=f"PATHWAY:KEGG:{parts[0].strip()}",
-                            entity_type=EntityType.PATHWAY,
-                            preferred_name=parts[1].strip(),
-                            canonical_id=parts[0].strip(),
-                            evidence=[Evidence(database=self.NAME, source_url=f"https://www.kegg.jp/entry/{parts[0].strip()}")]
-                        )
-                        ent.add_cross_ref(DatabaseSource.KEGG, parts[0].strip())
-                        entities.append(ent)
+            # A pathway id resolves through /get; find/pathway only matches
+            # free-text keywords, so using it here always came back empty.
+            txt = await self._raw_get(session, f"{base}/get/{q_clean}")
+            fields = self._parse_kegg_entry(txt)
+            if fields and fields.get("ENTRY"):
+                entry_id = fields["ENTRY"]
+                ent = Entity(
+                    uid=f"PATHWAY:KEGG:{entry_id}",
+                    entity_type=EntityType.PATHWAY,
+                    preferred_name=str(fields.get("NAME", entry_id)).strip(),
+                    canonical_id=entry_id,
+                    evidence=[Evidence(database=self.NAME, source_url=f"https://www.kegg.jp/entry/{entry_id}")],
+                    attributes={"description": fields.get("DESCRIPTION", "")[:500]},
+                )
+                ent.add_cross_ref(DatabaseSource.KEGG, entry_id)
+                entities.append(ent)
         else:
             # Keyword compound search
             txt = await self._raw_get(session, f"{base}/find/compound/{quote(q_clean)}/")
@@ -3152,7 +3366,70 @@ class KEGGConnector(BaseConnector):
                             )
                             ent.add_cross_ref(DatabaseSource.KEGG, cpd_id)
                             entities.append(ent)
+
+            # find/genes/<term> resolves protein symbols (EGFR -> hsa:1956) and
+            # full protein names; find/compound matches neither, so without this
+            # KEGG returned nothing for every protein or gene query.
+            gene_txt = await self._raw_get(session, f"{base}/find/genes/{quote(q_clean)}/")
+            if gene_txt:
+                q_lower = q_clean.lower()
+                for line in gene_txt.strip().split("\n")[:5]:
+                    parts = line.split("\t")
+                    if len(parts) < 2:
+                        continue
+                    gene_id = parts[0].strip()
+                    if ":" not in gene_id:
+                        continue
+                    org, num = gene_id.split(":", 1)
+                    if not re.match(r"^\d+$", num):
+                        continue
+                    desc = parts[1].strip()
+                    symbols = [s.strip() for s in desc.split(";")[0].split(",")]
+                    # KEGG ranks VEGFR/KDR above EGFR for "EGFR"; keep only exact
+                    # symbol matches so a shared fragment cannot pull in noise.
+                    exact = [s for s in symbols if s.lower() == q_lower]
+                    if not exact:
+                        continue
+                    detail = await self._raw_get(session, f"{base}/get/{gene_id}")
+                    fields = self._parse_kegg_entry(detail) if detail else {}
+                    long_name = ""
+                    if fields.get("NAME"):
+                        long_name = re.sub(r"\(RefSeq\)\s*", "", str(fields["NAME"])).strip()
+                    ent = Entity(
+                        uid=f"GENE:KEGG:{gene_id}",
+                        entity_type=EntityType.GENE,
+                        preferred_name=exact[0],
+                        canonical_id=gene_id,
+                        evidence=[Evidence(database=self.NAME, source_url=f"https://www.kegg.jp/entry/{gene_id}")],
+                        attributes={"organism": org, "description": long_name or desc[:300]},
+                    )
+                    ent.add_cross_ref(DatabaseSource.KEGG, gene_id)
+                    entities.append(ent)
         return entities, relations
+
+    @staticmethod
+    def _parse_kegg_entry(txt: Optional[str]) -> Dict[str, str]:
+        """Parse a KEGG flat-file entry into {FIELD: value}.
+
+        KEGG's format is fixed-width: the field name occupies columns 0-11 and
+        wrapped continuations start at column 12, so the key is taken from the
+        first 12 columns rather than guessed from spacing (the separator is
+        not consistent -- ENTRY/NAME pad to column 12, DESCRIPTION does not).
+        """
+        if not txt:
+            return {}
+        fields: Dict[str, str] = {}
+        key: Optional[str] = None
+        for line in txt.splitlines():
+            if not line.strip():
+                continue
+            head = line[:12].strip()
+            if head and head.isupper():
+                key = head
+                fields.setdefault(key, line[12:].strip())
+            elif key:
+                fields[key] = f"{fields.get(key, '')} {line.strip()}".strip()
+        return fields
 
     async def _raw_get(self, session, url):
         cached, etag, last_mod = self.cache.get(url)
@@ -3326,6 +3603,61 @@ class ReactomeConnector(BaseConnector):
                     )
                     ent2.add_cross_ref(DatabaseSource.REACTOME, st_id)
                     entities.append(ent2)
+
+            if entities:
+                return entities, relations
+
+            # pathways/low/entity and data/query both 404 on a protein symbol such
+            # as "EGFR" (they index pathway names, not participants). The search
+            # endpoint does match, so fall back to it and, for a protein hit, pull
+            # the pathways it participates in via mapping.
+            search = await self._safe_get(session, f"{base.replace('/data', '/search')}/query?query={quote(q_clean)}&cluster=true")
+            entries: List[Dict[str, Any]] = []
+            for group in ((search or {}).get("results") or [])[:2]:
+                entries.extend(group.get("entries") or [])
+            for item in entries[:5]:
+                st_id = item.get("stId", "")
+                if not st_id or any(e.canonical_id == st_id for e in entities):
+                    continue
+                name = re.sub(r"<[^>]+>", "", str(item.get("name") or q_clean)).strip()
+                etype_str = str(item.get("exactType") or item.get("type") or "")
+                # Participants report exactType "ReferenceGeneProduct", which does
+                # not contain the substring "Protein".
+                if any(k in etype_str for k in ("Protein", "GeneProduct", "Interactor")):
+                    etype = EntityType.PROTEIN
+                elif "Reaction" in etype_str:
+                    etype = EntityType.REACTION
+                else:
+                    etype = EntityType.PATHWAY
+                ent = Entity(
+                    uid=f"{etype.name}:REACTOME:{st_id}",
+                    entity_type=etype,
+                    preferred_name=name,
+                    canonical_id=st_id,
+                    evidence=[Evidence(database=self.NAME, source_url=f"https://reactome.org/content/detail/{st_id}")],
+                    attributes={"schema_class": etype_str},
+                )
+                ent.add_cross_ref(DatabaseSource.REACTOME, st_id)
+                entities.append(ent)
+                if etype == EntityType.PROTEIN and len(entities) == 1:
+                    pathways = await self._safe_get(
+                        session, f"{base}/mapping/UniProt/{quote(q_clean)}/pathways?species=9606"
+                    )
+                    for p in (pathways or [])[:5]:
+                        p_st_id = p.get("stId", "")
+                        p_name = str(p.get("displayName", p_st_id)).strip()
+                        if not p_st_id or any(e.canonical_id == p_st_id for e in entities):
+                            continue
+                        pw = Entity(
+                            uid=f"PATHWAY:REACTOME:{p_st_id}",
+                            entity_type=EntityType.PATHWAY,
+                            preferred_name=p_name,
+                            canonical_id=p_st_id,
+                            evidence=[Evidence(database=self.NAME, source_url=f"https://reactome.org/content/detail/{p_st_id}")],
+                            attributes={"schema_class": str(p.get("className", "Pathway")), "is_in_disease": p.get("isInDisease", False)},
+                        )
+                        pw.add_cross_ref(DatabaseSource.REACTOME, p_st_id)
+                        entities.append(pw)
         return entities, relations
 
 

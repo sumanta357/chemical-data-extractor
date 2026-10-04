@@ -1,0 +1,324 @@
+{
+  "generated_at": "2026-10-04T08:03:31Z",
+  "implemented_total": 18,
+  "counts": {
+    "working": 17,
+    "partial": 0,
+    "unavailable": 1,
+    "unverified": 0
+  },
+  "groups": [
+    {
+      "name": "Compounds",
+      "description": "Compound identifiers, structures and chemistry."
+    },
+    {
+      "name": "Bioactivity",
+      "description": "Measured binding, inhibition and potency values."
+    },
+    {
+      "name": "Proteins",
+      "description": "Protein records, accessions and functional associations."
+    },
+    {
+      "name": "Structures",
+      "description": "Experimental 3D structures and their ligands."
+    },
+    {
+      "name": "Pathways",
+      "description": "Enzymes, reactions and biological pathways."
+    },
+    {
+      "name": "Function",
+      "description": "Ontology terms and functional annotations."
+    },
+    {
+      "name": "Genes",
+      "description": "Gene-level records."
+    },
+    {
+      "name": "Organisms",
+      "description": "Taxonomy."
+    },
+    {
+      "name": "Literature",
+      "description": "Publications and citation evidence."
+    },
+    {
+      "name": "Patents",
+      "description": "Patent records and patent landscape."
+    }
+  ],
+  "sources": [
+    {
+      "name": "BindingDB",
+      "status": "working",
+      "covers": "Measured ligand-target affinities",
+      "group": "Bioactivity",
+      "note": "Returns curated affinities for protein accessions and, via a name-to-structure lookup, for compound names. Coverage varies by compound: some simply have no curated affinity within the cutoff.",
+      "plain_query": {
+        "EGFR": {
+          "entities": 0,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": false
+    },
+    {
+      "name": "ChEMBL",
+      "status": "working",
+      "covers": "Bioactivities, targets, potency (pChEMBL)",
+      "group": "Bioactivity",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 9,
+          "relations": 2,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "Guide to Pharmacology",
+      "status": "unavailable",
+      "covers": "Curated targets, ligands and pharmacology",
+      "group": "Bioactivity",
+      "note": "Temporarily unavailable: this source now requires an API key, which is not configured on this deployment.",
+      "plain_query": {
+        "EGFR": {
+          "entities": 0,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": false
+    },
+    {
+      "name": "PDBbind",
+      "status": "working",
+      "covers": "Measured binding affinities for PDB entries",
+      "group": "Bioactivity",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 1,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "ChEBI",
+      "status": "working",
+      "covers": "Chemical ontology and roles",
+      "group": "Compounds",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 5,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "PubChem",
+      "status": "working",
+      "covers": "Compounds, identifiers, structures",
+      "group": "Compounds",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 0,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": false
+    },
+    {
+      "name": "GeneOntology",
+      "status": "working",
+      "covers": "Gene Ontology terms and annotations",
+      "group": "Function",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 3,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "NCBI Gene",
+      "status": "working",
+      "covers": "Gene records",
+      "group": "Genes",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 3,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "EuropePMC",
+      "status": "working",
+      "covers": "Publications and citations",
+      "group": "Literature",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 4,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "OpenAlex",
+      "status": "working",
+      "covers": "Scholarly works, authors, citations",
+      "group": "Literature",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 3,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "NCBI Taxonomy",
+      "status": "working",
+      "covers": "Organism taxonomy",
+      "group": "Organisms",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 0,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": false
+    },
+    {
+      "name": "Patents",
+      "status": "working",
+      "covers": "Patent records for compounds, and publication numbers",
+      "group": "Patents",
+      "note": "Patent coverage comes from PubChem's compound cross-references, so it is strongest for well-known compounds. Searching a bare publication number depends on a public endpoint that rate-limits under load; when that happens you get a direct patent search link instead of a record.",
+      "plain_query": {
+        "EGFR": {
+          "entities": 1,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "BRENDA",
+      "status": "working",
+      "covers": "Enzyme kinetics and inhibitors",
+      "group": "Pathways",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 2,
+          "relations": 2,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "KEGG",
+      "status": "working",
+      "covers": "Compounds, reactions and pathways",
+      "group": "Pathways",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 1,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "Reactome",
+      "status": "working",
+      "covers": "Pathways, reactions and participants",
+      "group": "Pathways",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 10,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "STRING",
+      "status": "working",
+      "covers": "Protein-protein functional associations",
+      "group": "Proteins",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 52,
+          "relations": 26,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "UniProt",
+      "status": "working",
+      "covers": "Protein records, accessions, sequences, structures",
+      "group": "Proteins",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 3,
+          "relations": 0,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "PDBe-KB",
+      "status": "working",
+      "covers": "Experimental structures and ligand data",
+      "group": "Structures",
+      "note": "",
+      "plain_query": {
+        "EGFR": {
+          "entities": 20,
+          "relations": 20,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    }
+  ]
+}

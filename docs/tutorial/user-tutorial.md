@@ -1,7 +1,7 @@
 Chemical Data Extractor turns a single protein name or compound name into a
-multi-hop knowledge graph. It queries 19 scientific databases, resolves the
-results into entities and relationships, and exports the whole graph as an
-Excel workbook, CSV, GraphML, Cypher, RDF, Parquet and more.
+multi-hop knowledge graph. It queries a set of public scientific databases,
+resolves the results into entities and relationships, and exports the whole
+graph as an Excel workbook, CSV, GraphML, Cypher, RDF, Parquet and more.
 
 This guide takes you from your first search to advanced, repeatable workflows.
 No programming is required for anything in Part A to Part D.
@@ -22,8 +22,7 @@ No programming is required for anything in Part A to Part D.
 | 8. Plans and payment | Buying a plan, academic verification | Anyone who outgrows the free tier |
 | 9. Interface | Light and dark mode, keyboard use, mobile | Everyone |
 | 10. Troubleshooting | Every error message explained | Everyone |
-| 11. Advanced: batch and CLI | Running many queries unattended | Advanced / lab use |
-| 12. Reference | Data sources, glossary, file index | Reference |
+| 11. Reference | Data sources, glossary, where results come from | Reference |
 
 ---
 
@@ -296,7 +295,7 @@ a search regenerates the files.
 - **Statistics, pandas, R, or a database import** → `nodes.csv` and
   `edges.csv`.
 - **Visualising the network** → `graph.graphml`, opened in Gephi or Cytoscape.
-- **Your own graph database** → `neo4j_import.cypher`, run with `cypher-shell`.
+- **Your own graph database** → `neo4j_import.cypher`, which loads straight into Neo4j.
 - **Linked data and RDF work** → `graph.ttl`.
 - **Very large graphs** → the Parquet files.
 
@@ -426,66 +425,73 @@ failure. A 4-hop search legitimately runs for many minutes, and a status of
 
 ---
 
-# Part 11 — Advanced: batch and command line
+# Part 11 — Reference
 
-Everything above runs in the browser. If you want to run many queries
-unattended — a ligand screen, a target panel, a reproducibility batch — use the
-command line with the same engine.
+## 11.1 Data sources
 
-## 11.1 One query
+The search draws on 18 implemented data sources covering compounds, bioactivity,
+proteins, structures, pathways, genes, taxonomy, literature and patents. Every
+one is checked against its live API, and the interface lists their current
+status so you can see exactly what is available.
 
-```bash
-python api/scigraph.py "Aspirin" --hops 2
-```
-
-Useful flags:
-
-| Flag | Meaning |
+| Area | Sources |
 | --- | --- |
-| `--hops 1..4` | Expansion depth |
-| `--query-type auto\|protein\|ligand` | Override type detection |
-| `--export-dir DIR` | Where to write the exports |
-| `--no-enrich` | Skip structure images and the enriched workbook |
-| `--build-library` | Resolve the query and write a search library without searching |
+| Compounds | PubChem, ChEBI |
+| Bioactivity | ChEMBL, PDBbind, BindingDB |
+| Proteins | UniProt, STRING |
+| Structures | PDBe-KB |
+| Pathways | KEGG, Reactome, BRENDA, Gene Ontology |
+| Genes and organisms | NCBI Gene, NCBI Taxonomy |
+| Literature | Europe PMC, OpenAlex |
+| Patents | PubChem patent cross-references and public patent records |
 
-## 11.2 Many queries
+Two things worth knowing, both shown in the interface rather than hidden:
 
-Put one query per line in a text file. Blank lines and lines starting with `#`
-are ignored.
+- **Guide to Pharmacology** is unavailable on this deployment: the service now
+  requires an API key that is not configured here.
+- **BindingDB** holds *curated* affinities only. It answers protein accessions
+  and compound names, but a compound with no curated measurement within the
+  cutoff — some drug-like molecules simply have none — returns nothing. An empty
+  BindingDB result means "nothing curated", not "nothing exists".
 
-```bash
-python api/scigraph.py --batch ./batch_queries.txt --export-dir ./exports
-```
+Four of the sources answer only the identifier format they are authoritative
+for — a PubChem CID, a BindingDB ligand or target ID, an NCBI taxon name, or a
+Guide to Pharmacology ID. If you search a protein name and PubChem returns
+nothing, that is expected: PubChem indexes chemicals, not proteins.
 
-![A batch queries file](fig:batch)
+### Patents
 
-A ready-to-edit template is available from the **Resources** page of the
-application.
+Patent records are reached through the compound cross-references held by
+PubChem, so coverage is strongest for well-known compounds — a search for
+*Aspirin* returns a large patent set, while an obscure compound may return
+none.
 
-> Note: every query in a batch writes to the same export directory, so run a
-> batch when you want one combined result set. To keep individual graphs
-> separate, run the queries one at a time with different `--export-dir` values.
+You can also search a publication number directly (`US6280349`,
+`WO2004018667 A1`). The engine resolves the number to its title, assignee and
+filing year. That lookup depends on a public search endpoint which sometimes
+rate-limits; when it does, you get a direct patent search link for the number
+instead of a record, rather than an unrelated patent.
 
----
+Patents appear in the graph as their own node type, linked to the compound they
+cover, and in a dedicated **Patents** sheet in the workbook.
 
-# Part 12 — Reference
+## 11.2 Where results come from
 
-## 12.1 Data sources
+A search builds its graph in six stages: expansion across the connected
+databases, entity resolution, deduplication, enrichment (filling in missing
+identifiers and properties), ranking by evidence, and export. The engine log
+shows each stage as it happens, and every node and relationship in the exports
+carries the database it came from, so any value can be traced back to its
+source.
 
-The engine ships 19 connector families covering chemistry, structural biology,
-pathways and the literature. Representative sources include:
-
-- **Compounds and drugs** — PubChem, ChEMBL, ChEBI, DrugBank, BindingDB, Guide
-  to Pharmacology.
-- **Proteins and structures** — UniProt, PDB and PDBe, PDBe-KB, SIFTS,
-  InterPro, Pfam.
+- **Compounds and drugs** — PubChem, ChEBI, ChEMBL.
+- **Proteins and structures** — UniProt, PDBe-KB, STRING.
 - **Pathways and function** — KEGG, Reactome, BRENDA, Gene Ontology.
-- **Genomics** — NCBI Gene, Ensembl, RefSeq.
-- **Interactions** — STRING.
-- **Literature, patents and taxonomy** — Europe PMC, OpenAlex, the patent
-  corpus, NCBI Taxonomy.
+- **Genes and organisms** — NCBI Gene, NCBI Taxonomy.
+- **Literature and patents** — Europe PMC, OpenAlex, and patent records reached
+  through PubChem's compound cross-references.
 
-## 12.2 Glossary
+## 11.3 Glossary
 
 | Term | Meaning |
 | --- | --- |
@@ -494,18 +500,18 @@ pathways and the literature. Representative sources include:
 | Hop | One relationship step from the query |
 | pChEMBL | Negative log of potency in molar units; higher is stronger |
 | Enrichment | Filling in missing identifiers and properties after extraction |
-| Export directory | The server-side folder holding a run's files |
+| Export files | The files a finished search produces |
 | Search id | The identifier assigned to a run, shown in the results header |
 | Knowledge graph | The assembled set of nodes and their edges |
 
-## 12.3 Where to get help
+## 11.4 Where to get help
 
 - The **Resources** page of the application lists this tutorial, the quick
-  reference, the export-format reference and the batch template.
+  reference and the export-format reference.
 - The engine log of a failed run contains the most specific error available;
   quote the search id when reporting a problem.
 
 ---
 
-*Chemical Data Extractor v3.2 · 19 database connectors · multi-hop graph
-traversal · enrichment pipeline*
+*Chemical Data Extractor v3.2 · multi-hop graph traversal · 18 verified data
+sources · enrichment pipeline*

@@ -33,11 +33,11 @@
 | File | Open it in |
 | --- | --- |
 | `*_Knowledge_Graph.xlsx` | Excel or LibreOffice |
-| `nodes.csv`, `edges.csv` | Excel, pandas, R, a database importer |
+| `nodes.csv`, `edges.csv` | Excel, any data-analysis tool, a database importer |
 | `graph.graphml` | Gephi, Cytoscape, yEd |
-| `neo4j_import.cypher` | Neo4j (`cypher-shell`) |
+| `neo4j_import.cypher` | Neo4j |
 | `graph.ttl` | Any RDF store (Blazegraph, Jena) |
-| `nodes.parquet`, `edges.parquet` | pandas, DuckDB, Spark |
+| `nodes.parquet`, `edges.parquet` | Columnar tools (DuckDB, Spark, R, Python) |
 | `structure_images/` | Any image viewer |
 
 ## Two limits to remember
@@ -56,14 +56,10 @@
 | Professional | 1,999 | 300 | 1,500 |
 | Team | 7,499 | 3,000 | 10,000 |
 
-## Command line
+## Searching patents
 
-```bash
-python api/scigraph.py "Aspirin" --hops 2
-python api/scigraph.py --batch ./batch_queries.txt --export-dir ./exports
-```
-
-Batch files hold one query per line; `#` starts a comment.
+Search a compound name to get the patents covering it, or a publication number
+(`US6280349`, `WO2004018667 A1`) to resolve that patent directly.
 
 ## When something goes wrong
 
@@ -74,5 +70,7 @@ Batch files hold one query per line; `#` starts a comment.
 | Almost no results | Use the full name or a database identifier. |
 | Amber lines in the log | A database timed out and was skipped; harmless. |
 | Payment not reflected | Do not pay twice. Reload the page. |
+| No patents for a compound | Coverage is strongest for well-known compounds; try the full name. |
+| A patent number returns a search link | The public patent endpoint was rate-limited. Retry shortly. |
 
 Full explanations: see the **User Tutorial**.

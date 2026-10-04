@@ -7,16 +7,11 @@ import ResultsView from '@/components/ResultsView';
 import HistoryPanel from '@/components/HistoryPanel';
 import AIAssistant from '@/components/AIAssistant';
 import AccountPanel from '@/components/AccountPanel';
+import DataSourcePanel from '@/components/DataSourcePanel';
 import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import { HistoryIcon, SearchIcon } from '@/components/icons';
 import { getMe, authHeaders, type Entitlement } from '@/lib/billing';
 import type { SearchState } from '@/lib/types';
-
-const SOURCES = [
-  { title: 'Proteins', detail: 'UniProt, PDB, AlphaFold' },
-  { title: 'Compounds', detail: 'PubChem, ChEMBL, ChEBI' },
-  { title: 'Pathways', detail: 'KEGG, Reactome, Gene Ontology' },
-];
 
 export default function HomePage() {
   const [search, setSearch] = useState<SearchState | null>(null);
@@ -241,14 +236,11 @@ export default function HomePage() {
             Build a multi-hop knowledge graph from any protein or compound
           </h1>
           <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-            Chemical Data Extractor traverses 19 public chemistry, proteomics and
+            Chemical Data Extractor traverses public chemistry, proteomics and
             pathway databases from a single query, then exports the assembled
             graph as a workbook, CSV, GraphML, Cypher and more.
           </p>
           <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
-            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
-              19 databases
-            </span>
             <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
               Up to 4 hops
             </span>
@@ -288,18 +280,7 @@ export default function HomePage() {
                     streams its progress here, then lists the files you can
                     download.
                   </p>
-                  <dl className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
-                    {SOURCES.map((source) => (
-                      <div key={source.title} className="bg-surface px-4 py-3">
-                        <dt className="text-xs font-semibold text-fg">
-                          {source.title}
-                        </dt>
-                        <dd className="mt-0.5 text-xs text-fg-subtle">
-                          {source.detail}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
+                  <DataSourcePanel />
                   <p className="mt-5 text-xs text-fg-subtle">
                     One search runs at a time on the current plan. If another is
                     already running, yours is queued and starts automatically.

@@ -37,7 +37,7 @@ const RESOURCES: Resource[] = [
       'troubleshooting table for every message the app can show, and batch or command-line use.',
     when:
       'Read it once when you start, then keep it as the reference for anything the interface does ' +
-      'not explain in place.',
+      'not explain in place. Includes the list of connected data sources and their current limits.',
     primary: true,
   },
   {
@@ -66,19 +66,7 @@ const RESOURCES: Resource[] = [
       'Download it before you write the analysis or import script — it tells you which columns to ' +
       'join on and which reader to use, so you do not have to guess at the file layout.',
   },
-  {
-    file: '/downloads/batch-queries-template.txt',
-    title: 'Batch Queries Template',
-    kind: 'TXT',
-    meta: 'Plain text · ready to edit',
-    contains:
-      'A commented starter file for unattended runs, with example compound and protein queries ' +
-      'and the exact command that reads it.',
-    when:
-      'Use it when you need many searches in one go — a ligand screen, a target panel, or a ' +
-      'reproducible batch — from a machine with the engine installed.',
-  },
-];
+  ];
 
 const FAQ = [
   {

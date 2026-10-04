@@ -71,14 +71,9 @@ Use this file whenever the shape of the network is the result you need.
 
 ## 5. `neo4j_import.cypher` — for Neo4j
 
-A script of `CREATE` statements that rebuilds the graph in Neo4j.
-
-```bash
-cypher-shell -u neo4j -p <password> < neo4j_import.cypher
-```
-
-Run it against an empty database. Re-running it duplicates every node, so clear
-the database first or use a labelled import.
+A script of `CREATE` statements that rebuilds the graph in Neo4j. Load it into
+an empty database from the Neo4j interface or browser. Re-running it duplicates
+every node, so clear the database first or use a labelled import.
 
 ---
 
@@ -88,22 +83,15 @@ Turtle syntax: triples of subject, predicate and object.
 
 - **Blazegraph** — load into a named graph.
 - **Jena / Fuseki** — import into a model.
-- **rdflib (Python)** — `g = rdflib.Graph().parse("graph.ttl")`
+- **Python** — open directly with any RDF library.
 
 ---
 
 ## 7. `nodes.parquet` and `edges.parquet` — large graphs
 
 Columnar versions of the two CSV tables. They are much smaller and faster to
-query than CSV once a run produces tens of thousands of rows.
-
-```python
-import pandas as pd
-nodes = pd.read_parquet("nodes.parquet")
-edges = pd.read_parquet("edges.parquet")
-```
-
-DuckDB, Spark and Arrow all read Parquet natively.
+query than CSV once a run produces tens of thousands of rows, and they open
+directly in DuckDB, Spark, R and Python-based tools.
 
 ---
 
@@ -137,7 +125,7 @@ file list can be shorter than this reference.
 | If you want to… | Download |
 | --- | --- |
 | Look at the data in a spreadsheet | `*_Knowledge_Graph.xlsx` |
-| Analyse in pandas or R | `nodes.csv`, `edges.csv` |
+| Analyse the tables yourself | `nodes.csv`, `edges.csv` |
 | Draw the network | `graph.graphml` |
 | Load a graph database | `neo4j_import.cypher` |
 | Work with linked data | `graph.ttl` |

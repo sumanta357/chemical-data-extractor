@@ -117,7 +117,15 @@ def _pubchem_cid_properties(cid: int) -> Optional[dict]:
             data = json.loads(resp.read())
             if "PropertyTable" in data and "Properties" in data["PropertyTable"]:
                 props = data["PropertyTable"]["Properties"][0]
-                smiles = props.get("CanonicalSMILES") or props.get("IsomericSMILES") or ""
+                # PubChem renamed CanonicalSMILES to ConnectivitySMILES. A request for the
+                # old name is still accepted, but the response comes back under
+                # the new key, so reading only the old name yields nothing.
+                smiles = (
+                    props.get("ConnectivitySMILES")
+                    or props.get("CanonicalSMILES")
+                    or props.get("IsomericSMILES")
+                    or ""
+                )
                 result = {
                     "smiles": smiles,
                     "formula": props.get("MolecularFormula", ""),
