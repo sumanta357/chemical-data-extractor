@@ -151,3 +151,68 @@ export function EllipsisIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/**
+ * Brand mark: a navy hexagonal cell holding an extraction arrow, with a green
+ * circuit trace climbing out of it for the multi-hop growth the product does.
+ *
+ * Drawn inline rather than loaded as a bitmap so it stays crisp at any size,
+ * costs no request, and recolours with the theme through --logo-ink and
+ * --logo-accent. Swap in the supplied brand artwork when it is available and
+ * this becomes a wrapper around an <img>.
+ */
+export function LogoMark({ className = 'h-8 w-8' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      className={className}
+      fill="none"
+      aria-hidden
+      focusable="false"
+    >
+      {/* Outer cell: the hexagon, drawn as one closed path with rounded joins
+          so the corners read soft at 20px as well as at 64px. */}
+      <path
+        d="M32 3.5 58.5 18v28L32 60.5 5.5 46V18Z"
+        stroke="rgb(var(--logo-ink))"
+        strokeWidth={5}
+        strokeLinejoin="round"
+      />
+      {/* Inner offset cell, cut away on the lower left where the arrow exits. */}
+      <path
+        d="M40 13.5 55.5 22.5v18L40 49.5"
+        stroke="rgb(var(--logo-ink))"
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Extraction arrow, pointing down and out of the cell. */}
+      <path
+        d="M36 27 21 39"
+        stroke="rgb(var(--logo-ink))"
+        strokeWidth={6}
+        strokeLinecap="round"
+      />
+      <path d="M13 45 30 41.5 22.5 29Z" fill="rgb(var(--logo-ink))" />
+      {/* Circuit trace climbing out of the cell to the upper right. */}
+      <path
+        d="M34 44.5 50 29"
+        stroke="rgb(var(--logo-accent))"
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M42.5 26.5 53.5 25 51.5 36"
+        stroke="rgb(var(--logo-accent))"
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Solder pads. */}
+      <rect x="30" y="20" width="7" height="7" rx="1.5" fill="rgb(var(--logo-accent))" />
+      <rect x="43" y="39" width="7" height="7" rx="1.5" fill="rgb(var(--logo-accent))" />
+      <rect x="49" y="13" width="6" height="6" rx="1.5" fill="rgb(var(--logo-accent))" />
+    </svg>
+  );
+}

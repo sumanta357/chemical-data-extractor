@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import ThemeToggle from '@/components/ThemeToggle';
-import { BookIcon } from '@/components/icons';
+import { BookIcon, LogoMark } from '@/components/icons';
 
 type PageId = 'app' | 'resources';
 
@@ -17,25 +17,14 @@ interface HeaderProps {
 }
 
 /**
- * Wordmark glyph: a three-node graph, which is what the product actually
- * produces. Drawn inline so there is no image request and it stays crisp.
+ * Wordmark glyph: the brand mark from the supplied logo, with the product
+ * name beside it as live text so it stays selectable and readable in both
+ * themes rather than being baked into a bitmap.
  */
 function Mark() {
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-accent-line bg-accent-soft">
-      <svg
-        viewBox="0 0 24 24"
-        className="h-[18px] w-[18px] text-accent"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        aria-hidden
-      >
-        <circle cx="6" cy="17" r="2.6" />
-        <circle cx="17" cy="15.5" r="2.2" />
-        <circle cx="12" cy="6" r="2.6" />
-        <path d="m8.1 15.4 2.3-6.3M10.4 8.4l4.3 5.3M8.4 16.7l6.4-.8" />
-      </svg>
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent-line bg-accent-soft">
+      <LogoMark className="h-6 w-6" />
     </span>
   );
 }
@@ -119,9 +108,14 @@ export function SiteFooter() {
       <div className="mx-auto w-full max-w-content px-4 py-6 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-semibold text-fg">Chemical Data Extractor</p>
-            <p className="mt-0.5 text-xs text-fg-subtle">
-              19 database connectors · Multi-hop graph traversal · Enrichment pipeline
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-accent-line bg-accent-soft">
+                <LogoMark className="h-[18px] w-[18px]" />
+              </span>
+              <p className="text-sm font-semibold text-fg">Chemical Data Extractor</p>
+            </div>
+            <p className="mt-1 text-xs text-fg-subtle">
+              18 data sources · Multi-hop graph traversal · Enrichment pipeline
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs text-fg-subtle">

@@ -42,6 +42,12 @@ html.light {
   --accent-soft: 224 243 246;
   --accent-line: 138 197 210;
 
+  /* Logo: navy structure with a green data-growth trace. Kept as its own pair
+     so the mark holds the brand's two colours instead of inheriting the accent
+     teal, and so Dark mode can lift the navy off a near-black canvas. */
+  --logo-ink: 26 58 107;
+  --logo-accent: 14 145 97;
+
   /* Status. Each has a text tone and a tinted background so alerts read the
      same in both themes. */
   --danger: 185 28 28;
@@ -91,6 +97,11 @@ html.dark {
   --accent-on-solid: 4 30 38;
   --accent-soft: 12 45 54;
   --accent-line: 27 92 105;
+
+  /* The navy of the mark is too dark to read on the dark canvas, so it is
+     lightened here; the green is already the light-theme value. */
+  --logo-ink: 168 198 240;
+  --logo-accent: 52 211 158;
 
   --danger: 252 129 129;
   --danger-soft: 43 20 22;
