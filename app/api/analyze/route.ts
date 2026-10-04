@@ -77,12 +77,11 @@ function getProviders(): ProviderConfig[] {
   // (Nvidia 502s) the next one often still works.
   const ocKey = process.env.OPENCODE_API_KEY || DEFAULT_OPENCODE_KEY;
   if (ocKey) {
-    const ocModels = [
-      process.env.OPENCODE_MODEL || 'space-bunny-free',
-      'nemotron-3-ultra-free',
-      'nemotron-3.5-lightning-free',
-      'deepseek-v4-flash-free',
-    ];
+    // Only models the free tier actually serves to third-party callers belong
+    // here. The nemotron free models answer HTTP 403 "OpenCode's free tier can
+    // only be used from within OpenCode" and deepseek-v4-flash-free answers
+    // 400 "Model is unavailable", so listing them cost dead round-trips.
+    const ocModels = [process.env.OPENCODE_MODEL || 'space-bunny-free'];
     for (const model of ocModels) {
       providers.push({
         name: `opencode:${model}`,
@@ -126,7 +125,9 @@ function getProviders(): ProviderConfig[] {
       url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
       model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
       apiKey: geminiKey,
-      authStyles: ['bearer', 'x-goog-api-key'],
+      // This OpenAI-compatible endpoint rejects x-goog-api-key with HTTP 400
+      // "Missing or invalid Authorization header".
+      authStyles: ['bearer'],
     });
   }
 

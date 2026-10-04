@@ -1192,15 +1192,14 @@ def _extract_provider_error(data) -> Optional[str]:
 def _get_providers() -> list[dict]:
     providers: list[dict] = []
 
-    # OpenCode Zen — primary. Free models sit behind different upstream pools;
-    # if one is overloaded the next often still works.
+    # OpenCode Zen — primary. Only models the free tier actually serves to
+    # third-party callers belong here: the nemotron free models answer HTTP 403
+    # "OpenCode's free tier can only be used from within OpenCode", and
+    # deepseek-v4-flash-free answers 400 "Model is unavailable". Listing them
+    # cost three dead round-trips on every request and then failed anyway.
     oc_key = os.environ.get("OPENCODE_API_KEY") or DEFAULT_OPENCODE_KEY
     if oc_key:
-        oc_models = [
-            os.environ.get("OPENCODE_MODEL") or "nemotron-3-ultra-free",
-            "nemotron-3.5-lightning-free",
-            "deepseek-v4-flash-free",
-        ]
+        oc_models = [os.environ.get("OPENCODE_MODEL") or "space-bunny-free"]
         for model in oc_models:
             providers.append(
                 {
@@ -1232,7 +1231,9 @@ def _get_providers() -> list[dict]:
             }
         )
 
-    # Google Gemini — the reliable production provider (dual auth styles).
+    # Google Gemini. Only Bearer is offered: this OpenAI-compatible endpoint
+    # rejects x-goog-api-key with HTTP 400 "Missing or invalid Authorization
+    # header", so trying that style only produced a misleading final error.
     gemini_key = (
         os.environ.get("GEMINI_API_KEY")
         or os.environ.get("GOOGLE_AI_STUDIO_API_KEY")
@@ -1245,7 +1246,7 @@ def _get_providers() -> list[dict]:
                 "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                 "model": os.environ.get("GEMINI_MODEL") or "gemini-3.6-flash",
                 "api_key": gemini_key,
-                "auth_styles": ["bearer", "x-goog-api-key"],
+                "auth_styles": ["bearer"],
             }
         )
 
