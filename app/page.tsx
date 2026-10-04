@@ -7,6 +7,7 @@ import ResultsView from '@/components/ResultsView';
 import HistoryPanel from '@/components/HistoryPanel';
 import AIAssistant from '@/components/AIAssistant';
 import AccountPanel from '@/components/AccountPanel';
+import ConfirmEmailPanel from '@/components/ConfirmEmailPanel';
 
 import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import { HistoryIcon, SearchIcon } from '@/components/icons';
@@ -21,6 +22,24 @@ export default function HomePage() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Did we arrive from a Supabase auth callback (the confirmation link)?
+  //
+  // Read during the first render, before any effect runs, because the Supabase
+  // client strips these params off the URL as soon as it exchanges them — by
+  // the time an effect looked, the evidence would be gone. Checking the URL
+  // itself also means an ordinary visit costs nothing: no fetch, no session
+  // lookup, no change to how fast the workspace appears.
+  //
+  // PKCE callbacks carry ?code=; the implicit flow puts access_token in the
+  // fragment. Either means "this visit is the result of an auth link".
+  const [fromAuthCallback] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.location.search.includes('code=') ||
+      window.location.hash.includes('access_token')
+    );
+  });
 
   const handleSearch = useCallback(
     async (query: string, queryType: string, hops: number) => {
@@ -212,6 +231,23 @@ export default function HomePage() {
   );
 
   const hasResults = search?.status === 'completed' && search.export_files.length > 0;
+
+  // Placed after every hook so none can be skipped by the early return. The
+  // panel bootstraps the Supabase client itself, which is what lets it read
+  // the session out of the confirmation link.
+  if (fromAuthCallback) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader current="app" />
+
+        <main className="flex flex-1 items-center justify-center px-4 py-12">
+          <ConfirmEmailPanel />
+        </main>
+
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

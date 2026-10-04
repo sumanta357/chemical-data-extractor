@@ -268,10 +268,13 @@ export default function AccountPanel({
           email,
           password,
           options: {
-            // The confirmation link lands on /confirm-email, which shows the
-            // confirmation and signs the user in. Sending it to "/" dropped
-            // them on the landing page with no sign the click had worked.
-            emailRedirectTo: `${window.location.origin}/confirm-email`,
+            // Left as the bare Site URL on purpose. Supabase only redirects
+            // to a URL it has been told to trust, and the Site URL is the one
+            // already allowed; any other path or query string has to be added
+            // to the project's Redirect URLs by hand first. The landing page
+            // recognises the confirmation from the auth callback Supabase
+            // appends itself, so nothing extra has to be allowlisted.
+            emailRedirectTo: `${window.location.origin}/`,
             data: { full_name: displayName || undefined },
           },
         });
