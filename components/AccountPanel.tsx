@@ -264,7 +264,10 @@ export default function AccountPanel({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            // The confirmation link lands on /confirm-email, which shows the
+            // confirmation and signs the user in. Sending it to "/" dropped
+            // them on the landing page with no sign the click had worked.
+            emailRedirectTo: `${window.location.origin}/confirm-email`,
             data: { full_name: displayName || undefined },
           },
         });
@@ -274,7 +277,7 @@ export default function AccountPanel({
         setNotice(
           data.session
             ? 'Account created. Welcome aboard.'
-            : 'Check your inbox to confirm your email address, then sign in.',
+            : 'Check your inbox to confirm your email address. Opening that link confirms your address and signs you in.',
         );
         setMode('signin');
       }
