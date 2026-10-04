@@ -44,7 +44,8 @@ html.light {
 
   /* Logo: navy structure with a green data-growth trace. Kept as its own pair
      so the mark holds the brand's two colours instead of inheriting the accent
-     teal, and so Dark mode can lift the navy off a near-black canvas. */
+     teal. The mark itself is loaded from public/logo*.svg, which cannot read
+     these variables; they document the two brand colours for reference. */
   --logo-ink: 26 58 107;
   --logo-accent: 14 145 97;
 
@@ -237,6 +238,23 @@ select option {
 
   .mono {
     font-family: theme('fontFamily.mono');
+  }
+
+  /* Brand mark. An <img> is styled from outside its own document, so the Dark
+     variant cannot inherit the page's CSS variables; both files are shipped and
+     one is hidden. The switch keys off the `dark` class on <html>, which is what
+     the theme bootstrap in app/layout.tsx actually writes. */
+  .logo-art {
+    display: block;
+  }
+  .logo-art--dark {
+    display: none;
+  }
+  .dark .logo-art--light {
+    display: none;
+  }
+  .dark .logo-art--dark {
+    display: block;
   }
 }
 
