@@ -20,6 +20,7 @@ import {
 import { authErrorMessage, getSupabase } from '@/lib/supabase';
 import {
   getAcademicStatus,
+  checkAcademicEligibility,
   verifyAcademic,
   type AcademicVerification,
 } from '@/lib/billing';
@@ -126,6 +127,9 @@ export default function AccountPanel({
   const [academicBusy, setAcademicBusy] = useState(false);
   const [academicError, setAcademicError] = useState<string | null>(null);
   const [academicNotice, setAcademicNotice] = useState<string | null>(null);
+  // Why the Academic plan was not opened, when the address cannot qualify.
+  const [academicPlanNote, setAcademicPlanNote] = useState<string | null>(null);
+  const [eligibilityChecking, setEligibilityChecking] = useState(false);
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   // The host page owns `open`; the emailed-link pages own `opened`.
@@ -419,6 +423,40 @@ export default function AccountPanel({
     }
   }
 
+  /** Route a click on the Academic plan to the right next step.
+   *
+   *  The verification form used to open for everyone, so anyone on a personal
+   *  address was shown a form whose only possible outcome was a rejection —
+   *  the server refuses an Academic order without a verification token, so the
+   *  form is a dead end rather than a step. Ask the server whether the address
+   *  can qualify first: if it can, show the form; if it cannot, leave the plan
+   *  grid on screen and point at the plans they can actually buy. */
+  async function chooseAcademicPlan(plan: Plan) {
+    const accountEmail = entitlement?.email || '';
+    if (!accountEmail) {
+      beginAcademicVerification();
+      return;
+    }
+    setEligibilityChecking(true);
+    setAcademicPlanNote(null);
+    try {
+      const verdict = await checkAcademicEligibility(accountEmail);
+      if (verdict?.eligible) {
+        beginAcademicVerification();
+        return;
+      }
+      setAcademicPlanNote(verdict?.reason || 'That address is not an academic one.');
+      setView('plans');
+      setCheckout({ phase: 'idle' });
+    } catch {
+      // The probe is an optimisation, not a gate. If it cannot be reached, fall
+      // back to the form rather than hiding the option over a network error.
+      beginAcademicVerification();
+    } finally {
+      setEligibilityChecking(false);
+    }
+  }
+
   async function startCheckout(plan: Plan, academicToken?: string | null) {
     setCheckout({ phase: 'preparing' });
     setError(null);
@@ -523,6 +561,9 @@ export default function AccountPanel({
   const openAt = (next: View) => {
     setError(null);
     setCheckout({ phase: 'idle' });
+    // A stale "not an academic address" note from a previous visit would greet
+    // someone who has since switched to an institutional one.
+    if (next !== 'plans') setAcademicPlanNote(null);
     setView(next);
     onOpen();
   };
@@ -692,13 +733,15 @@ export default function AccountPanel({
                         }
                         if (plan.id === 'academic' && !academicVerified) {
                           // Academic must be verified server-side before money
-                          // moves; show the verification step instead of checkout.
-                          beginAcademicVerification();
+                          // moves. Only show that step to an address that could
+                          // actually pass it; everyone else gets the plans they
+                          // can buy right now.
+                          void chooseAcademicPlan(plan);
                           return;
                         }
                         startCheckout(plan, plan.id === 'academic' ? academicToken : null);
                       }}
-                      disabled={checkoutBusy}
+                      disabled={checkoutBusy || (eligibilityChecking && plan.id === 'academic')}
                       aria-busy={checkout.phase === 'preparing'}
                       className="flex flex-col rounded-lg border border-line bg-surface-2 p-4 text-left transition-colors hover:border-accent-line hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-55"
                     >
@@ -737,6 +780,30 @@ export default function AccountPanel({
               </div>
 
               {error && <p className={note('warning')}>{error}</p>}
+
+              {/* Shown when the Academic plan was declined on the address. The
+                  grid is still on screen, so the plans they can buy are one
+                  click away — this is not a dead end. */}
+              {academicPlanNote && (
+                <div className={cx(note('warning'), 'space-y-2')}>
+                  <p>{academicPlanNote}</p>
+                  <p className="text-fg-muted">
+                    The Academic plan is reserved for verified institutional
+                    addresses. Choose Starter or Professional above to upgrade
+                    now.{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAcademicPlanNote(null);
+                        beginAcademicVerification();
+                      }}
+                      className="link"
+                    >
+                      I have an academic address
+                    </button>
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

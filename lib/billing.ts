@@ -191,6 +191,17 @@ export const getAcademicStatus = () =>
     profile: AcademicProfile;
   }>;
 
+/** Would this address pass the academic eligibility check?
+ *
+ *  Read-only: unlike POST /verify it records no attempt and does not set the
+ *  account to "rejected", so the UI can ask before showing the form. The rule
+ *  itself lives in python-api/academic.py and is not duplicated here. */
+export const checkAcademicEligibility = (email: string) =>
+  api('/api/account/academic/eligibility', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }) as Promise<{ eligible: boolean; domain: string; reason: string }>;
+
 export const verifyAcademic = (fields: {
   academic_email: string;
   institute_name?: string;

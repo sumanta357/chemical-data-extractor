@@ -729,5 +729,98 @@ class EligibilityRules(unittest.TestCase):
                 os.environ["RAZORPAY_KEY_SECRET"] = key
 
 
+class AcademicEligibilityProbe(AcademicTestCase):
+    """The read-only probe the account panel calls before showing the form.
+
+    It exists so a personal address can be declined without cost. The real
+    endpoint records an attempt against a five-per-hour budget and flips the
+    account to "rejected", which is the wrong thing to do to someone who merely
+    clicked a plan card.
+    """
+
+    def probe(self, email):
+        return self.client.post("/api/account/academic/eligibility",
+                                json={"email": email})
+
+    def test_an_institutional_address_is_reported_eligible(self):
+        res = self.probe(self.academic_email)
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertTrue(body["eligible"])
+        self.assertEqual(body["domain"], "university.edu")
+        self.assertTrue(body["reason"])
+
+    def test_a_personal_address_is_reported_ineligible_with_a_reason(self):
+        res = self.probe("someone@gmail.com")
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertFalse(body["eligible"])
+        self.assertEqual(body["domain"], "gmail.com")
+        self.assertTrue(body["reason"], "the UI shows this to the user")
+
+    def test_it_never_answers_422(self):
+        """422 is what /verify returns for an ineligible address; the probe has
+        to be distinguishable so the UI does not treat a decline as an error."""
+        self.assertEqual(self.probe("someone@gmail.com").status_code, 200)
+
+    def test_probing_costs_no_verification_attempt(self):
+        # An epoch far enough back that every recorded attempt counts.
+        epoch = "1970-01-01T00:00:00"
+
+        def attempts():
+            return billing_store.count_academic_attempts_since(self.account["id"], epoch)
+
+        baseline = attempts()
+        for _ in range(5):
+            self.assertEqual(self.probe("someone@gmail.com").status_code, 200)
+        self.assertEqual(attempts(), baseline,
+                         "the probe consumed the hourly verification budget")
+
+        # Control: without this the assertion above would also pass if the
+        # counter were simply dead and always read zero.
+        self.verify(email="someone@gmail.com")
+        self.assertGreater(attempts(), baseline,
+                           "the attempt counter does not move on a real verify, "
+                           "so the assertion above proves nothing")
+
+    def test_probing_does_not_reject_the_account(self):
+        self.probe("someone@gmail.com")
+        self.assertFalse(academic.is_verified(
+            billing_store.get_user_by_id(self.account["id"])))
+
+    def test_a_rejected_account_may_still_probe_and_recover(self):
+        """Declining a card must not close the door on a later real address."""
+        self.assertEqual(self.verify(email="someone@gmail.com").status_code, 422)
+        self.probe(self.academic_email)
+        res = self.verify(email=self.academic_email)
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertTrue(res.json()["verification"]["verified_email"])
+
+    def test_a_malformed_address_is_reported_not_rejected(self):
+        res = self.probe("not-an-email")
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(res.json()["eligible"])
+        self.assertTrue(res.json()["reason"])
+
+    def test_the_probe_requires_a_signed_in_account(self):
+        anonymous = TestClient(engine_app.app)
+        res = anonymous.post("/api/account/academic/eligibility",
+                             json={"email": self.academic_email})
+        self.assertIn(res.status_code, (401, 403))
+
+    def test_the_probe_agrees_with_the_check_it_precedes(self):
+        """A probe that disagrees with /verify would hide a real academic."""
+        for email in (self.academic_email,
+                      "someone@gmail.com",
+                      "someone@yahoo.co.uk",
+                      "a.student@dept.university.edu",
+                      "someone@sympatico.ca",
+                      "not-an-email"):
+            with self.subTest(email=email):
+                probed = self.probe(email).json()["eligible"]
+                checked = academic.classify_email(email)["eligible"]
+                self.assertEqual(probed, checked)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -192,6 +192,40 @@ async def academic_status(request: Request):
     }
 
 
+class AcademicEligibilityRequest(BaseModel):
+    email: str
+
+
+@router.post("/api/account/academic/eligibility")
+async def academic_eligibility(payload: AcademicEligibilityRequest, request: Request):
+    """Would this address pass the academic check? Read-only.
+
+    The verification endpoint is not a probe: it records an attempt against a
+    small hourly budget and flips the account to "rejected" when the domain
+    fails. The account panel needs to know whether to show the verification
+    form *before* the user commits to it, and asking a personal address such as
+    gmail.com should cost neither an attempt nor a rejected status.
+
+    Nothing here is an authorisation — only `academic.classify_email`, the same
+    function the real check uses, so the answer cannot drift from the rule that
+    will actually be enforced.
+    """
+    user = auth.current_user_required(request)
+    try:
+        email = auth.validate_email(payload.email)
+    except HTTPException:
+        return {"eligible": False, "domain": "", "reason": "That does not look like a valid email address."}
+
+    verdict = academic.classify_email(email)
+    LOG.info("Academic eligibility probed for user=%s domain=%s eligible=%s",
+             user["id"], verdict["domain"], verdict["eligible"])
+    return {
+        "eligible": verdict["eligible"],
+        "domain": verdict["domain"],
+        "reason": verdict["reason"],
+    }
+
+
 @router.post("/api/account/academic/verify")
 async def verify_academic(payload: AcademicVerifyRequest, request: Request):
     """Run the eligibility check and, when it passes, mark the account verified.
