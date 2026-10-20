@@ -16,6 +16,7 @@ code in billing_store.py is identical on either backend.
 """
 
 import os
+import re
 import socket
 import sqlite3
 import threading
@@ -60,6 +61,29 @@ def _scrub(message: str) -> str:
             if password:
                 message = message.replace(password, "***")
     return message
+
+
+# Postgres reports a unique-constraint failure as a headline plus the offending
+# row: `DETAIL:  Key (email)=(someone@example.com) already exists.` That line is
+# how the error reached anonymous callers of /api/billing/config. Everything from
+# the first diagnostic marker on is dropped before the text is kept for health
+# checks, and any address left over in the headline is masked.
+_ERROR_TAIL = re.compile(r"\n\s*(DETAIL|HINT|CONTEXT|STATEMENT|SQL state|QUERY)\b.*",
+                         re.IGNORECASE | re.DOTALL)
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+
+
+def _redact(message: str) -> str:
+    """Keep the failure, drop the row it happened on.
+
+    Operators still get the exception type and the constraint name, which is
+    what identifies the bug; the value that collided does not belong in a
+    response body. Newlines collapse too, so a multi-line error cannot smuggle
+    anything past a log line either.
+    """
+    head = _ERROR_TAIL.split(message or "", maxsplit=1)[0]
+    head = " ".join(head.split())
+    return _EMAIL.sub("***", head)
 
 
 class DatabaseUnavailable(RuntimeError):
@@ -111,11 +135,11 @@ class Database:
             self._retry_after = 0.0
         except DatabaseUnavailable as exc:
             self._retry_after = time.time() + 20
-            self._last_error = str(exc)
+            self._last_error = _redact(_scrub(str(exc)))[:300]
             raise
         except Exception as exc:
             self._retry_after = time.time() + 20
-            self._last_error = _scrub(str(exc))[:300]
+            self._last_error = _redact(_scrub(str(exc)))[:300]
             raise DatabaseUnavailable(f"could not initialise the accounts store: {exc}")
 
     # ── connection handling ───────────────────────────────────────────────
@@ -256,9 +280,10 @@ class Database:
     def _note_error(self, exc: Exception) -> None:
         """Remember the last statement failure so health checks can explain it.
 
-        Scrubbed: the connection string password must never reach a response.
+        Scrubbed twice over: the connection string password, and the row values
+        a constraint failure quotes back at us.
         """
-        self._last_error = _scrub(f"{exc.__class__.__name__}: {exc}")[:300]
+        self._last_error = _redact(_scrub(f"{exc.__class__.__name__}: {exc}"))[:300]
 
     def _connection(self):
         if not USE_POSTGRES:

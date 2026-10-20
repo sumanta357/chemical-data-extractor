@@ -11,6 +11,16 @@ export interface ExportFile {
   url: string;
 }
 
+export interface SearchArchive {
+  provider: 'gcs';
+  bucket: string;
+  object: string;
+  filename: string;
+  size_bytes: number;
+  size_display: string;
+  uploaded_at: string;
+}
+
 export interface SearchState {
   search_id: string;
   query: string;
@@ -20,6 +30,8 @@ export interface SearchState {
   progress: string | null;
   log: string[];
   export_files: ExportFile[];
+  /** Durable archive in Google Cloud Storage, when the engine made one. */
+  storage?: SearchArchive | null;
   export_dir: string;
   /** base64 file payloads returned by the hosted Python engine (production) */
   base64_files?: Record<string, string>;
@@ -54,4 +66,75 @@ export interface LogResponse {
   offset: number;
   total_lines: number;
   new_lines: string[];
+}
+
+/** Decision intelligence computed by the engine from the finished graph. */
+export interface DecisionIntel {
+  search_id: string;
+  query: string;
+  node_count: number;
+  edge_count: number;
+  feasibility: {
+    grade: string;
+    label: string | null;
+    scored_compounds: number;
+    affinity_datapoints: number;
+    median_pchembl?: number;
+    method: string;
+    compounds: Array<{
+      uid: string;
+      name: string;
+      grade: string;
+      label: string;
+      potency_score: number;
+      datapoints: number;
+      best_value: number;
+    }>;
+    note: string;
+  };
+  ip: {
+    status: 'green' | 'yellow' | 'red';
+    reason: string;
+    patents: Array<{ uid: string; name: string; year: number | null }>;
+    caveat: string;
+  };
+  dark_literature: {
+    patent_count: number;
+    compounds_with_patents: number;
+    overlap_signals: number;
+    compounds: Array<{ uid: string; name: string; patent_count: number }>;
+    reading: string;
+    caveat: string;
+  };
+  moa: {
+    query: string;
+    targets: Array<{ name: string; best: MoaEvidence; count: number }>;
+    structures: Array<{ pdb_id: string; compound: string }>;
+    potency_edges: MoaEvidence[];
+    compounds: Array<{ uid: string; name: string; smiles: string }>;
+    publications: number;
+    patents: number;
+  };
+  vendors: {
+    compounds: Array<{
+      uid: string;
+      name: string;
+      smiles: string;
+      identifier: string;
+      identifier_kind: string;
+      vendors_url: string;
+    }>;
+    registry: string;
+    note: string;
+  };
+  not_assessed: string[];
+}
+
+interface MoaEvidence {
+  compound: string;
+  target: string;
+  activity_type: string;
+  value: string;
+  units: string;
+  pchembl: number;
 }

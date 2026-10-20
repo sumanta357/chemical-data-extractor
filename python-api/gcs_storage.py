@@ -1,0 +1,289 @@
+"""Durable copies of search exports in Google Cloud Storage.
+
+Every export the engine produces lands on ephemeral local disk, and a sweep
+deletes them about half an hour after the search finishes
+(EXPORT_MAX_AGE_MINUTES in app.py). On a free-tier host that disk is discarded
+on every deploy as well, so a completed search has no lasting artefact
+anywhere. When a bucket is configured the export directory is archived as one
+zip, kept there, and the search is given a durable download link.
+
+Configuration, both from the environment:
+
+    GCS_BUCKET                          name of the bucket to write to
+    GOOGLE_APPLICATION_CREDENTIALS_JSON service-account JSON, pasted inline
+
+With neither set this module reports itself disabled and every entry point
+becomes a no-op, so a deployment that does not want cloud storage behaves
+exactly as it did before.
+
+The bucket is expected to be private and links are signed rather than public:
+these exports are research output, and a permanent public URL would leak them
+to anyone the link was forwarded to. Signed URLs expire, so the object name is
+what gets stored with the search and a fresh link is minted per request.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import os
+import re
+import secrets
+import threading
+import zipfile
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Optional
+
+import logging
+
+LOG = logging.getLogger("scigraph.gcs")
+
+# How long a download link stays valid. Long enough that a link pasted into a
+# lab notebook still works, short enough that it is not a standing capability.
+SIGNED_URL_TTL_SECONDS = int(os.environ.get("GCS_SIGNED_URL_TTL_SECONDS", "604800"))
+
+# Refuse to build an archive larger than this. An enriched workbook plus a
+# structure image per compound can reach tens of megabytes, and a runaway
+# upload on a small host is worse than no archive at all.
+MAX_ARCHIVE_MB = int(os.environ.get("GCS_MAX_ARCHIVE_MB", "200"))
+
+_client_lock = threading.Lock()
+_client: Any = None
+
+
+# ── Configuration ────────────────────────────────────────────────────────────
+
+def bucket_name() -> str:
+    return (os.environ.get("GCS_BUCKET") or "").strip()
+
+
+def is_configured() -> bool:
+    """True when a bucket and usable credentials are both present.
+
+    Credentials may be inline JSON or a path to a mounted key file; the hosted
+    platforms can only offer the former.
+    """
+    return bool(bucket_name()) and bool(_credentials_spec())
+
+
+def _credentials_spec() -> Optional[dict]:
+    """Parse the inline service-account JSON, if the deployment provides one."""
+    raw = (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON") or "").strip()
+    if not raw:
+        # A mounted key file works too; the client library reads the path.
+        if (os.environ.get("GOOGLE_APPLICATION_CREDENTIALS") or "").strip():
+            return {}
+        return None
+    try:
+        creds = json.loads(raw)
+    except ValueError as exc:
+        LOG.warning("GOOGLE_APPLICATION_CREDENTIALS_JSON is not valid JSON: %s", exc)
+        return None
+    if not isinstance(creds, dict) or not creds.get("client_email"):
+        LOG.warning("GOOGLE_APPLICATION_CREDENTIALS_JSON has no client_email")
+        return None
+    return creds
+
+
+def client() -> Any:
+    """The lazily built storage client. None when unavailable.
+
+    Every failure here is logged and swallowed: cloud storage is an
+    enhancement, and a misconfigured bucket must never stop a search from
+    completing.
+    """
+    global _client
+    if _client is not None:
+        return _client
+    if not is_configured():
+        return None
+    with _client_lock:
+        if _client is not None:
+            return _client
+        try:
+            from google.cloud import storage as gcs  # imported lazily
+
+            creds = _credentials_spec()
+            if creds:
+                from google.oauth2 import service_account
+
+                _client = gcs.Client(
+                    credentials=service_account.Credentials.from_service_account_info(creds)
+                )
+            else:
+                _client = gcs.Client()
+            LOG.info("Google Cloud Storage ready (bucket=%s)", bucket_name())
+        except Exception as exc:  # pragma: no cover - depends on the environment
+            LOG.warning("Google Cloud Storage unavailable: %s: %s",
+                        exc.__class__.__name__, exc)
+            _client = None
+    return _client
+
+
+# ── Naming ───────────────────────────────────────────────────────────────────
+
+def _slug(text: str, limit: int = 40) -> str:
+    """Reduce arbitrary text to characters that are safe in an object name."""
+    return re.sub(r"[^a-zA-Z0-9]+", "_", (text or "").strip())[:limit].strip("_")
+
+
+def archive_name(search_id: str, query: str) -> str:
+    """A readable, collision-free object name for one search's exports.
+
+    Both parts are slugged. `query` is user-supplied and `search_id` is only
+    ever generated by us, but a name that can still contain ".." is not worth
+    trusting a future caller with. The random suffix keeps two archives of the
+    same search apart even when they land inside the same second.
+    """
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    parts = [p for p in (_slug(search_id, 16), _slug(query, 40), stamp,
+                         secrets.token_hex(2)) if p]
+    return "_".join(parts) + ".zip"
+
+
+def object_name(user_id: Any, search_id: str, filename: str) -> str:
+    """Where the archive lives in the bucket.
+
+    The owner id is the first path segment so a listing scoped to one account
+    is a prefix scan, and so an archive can never be attributed to the wrong
+    person. Anonymous searches (accounts off) fall under 'anonymous'.
+    """
+    owner = str(user_id) if user_id is not None else "anonymous"
+    return f"exports/{owner}/{search_id}/{filename}"
+
+
+# ── Archive ──────────────────────────────────────────────────────────────────
+
+def _iter_export_files(export_dir: Path):
+    """Every regular file under the export directory, hidden entries skipped."""
+    for path in sorted(export_dir.rglob("*")):
+        if path.is_file() and not path.name.startswith("."):
+            yield path
+
+
+def build_archive(export_dir: str, filename: str) -> Optional[bytes]:
+    """Zip the export directory and return the bytes, or None if there is
+    nothing to archive or it exceeds MAX_ARCHIVE_MB.
+
+    Zipping in memory keeps this off the container's already-scarce disk: the
+    exports are already there, and writing a second full copy beside them is
+    what fills a small host.
+    """
+    path = Path(export_dir)
+    if not path.is_dir():
+        return None
+
+    limit = MAX_ARCHIVE_MB * 1024 * 1024
+    files = list(_iter_export_files(path))
+    if not files:
+        return None
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        for file_path in files:
+            try:
+                if file_path.stat().st_size > limit:
+                    LOG.warning("Skipping oversized export %s", file_path.name)
+                    continue
+                zf.write(file_path, arcname=str(file_path.relative_to(path)))
+            except OSError as exc:
+                LOG.warning("Could not add %s to the archive: %s", file_path.name, exc)
+    raw = buffer.getvalue()
+    if not raw:
+        return None
+    if len(raw) > limit:
+        LOG.warning("Archive for %s is %.1fMB, over the %sMB limit — not stored",
+                    filename, len(raw) / 1048576, MAX_ARCHIVE_MB)
+        return None
+    return raw
+
+
+# ── Upload and links ─────────────────────────────────────────────────────────
+
+def upload_search_exports(user_id: Any, search_id: str, query: str,
+                          export_dir: str) -> Optional[dict]:
+    """Archive and store one search's exports.
+
+    Returns the metadata to keep with the search, or None when storage is not
+    configured, there is nothing to archive, or the upload failed. It never
+    raises: a search that finished must be reported as finished.
+    """
+    if not is_configured():
+        return None
+    gcs_client = client()
+    if gcs_client is None:
+        return None
+
+    try:
+        filename = archive_name(search_id, query)
+        raw = build_archive(export_dir, filename)
+        if raw is None:
+            return None
+        obj = object_name(user_id, search_id, filename)
+        bucket = gcs_client.bucket(bucket_name())
+        bucket.blob(obj).upload_from_string(
+            raw,
+            content_type="application/zip",
+            # The object is immutable: re-running a search writes a new archive
+            # under a new name, so a link handed out for one search can never
+            # start serving different bytes.
+            generation=0,
+        )
+        LOG.info("Archived search %s to gs://%s/%s (%.1fMB)", search_id,
+                 bucket_name(), obj, len(raw) / 1048576)
+        return {
+            "provider": "gcs",
+            "bucket": bucket_name(),
+            "object": obj,
+            "filename": filename,
+            "size_bytes": len(raw),
+            "size_display": _format_size(len(raw)),
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        LOG.warning("Could not archive search %s: %s: %s",
+                    search_id, exc.__class__.__name__, exc)
+        return None
+
+
+def signed_url(object: str, expires_in: Optional[int] = None) -> Optional[str]:
+    """A fresh download URL for a stored archive, or None."""
+    gcs_client = client()
+    if gcs_client is None or not object:
+        return None
+    ttl = int(expires_in or SIGNED_URL_TTL_SECONDS)
+    try:
+        return gcs_client.bucket(bucket_name()).blob(object).generate_signed_url(
+            version="v4",
+            expiration=timedelta(seconds=ttl),
+            method="GET",
+        )
+    except Exception as exc:
+        LOG.warning("Could not sign gs://%s/%s: %s: %s", bucket_name(), object,
+                    exc.__class__.__name__, exc)
+        return None
+
+
+def delete_search_archive(object: str) -> bool:
+    """Remove a stored archive. Used by the retention sweep."""
+    gcs_client = client()
+    if gcs_client is None or not object:
+        return False
+    try:
+        gcs_client.bucket(bucket_name()).blob(object).delete()
+        return True
+    except Exception as exc:
+        LOG.warning("Could not delete gs://%s/%s: %s: %s", bucket_name(), object,
+                    exc.__class__.__name__, exc)
+        return False
+
+
+def _format_size(size: int) -> str:
+    if size < 0:
+        return "0 B"
+    for unit in ["B", "KB", "MB"]:
+        if size < 1024:
+            return f"{size:.0f} {unit}"
+        size /= 1024
+    return f"{size:.1f} GB"

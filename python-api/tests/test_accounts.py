@@ -327,5 +327,71 @@ class ProfileApiTests(unittest.TestCase):
         self.assertTrue(me["entitlement"]["signed_in"])
 
 
+class LegacyAccountLinkingTests(unittest.TestCase):
+    """An account row that predates Supabase — or lost the insert race — has no
+    `supabase_user_id`. Before the fix every request for that user re-ran the
+    insert, hit the unique email index again, and fell back to the same unlinked
+    row, so the failure repeated forever and surfaced to anonymous callers."""
+
+    def _legacy_row(self, email: str) -> dict:
+        """A users row with no Supabase id: insert directly, as an older
+        release of the schema would have left it."""
+        import db as dbmod
+        now = billing_store._iso()
+        user_id = dbmod.db.execute(
+            """INSERT INTO users (email, password_hash, name, created_at, plan,
+                   plan_status, period_start, period_end)
+               VALUES (?, ?, ?, ?, 'free', 'active', ?, ?)""",
+            (email, billing_store.SUPABASE_PASSWORD_PLACEHOLDER, None, now, now, now))
+        return billing_store.get_user_by_id(user_id)
+
+    def test_sign_in_binds_the_existing_row_instead_of_reinserting(self):
+        email = unique_email("legacy")
+        legacy = self._legacy_row(email)
+        self.assertIsNone(legacy["supabase_user_id"])
+
+        sub = str(uuid.uuid4())
+        who = dict(id=sub, email=email, email_verified=True, name="Legacy", provider="email")
+        first = auth.resolve_account(who)
+        self.assertEqual(first["id"], legacy["id"], "must reuse the existing account")
+        self.assertEqual(first["supabase_user_id"], sub, "must store the Supabase id")
+        self.assertIsNotNone(first["email_verified_at"])
+
+        # Second visit: the row is found by id, so the insert is never retried
+        # and no constraint is violated again.
+        second = auth.resolve_account(who)
+        self.assertEqual(second["id"], legacy["id"])
+        self.assertEqual(second["supabase_user_id"], sub)
+
+    def test_a_bound_account_is_never_re_pointed_at_another_identity(self):
+        """Same address, different Supabase identity: the insert fails on the
+        unique index, and the fallback must not re-bind (or re-name) the row
+        that already belongs to somebody."""
+        email = unique_email("taken")
+        owner = make_account(email, name="Owner")
+        other = dict(id=str(uuid.uuid4()), email=email, email_verified=True,
+                     name="Other", provider="email")
+        # The insert fails on the unique email index; the existing row already
+        # belongs to another Supabase user, so it must come back untouched.
+        self.assertEqual(auth.resolve_account(other)["id"], owner["id"])
+        still = billing_store.get_user_by_id(owner["id"])
+        self.assertEqual(still["supabase_user_id"], owner["supabase_user_id"])
+        self.assertNotEqual(still["supabase_user_id"], other["id"])
+        self.assertEqual(still["name"], "Owner", "the other identity overwrote the name")
+
+    def test_a_locally_taken_address_does_not_log_the_user_out(self):
+        """The address changed in Supabase and collides with another local row:
+        the session must survive on its own id, with the old address mirrored."""
+        mine = make_account(unique_email("mine"), name="Mine")
+        other = make_account(unique_email("other"), name="Other")
+        moved = dict(id=mine["supabase_user_id"], email=other["email"],
+                     email_verified=True, name="Mine", provider="email")
+        account = auth.resolve_account(moved)
+        self.assertEqual(account["id"], mine["id"])
+        self.assertEqual(account["email"], mine["email"], "must keep the usable address")
+        # And a later request is still resolved by the same id.
+        self.assertEqual(auth.resolve_account(moved)["id"], mine["id"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

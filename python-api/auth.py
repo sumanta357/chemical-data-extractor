@@ -109,11 +109,22 @@ def resolve_account(identity: dict) -> dict:
                 bool(identity.get("email_verified")),
             )
         except billing_store.INTEGRITY_ERROR:
-            # Supabase keeps email addresses unique, so this should not happen
-            # — but if an address is already taken, fall back to that account
-            # rather than failing the sign-in.
-            LOG.warning("Email already has a billing account; linking by address")
-            return billing_store.get_user_by_email(identity["email"]) or {}
+            # Supabase keeps email addresses unique, so this only happens for an
+            # account that already exists without a Supabase id (a legacy row, or
+            # a sign-up that lost the insert race). Bind it now instead of
+            # leaving it unlinked — an unlinked row is retried, and fails, on
+            # every single request for that user.
+            existing = billing_store.get_user_by_email(identity["email"])
+            if existing is None:
+                raise
+            LOG.info("Email already has a billing account; linking by address")
+            # Supabase verified this address, so it is the same person: return
+            # that account rather than failing the sign-in. Binding the id only
+            # happens when the row has none, so an account already bound to
+            # another identity is never re-pointed at this one.
+            return billing_store.link_supabase_account(
+                existing["id"], sub, identity.get("name"),
+                bool(identity.get("email_verified"))) or existing
 
     # Keep the mirrored details in step with Supabase.
     changes = {}
@@ -124,8 +135,16 @@ def resolve_account(identity: dict) -> dict:
     if identity.get("email_verified") and not account.get("email_verified_at"):
         billing_store.mark_email_verified(account["id"])
     if changes:
-        billing_store.update_identity(account["id"], changes)
-        account = billing_store.get_user_by_id(account["id"]) or account
+        try:
+            billing_store.update_identity(account["id"], changes)
+        except billing_store.INTEGRITY_ERROR:
+            # The new address is already taken locally. The account is still
+            # this identity's — it was found by Supabase id — so keep the old
+            # mirrored address rather than failing every later request.
+            LOG.warning("Could not mirror the address change on account %s: "
+                        "already in use locally", account["id"])
+        else:
+            account = billing_store.get_user_by_id(account["id"]) or account
     return account
 
 

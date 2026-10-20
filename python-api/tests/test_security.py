@@ -226,6 +226,34 @@ class Disclosure(SecurityBase):
                 for needle in needles:
                     self.assertNotIn(needle, text, f"{path} leaked {needle!r}")
 
+    def test_health_config_does_not_publish_a_row_value_from_a_failed_statement(self):
+        """The real leak: a unique-constraint failure is reported back with the
+        offending row, and /api/billing/config answers anonymous callers with
+        the last statement error. Force the failure, then read the endpoint
+        unauthenticated."""
+        import db as dbmod
+
+        needle = "leaked-" + uuid.uuid4().hex[:12] + "@example.com"
+        original = dbmod.db
+        store = dbmod.Database()
+        dbmod.db = store
+        try:
+            store.query_one("SELECT 1 AS ok")
+            # Exactly the shape psycopg reports for a duplicate email.
+            error = (f'UniqueViolation: duplicate key value violates unique constraint '
+                     f'"users_email_key"\nDETAIL:  Key (email)=({needle}) already exists.\n'
+                     f'SQL state: 23505')
+            store._note_error(RuntimeError(error))
+            body = self.anon.get("/api/billing/config").text
+        finally:
+            dbmod.db = original
+
+        self.assertNotIn(needle, body, "an anonymous caller read a user's email")
+        self.assertNotIn("@example.com", body)
+        # The failure itself is still visible, so a misconfigured store is
+        # diagnosable from outside.
+        self.assertIn("users_email_key", body)
+
     def test_search_error_response_has_no_internal_trace(self):
         res = self.start(query="a" * 5000)
         self.assertNotIn("Traceback", res.text)

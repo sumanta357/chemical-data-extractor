@@ -227,6 +227,21 @@ async function refreshRemoteState(state: SearchState): Promise<void> {
       }));
     }
 
+    // The engine archives a finished search to cloud storage. Carried through
+    // like any other field so a completed search keeps its durable link after
+    // a page reload.
+    if (data.storage && typeof data.storage === 'object' && data.storage.object) {
+      state.storage = {
+        provider: 'gcs',
+        bucket: data.storage.bucket ?? '',
+        object: data.storage.object,
+        filename: data.storage.filename ?? '',
+        size_bytes: data.storage.size_bytes ?? 0,
+        size_display: data.storage.size_display ?? formatSize(data.storage.size_bytes ?? 0),
+        uploaded_at: data.storage.uploaded_at ?? '',
+      };
+    }
+
     // Persist state changes
     if (state.status === 'completed' || state.status === 'failed') {
       persistSearches();

@@ -77,6 +77,27 @@ except Exception as _billing_import_error:  # pragma: no cover - defensive
                 _billing_import_error)
 
 
+# ── Durable export storage (optional layer) ──────────────────────────────────
+# Exports are written to local disk and swept about half an hour after a search
+# finishes, so nothing a user ran is still there tomorrow. With GCS_BUCKET and
+# GOOGLE_APPLICATION_CREDENTIALS_JSON set, every completed search is also
+# archived to Google Cloud Storage and given a durable link. Unset, the search
+# path is unchanged.
+try:
+    import gcs_storage as _gcs
+except Exception as _gcs_import_error:  # pragma: no cover - defensive
+    _gcs = None
+    LOG.warning("Cloud storage layer unavailable (%s) — exports stay local",
+                _gcs_import_error)
+
+try:
+    import decision as _decision
+except Exception as _decision_import_error:  # pragma: no cover - defensive
+    _decision = None
+    LOG.warning("Decision intelligence layer unavailable (%s)",
+                _decision_import_error)
+
+
 try:
     from db import DatabaseUnavailable as _DatabaseUnavailable
 
@@ -186,9 +207,15 @@ def _init_db():
                 export_dir TEXT DEFAULT '',
                 created_at TEXT DEFAULT '',
                 elapsed_seconds REAL,
-                error TEXT
+                error TEXT,
+                storage TEXT DEFAULT '{}'
             )
         """)
+        # SQLite has no ADD COLUMN IF NOT EXISTS, so inspect first. Fresh
+        # databases already have the column from the CREATE above.
+        existing = {r[1] for r in conn.execute("PRAGMA table_info(searches)")}
+        if "storage" not in existing:
+            conn.execute("ALTER TABLE searches ADD COLUMN storage TEXT DEFAULT '{}'")
     # In-memory cache for active searches (fast access during polling)
 searches: dict[str, dict] = {}
 
@@ -204,6 +231,7 @@ try:
                 "log": _json.loads(row["log"]), "export_files": _json.loads(row["export_files"]),
                 "export_dir": row["export_dir"], "created_at": row["created_at"],
                 "elapsed_seconds": row["elapsed_seconds"], "error": row["error"],
+                "storage": _json.loads(row["storage"] or "{}"),
             }
 except Exception:
     pass
@@ -214,18 +242,19 @@ def _save_search(state: dict):
         with sqlite3.connect(str(SEARCH_DB), timeout=10) as conn:
             conn.execute("""
                 INSERT INTO searches (search_id, query, query_type, hops, status, progress,
-                    log, export_files, export_dir, created_at, elapsed_seconds, error)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    log, export_files, export_dir, created_at, elapsed_seconds, error, storage)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(search_id) DO UPDATE SET
                     status=excluded.status, progress=excluded.progress, log=excluded.log,
                     export_files=excluded.export_files, elapsed_seconds=excluded.elapsed_seconds,
-                    error=excluded.error
+                    error=excluded.error, storage=excluded.storage
             """, (
                 state["search_id"], state["query"], state.get("query_type","auto"),
                 state.get("hops",1), state["status"], state.get("progress",""),
                 _json.dumps(state.get("log",[])), _json.dumps(state.get("export_files",[])),
                 state.get("export_dir",""), state.get("created_at",""),
                 state.get("elapsed_seconds"), state.get("error"),
+                _json.dumps(state.get("storage", {})),
             ))
     except Exception as e:
         LOG.warning("Failed to save search %s: %s", state.get("search_id","?"), e)
@@ -465,6 +494,8 @@ class SearchStatus(BaseModel):
     created_at: str = ""
     elapsed_seconds: Optional[float] = None
     error: Optional[str] = None
+    # Durable archive in Google Cloud Storage, when one was made.
+    storage: Optional[dict] = None
 
 
 # ── Background Search Runner ─────────────────────────────────────────────────
@@ -725,6 +756,17 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             state["status"] = "completed"
             state["elapsed_seconds"] = time.time() - start_time
             state["export_files"] = _list_export_files(export_dir)
+            # Archive before saving, so the durable link is present in the state
+            # the very first completed poll sees. Best-effort by construction —
+            # upload_search_exports swallows its own failures, because a
+            # storage problem must never turn a finished search into a failure.
+            archived = _gcs.upload_search_exports(
+                state.get("owner_user_id"), search_id, state.get("query", ""), export_dir
+            ) if _gcs else None
+            if archived:
+                state["storage"] = archived
+                state["log"].append(
+                    f"  ☁ Archived to Google Cloud Storage ({archived['size_display']})")
             enriched_exists = any(f["name"] == "enriched_data.xlsx" for f in state["export_files"])
             if enriched_exists:
                 state["progress"] = f"✅ Completed in {state['elapsed_seconds']:.1f}s + enriched multi-sheet Excel"
@@ -797,6 +839,11 @@ async def health():
     return {
         "status": "ok",
         "service": "scigraph-api",
+        "export_storage": {
+            "configured": bool(_gcs and _gcs.is_configured()),
+            "provider": "google-cloud-storage",
+            "bucket": (_gcs.bucket_name() if _gcs and _gcs.is_configured() else None),
+        },
         "version": "3.2.2",
         "exports_dir": str(EXPORTS_DIR),
         "workspace_dir": str(WORKSPACE_DIR),
@@ -1038,6 +1085,72 @@ async def get_search_graph(search_id: str, http_request: Request = None):
         "edges": edges,
         "node_count": len(nodes),
         "edge_count": len(edges),
+    }
+
+
+@app.get("/api/search/{search_id}/decision-intel")
+async def search_decision_intel(search_id: str, http_request: Request = None):
+    """Instant decision intelligence for a finished search.
+
+    A feasibility verdict (efficacy grade from aggregated affinities), IP
+    freedom status from the surfaced patents, dark-literature prior-art
+    overlap, an MoA evidence storyboard, and vendor-sourcing links — all
+    computed offline from the export CSVs, so it is instant and adds no
+    egress. Owner-scoped like every other search endpoint.
+    """
+    state = searches.get(search_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Search not found")
+    _require_search_owner(search_id, state, http_request)
+
+    export_dir = state.get("export_dir", "")
+    if not export_dir or not Path(export_dir).exists():
+        raise HTTPException(
+            status_code=404, detail="Decision intelligence is not available for this search"
+        )
+    try:
+        intel = _decision.decision_intel(export_dir, state.get("query", ""))
+    except Exception as exc:  # pragma: no cover - defensive
+        LOG.warning("Decision intel failed for %s: %s", search_id, exc)
+        raise HTTPException(status_code=500, detail="Decision intelligence computation failed")
+    if intel is None:
+        raise HTTPException(
+            status_code=404, detail="Decision intelligence is not available for this search"
+        )
+    intel["search_id"] = search_id
+    return intel
+
+
+@app.get("/api/search/{search_id}/cloud-link")
+async def search_cloud_link(search_id: str, http_request: Request = None):
+    """Mint a fresh, time-limited download link for a search's archive.
+
+    Only the object name is kept with the search, so links can expire without
+    the search ever losing the ability to produce a fresh one. Owner-scoped
+    like every other search endpoint.
+    """
+    state = searches.get(search_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Search not found")
+    _require_search_owner(search_id, state, http_request)
+
+    stored = (state.get("storage") or {}).get("object")
+    if not stored:
+        raise HTTPException(
+            status_code=404,
+            detail="This search has no archived copy. Use the direct downloads.",
+        )
+    url = _gcs.signed_url(stored) if _gcs else None
+    if not url:
+        raise HTTPException(
+            status_code=503,
+            detail="Cloud storage is unavailable right now. Try the direct downloads.",
+        )
+    return {
+        "url": url,
+        "expires_in": _gcs.SIGNED_URL_TTL_SECONDS,
+        "object": stored,
+        "size_display": (state.get("storage") or {}).get("size_display"),
     }
 
 
