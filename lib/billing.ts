@@ -12,6 +12,8 @@ export interface Plan {
   price_inr: number;
   searches: number;
   analyst_messages: number;
+  /** Billing period in days; 0 = the plan never expires (Single Search). */
+  period_days?: number;
   tag?: string | null;
   features: string[];
 }

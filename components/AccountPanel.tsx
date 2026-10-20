@@ -129,6 +129,9 @@ export default function AccountPanel({
   const [academicNotice, setAcademicNotice] = useState<string | null>(null);
   // Why the Academic plan was not opened, when the address cannot qualify.
   const [academicPlanNote, setAcademicPlanNote] = useState<string | null>(null);
+  // Read-only "this address will not qualify" advice, so opening the form can
+  // warn about a personal address without spending a verification attempt.
+  const [academicHint, setAcademicHint] = useState<string | null>(null);
   const [eligibilityChecking, setEligibilityChecking] = useState(false);
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -377,9 +380,9 @@ export default function AccountPanel({
     });
   }
 
-  async function runAcademicVerification(e?: FormEvent, emailOverride?: string) {
+  async function runAcademicVerification(e?: FormEvent) {
     e?.preventDefault();
-    const email = (emailOverride ?? profile.academic_email ?? '').trim();
+    const email = (profile.academic_email ?? '').trim();
     if (!email) {
       setAcademicError('Enter your institutional email address.');
       return;
@@ -387,6 +390,7 @@ export default function AccountPanel({
     setAcademicBusy(true);
     setAcademicError(null);
     setAcademicNotice(null);
+    setAcademicHint(null);
     try {
       const result = await verifyAcademic({
         academic_email: email,
@@ -409,20 +413,46 @@ export default function AccountPanel({
     }
   }
 
-  /** Enter the verification step, pre-filling the account address and checking
-   *  it straight away so a recognised institutional domain is approved without
-   *  the visitor typing anything. */
+  /** Ask whether an address could pass the academic check, at no cost.
+   *
+   *  This is the read-only probe, not the verification: it records no attempt
+   *  against the hourly budget and flips no status, so it is safe to run the
+   *  moment the form opens. */
+  async function hintAcademicEligibility(email: string) {
+    try {
+      const verdict = await checkAcademicEligibility(email);
+      setAcademicHint(
+        verdict?.eligible
+          ? `${verdict?.domain || email} is a recognised academic domain. Select “Verify academic email” to confirm it and unlock payment.`
+          : `Please use your academic email id to proceed with payment. ${verdict?.reason || 'That address is not an academic one.'}`
+      );
+    } catch {
+      // The hint is an optimisation. A failed probe must never hide the form.
+    }
+  }
+
+  /** Enter the verification step, pre-filling the account address.
+   *
+   *  This used to *submit* that address the moment the form opened. That turned
+   *  an ordinary click into a verification attempt: POST /verify records one
+   *  against a budget of five per hour and sets the account to "rejected" when
+   *  the domain fails. So anyone on a personal address burned an attempt just
+   *  by looking at the plan, and five visits locked them out for an hour with
+   *  no indication why. Verification is now only ever a deliberate submit of
+   *  the form; the free probe below keeps the useful part — telling the
+   *  visitor straight away whether the address can qualify. */
   function beginAcademicVerification() {
     setCheckout({ phase: 'idle' });
     setAcademicError(null);
     setAcademicNotice(null);
+    setAcademicHint(null);
     setView('academic');
     const accountEmail = entitlement?.email || '';
     if (!profile.academic_email && accountEmail) {
       setProfile((p) => ({ ...p, academic_email: accountEmail }));
     }
     if (academic?.status !== 'verified' && accountEmail) {
-      void runAcademicVerification(undefined, accountEmail);
+      void hintAcademicEligibility(accountEmail);
     }
   }
 
@@ -486,7 +516,9 @@ export default function AccountPanel({
           amount: order.amount,
           currency: order.currency,
           name: 'Chemical Data Extractor',
-          description: `${plan.name} plan — ${plan.searches} searches per month`,
+          description: plan.period_days === 0
+            ? `${plan.name} — ${plan.searches} search, no expiry`
+            : `${plan.name} plan — ${plan.searches} searches per month`,
           handler: async (response: any) => {
             try {
               setCheckout({ phase: 'verifying' });
@@ -752,7 +784,9 @@ export default function AccountPanel({
                         <span className="text-sm font-semibold text-fg">{plan.name}</span>
                         <span className="whitespace-nowrap text-sm tabular-nums text-fg">
                           ₹{plan.price_inr.toLocaleString('en-IN')}
-                          <span className="text-xs font-normal text-fg-subtle">/mo</span>
+                          <span className="text-xs font-normal text-fg-subtle">
+                            {plan.period_days === 0 ? ' once' : '/mo'}
+                          </span>
                         </span>
                       </span>
                       {plan.tag && (
@@ -880,13 +914,26 @@ export default function AccountPanel({
                   type="email"
                   autoComplete="email"
                   required
+                  aria-describedby={academicHint ? 'academic-email-hint' : undefined}
                   value={profile.academic_email || ''}
-                  onChange={(e) =>
-                    setProfile((p) => ({ ...p, academic_email: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    // The hint describes the address that was probed; editing
+                    // the field makes it stale, so it goes rather than lies.
+                    if (academicHint) setAcademicHint(null);
+                    setProfile((p) => ({ ...p, academic_email: e.target.value }));
+                  }}
                   placeholder="you@university.edu"
                   className="field"
                 />
+                {academicHint && (
+                  <p
+                    id="academic-email-hint"
+                    className={note('info')}
+                    role="status"
+                  >
+                    {academicHint}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -946,7 +993,8 @@ export default function AccountPanel({
                   disabled={checkoutBusy || !academicToken}
                   className={cx(btnSecondary, 'w-full')}
                 >
-                  Continue to payment — ₹249
+                  Continue to payment — ₹
+                  {plans.find((p) => p.id === 'academic')?.price_inr.toLocaleString('en-IN') ?? '—'}
                 </button>
               )}
 
@@ -1121,7 +1169,9 @@ export default function AccountPanel({
                   </dd>
                   {entitlement?.period_end && (
                     <dd className="mt-1 text-xs text-fg-muted">
-                      Renews {new Date(entitlement.period_end).toLocaleDateString()}
+                      {entitlement.plan === 'single'
+                        ? 'No monthly renewal — your search never expires'
+                        : `Renews ${new Date(entitlement.period_end).toLocaleDateString()}`}
                     </dd>
                   )}
                 </div>

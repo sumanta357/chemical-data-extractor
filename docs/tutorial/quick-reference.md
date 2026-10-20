@@ -48,13 +48,17 @@
 
 ## Plans
 
-| Plan | ₹ / month | Searches | Analyst messages |
+| Plan | ₹ | Searches | Analyst messages |
 | --- | --- | --- | --- |
 | Free | 0 | 3 | 5 |
-| Academic | 249 | 30 | 100 |
-| Starter | 499 | 50 | 250 |
-| Professional | 1,999 | 300 | 1,500 |
-| Team | 7,499 | 3,000 | 10,000 |
+| Single Search | 49, once | 1, never expires | 5 |
+| Academic | 1,999 | 30 | 100 |
+| Starter | 3,999 | 50 | 250 |
+| Professional | 7,999 | 300 | 1,500 |
+| Team | 9,999 | 3,000 | 10,000 |
+
+Single Search is a one-time payment — no monthly renewal. All other paid
+plans renew monthly.
 
 ## Searching patents
 

@@ -88,7 +88,7 @@ class FakeRazorpay:
             return self.orders.get(path.rsplit("/", 1)[1], {})
         raise billing.RazorpayError("Unexpected provider call", 502)
 
-    def capture(self, order_id, amount=24900, status="captured", pid=None):
+    def capture(self, order_id, amount=199900, status="captured", pid=None):
         pid = pid or "pay_test" + uuid.uuid4().hex[:16]
         payment = {"id": pid, "order_id": order_id, "amount": amount,
                    "currency": "INR", "status": status, "method": "card"}
@@ -364,7 +364,7 @@ class PaymentIntegrity(AcademicTestCase):
 
     def test_partial_payment_does_not_activate_the_plan(self):
         """Razorpay can settle less than the order total. A ₹1 payment must
-        not open a ₹249 Academic plan."""
+        not open a ₹1,999 Academic plan."""
         order_id = self._order()
         payment = self.rzp.capture(order_id, amount=100)
         sig = hmac.new(b"rzp_test_key_secret",
@@ -413,7 +413,7 @@ class PaymentIntegrity(AcademicTestCase):
     def test_exact_amount_still_activates(self):
         """Guard against the fix being over-eager: the correct price must work."""
         order_id = self._order()
-        payment = self.rzp.capture(order_id, amount=24900)
+        payment = self.rzp.capture(order_id, amount=199900)
         sig = hmac.new(b"rzp_test_key_secret",
                        f"{order_id}|{payment['id']}".encode(), hashlib.sha256).hexdigest()
         res = self.client.post("/api/billing/verify-payment", json={
@@ -562,9 +562,9 @@ class AccessControl(AcademicTestCase):
         res = self.client.post("/api/billing/create-order", json={
             "plan": "starter", "academic_verification_token": None})
         order_id = res.json()["order_id"]
-        payment = self.rzp.capture(order_id, amount=49900)
+        payment = self.rzp.capture(order_id, amount=399900)
         billing_store.record_payment(payment["id"], order_id, self.account["id"],
-                                     "starter", 49900, "captured", "card", captured=True)
+                                     "starter", 399900, "captured", "card", captured=True)
 
         SupabaseStub(email="nosy@example.com").install(self)
         nosy = TestClient(engine_app.app, headers=AUTH_HEADERS)

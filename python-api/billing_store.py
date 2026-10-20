@@ -294,6 +294,40 @@ def create_supabase_user(sub: str, email: str, name: Optional[str] = None,
     return get_user_by_id(user_id)
 
 
+def link_supabase_account(user_id: int, sub: str,
+                          name: Optional[str] = None,
+                          email_verified: bool = False) -> dict:
+    """Attach a Supabase id to an account that exists without one.
+
+    A row created before Supabase (or created by a request that lost the race)
+    has no `supabase_user_id`, so every lookup by id misses and the insert is
+    retried — which fails on the unique email index again, for as long as the
+    account lives. Writing the id once ends that loop.
+
+    An account already bound to a *different* Supabase identity is left alone
+    and returned unchanged ({} here): the address is the only evidence linking
+    the two, and re-pointing a bound account would move another user's plan,
+    quota and orders. The caller keeps serving the account it found.
+    """
+    owner = get_user_by_id(user_id) or {}
+    linked = (owner.get("supabase_user_id") or "").strip()
+    if linked and linked != sub:
+        LOG.info("Account %s is already bound to another Supabase identity; "
+                 "leaving it untouched", user_id)
+        return {}
+    sets = ["supabase_user_id = ?"]
+    params = [sub]
+    if name:
+        sets.append("name = ?")
+        params.append(name)
+    if email_verified:
+        sets.append("email_verified_at = COALESCE(email_verified_at, ?)")
+        params.append(_iso())
+    params.append(user_id)
+    db.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", tuple(params))
+    return get_user_by_id(user_id) or {}
+
+
 def update_identity(user_id: int, changes: dict) -> None:
     """Mirror the details Supabase owns (name, email)."""
     allowed = ("name", "email")
@@ -475,12 +509,25 @@ def list_academic_customers(plan: str = "academic", q: Optional[str] = None,
             "limit": limit, "offset": offset, "sort": sort, "order": direction.lower()}
 
 
+def _period_end(now: datetime, period_days: int) -> datetime:
+    """End of the usage period for a plan.
+
+    `period_days = 0` means the plan does not expire (the Single Search
+    plan). The period is pinned a century ahead rather than left open: a
+    zero-length period would make `reset_period_if_due` roll the counters
+    over immediately and hand back the one search that was just bought.
+    """
+    if period_days and period_days > 0:
+        return now + timedelta(days=period_days)
+    return now + timedelta(days=36500)
+
+
 def set_plan(user_id: int, plan: str, period_days: int = 30,
              status: str = "active", payment_id: Optional[str] = None,
              amount_paise: Optional[int] = None) -> dict:
     """Activate/change a plan and (re)start the usage period."""
     now = _now()
-    period_end = now + timedelta(days=period_days)
+    period_end = _period_end(now, period_days)
     db.execute(
         """UPDATE users
               SET plan = ?, plan_status = ?, period_start = ?, period_end = ?,
@@ -503,7 +550,7 @@ def record_subscription(user_id: int, plan: str, status: str,
                amount_paise, started_at, current_period_end, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
         (user_id, plan, status, payment_id, amount_paise,
-         _iso(now), _iso(now + timedelta(days=period_days)), _iso(now)),
+         _iso(now), _iso(_period_end(now, period_days)), _iso(now)),
     )
 
 

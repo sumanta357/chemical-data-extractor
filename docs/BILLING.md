@@ -33,16 +33,23 @@ was modified.
 
 ## Plans
 
-| Plan | Price | Searches / month | Analyst messages |
+| Plan | Price | Searches | Analyst messages |
 |---|---|---|---|
-| Free | ₹0 | 3 | 5 |
-| Academic | ₹249 | 30 | 100 |
-| Starter | ₹499 | 50 | 250 |
-| Professional | ₹1,999 | 300 | 1,500 |
-| Team | ₹7,499 | 3,000 | 10,000 |
+| Free | ₹0 | 3 / month | 5 / month |
+| Single Search | ₹49 | 1, never expires | 5 |
+| Academic | ₹1,999 | 30 / month | 100 / month |
+| Starter | ₹3,999 | 50 / month | 250 / month |
+| Professional | ₹7,999 | 300 / month | 1,500 / month |
+| Team | ₹9,999 | 3,000 / month across 10 seats | 10,000 / month |
 
 Prices live in `PLANS` in `python-api/billing.py` and are the **only** source of
 truth — the browser can never send an amount.
+
+The Single Search plan carries `period_days = 0`, meaning **no expiry**. The
+store (`billing_store._period_end`) pins such a period a century ahead instead
+of honouring it literally: a zero-length period would make the monthly reset
+fire immediately and refund the one search that was just purchased. The one
+search is therefore consumed once and never refills.
 
 ---
 
@@ -194,6 +201,35 @@ DATABASE_URL = postgresql://user:password@ep-xxx.region.neon.tech/neondb?sslmode
 ```
 
 Tables are created automatically on first start — there is no migration step.
+
+#### Reading `accounts_store` from `/api/billing/config`
+
+`/api/billing/config` is public, so it returns the store's health and nothing
+else: `driver`, `reachable`, and the last statement failure. That failure text
+is redacted before it leaves the process — a unique-constraint error reports
+the row it collided on (`Key (email)=(…) already exists`), which would hand a
+user's address to every anonymous caller. What survives redaction is the
+exception type and the constraint name, which is enough to see *that* the
+duplicate-email path is being hit.
+
+#### A duplicate email no longer repeats forever
+
+`resolve_account()` creates the billing account the first time a Supabase user
+is seen, then matches on `supabase_user_id`. If the insert hits the unique
+email index — a row that predates Supabase, or a sign-up that lost the race —
+the account was previously returned by address but **never bound**, so the next
+request looked it up by id, missed, and re-ran the same failing insert. The
+error was therefore permanent for that user, not a one-off.
+
+The fallback now calls `billing_store.link_supabase_account()`, which writes the
+id once. Two rules hold it back:
+
+- An account already bound to a **different** Supabase identity is returned
+  unchanged. The address is the only evidence the two are the same person, and
+  re-pointing a bound row would move somebody else's plan, quota and orders.
+- An address change in Supabase that collides with another local row is logged
+  and skipped. The account was found by Supabase id, so the session survives on
+  the address it already had instead of failing every later request.
 
 Notes:
 - Only the accounts store moves to Postgres. The search database (`SEARCH_DB`) stays

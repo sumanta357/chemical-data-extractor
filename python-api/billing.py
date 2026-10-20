@@ -80,11 +80,29 @@ PLANS: dict[str, dict] = {
             "5 AI analyst messages",
         ],
     },
+    "single": {
+        "id": "single",
+        "name": "Single Search",
+        "price_inr": 49,
+        "amount_paise": 4900,
+        "searches": 1,
+        "analyst_messages": 5,
+        # 0 = no expiry: the one search never rolls over or refills. The
+        # store pins such a period a century ahead instead of honouring it
+        # literally (a zero-length period would refund the search at once).
+        "period_days": 0,
+        "tag": "Try one search — never expires",
+        "features": [
+            "1 knowledge graph search, yours until you use it",
+            "Export files included (CSV, Excel, and more)",
+            "5 AI analyst messages",
+        ],
+    },
     "academic": {
         "id": "academic",
         "name": "Academic",
-        "price_inr": 249,
-        "amount_paise": 24900,
+        "price_inr": 1999,
+        "amount_paise": 199900,
         "searches": 30,
         "analyst_messages": 100,
         "period_days": 30,
@@ -98,8 +116,8 @@ PLANS: dict[str, dict] = {
     "starter": {
         "id": "starter",
         "name": "Starter",
-        "price_inr": 499,
-        "amount_paise": 49900,
+        "price_inr": 3999,
+        "amount_paise": 399900,
         "searches": 50,
         "analyst_messages": 250,
         "period_days": 30,
@@ -114,8 +132,8 @@ PLANS: dict[str, dict] = {
     "pro": {
         "id": "pro",
         "name": "Professional",
-        "price_inr": 1999,
-        "amount_paise": 199900,
+        "price_inr": 7999,
+        "amount_paise": 799900,
         "searches": 300,
         "analyst_messages": 1500,
         "period_days": 30,
@@ -130,8 +148,8 @@ PLANS: dict[str, dict] = {
     "team": {
         "id": "team",
         "name": "Team",
-        "price_inr": 7499,
-        "amount_paise": 749900,
+        "price_inr": 9999,
+        "amount_paise": 999900,
         "searches": 3000,
         "analyst_messages": 10000,
         "period_days": 30,
@@ -155,6 +173,9 @@ def public_plans() -> list[dict]:
             "price_inr": p["price_inr"],
             "searches": p["searches"],
             "analyst_messages": p["analyst_messages"],
+            # 0 = the plan never expires (Single Search); the browser uses it
+            # to drop the "/mo" suffix instead of implying a subscription.
+            "period_days": p["period_days"],
             "tag": p.get("tag"),
             "features": p["features"],
         }
@@ -452,9 +473,9 @@ def payment_matches_order(order: dict, payment: dict) -> tuple[bool, str]:
 
     Razorpay can settle a *partial* amount (some methods and payment links let
     the payer choose less than the order total). Without this check a ₹1
-    payment would activate a ₹249 plan, so the captured amount and currency
-    are compared against the order we stored — never against anything the
-    browser sent.
+    payment would activate a full-price plan, so the captured amount and
+    currency are compared against the order we stored — never against
+    anything the browser sent.
     """
     try:
         expected = int(order.get("amount_paise") or 0)

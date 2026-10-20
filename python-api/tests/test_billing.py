@@ -20,6 +20,7 @@ import tempfile
 import time
 import unittest
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Test credentials + an isolated database, set before the modules are imported.
@@ -156,6 +157,45 @@ class PlanCatalogTests(unittest.TestCase):
     def test_free_plan_is_not_purchasable(self):
         self.assertEqual(billing.PLANS["free"]["amount_paise"], 0)
 
+    def test_paid_plan_prices(self):
+        self.assertEqual(billing.PLANS["academic"]["price_inr"], 1999)
+        self.assertEqual(billing.PLANS["starter"]["price_inr"], 3999)
+        self.assertEqual(billing.PLANS["pro"]["price_inr"], 7999)
+        self.assertEqual(billing.PLANS["team"]["price_inr"], 9999)
+
+    def test_single_search_plan_is_one_search_with_no_expiry(self):
+        single = billing.PLANS["single"]
+        self.assertEqual(single["price_inr"], 49)
+        self.assertEqual(single["amount_paise"], 4900)
+        self.assertEqual(single["searches"], 1)
+        self.assertEqual(single["period_days"], 0)
+
+
+class NoExpiryPlanTests(unittest.TestCase):
+    """The Single Search plan (period_days = 0) must never be refunded by the
+    monthly reset — otherwise ₹49 would buy unlimited one-at-a-time searches."""
+
+    def test_single_search_never_refills(self):
+        user = make_user("single-plan@example.com")
+        user = billing_store.set_plan(
+            user["id"], "single", billing.PLANS["single"]["period_days"],
+            "active", "pay_single_plan_1", 4900)
+
+        end = datetime.fromisoformat(user["period_end"])
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        self.assertGreater(end.year, datetime.now(timezone.utc).year + 50,
+                           "a no-expiry plan's period must never elapse")
+
+        ent = billing.entitlement_for(user)
+        self.assertEqual(ent["searches_limit"], 1)
+        self.assertEqual(ent["searches_remaining"], 1)
+
+        billing_store.increment_counters(user["id"], searches=1)
+        ent = billing.entitlement_for(billing_store.get_user_by_id(user["id"]))
+        self.assertEqual(ent["searches_remaining"], 0,
+                         "the used search must not come back without a new payment")
+
     def test_unknown_plan_rejected(self):
         with self.assertRaises(Exception):
             billing.get_plan("enterprise-unlimited")
@@ -246,7 +286,7 @@ class OrderCreationTests(unittest.TestCase):
 
         self.assertEqual(captured["method"], "POST")
         self.assertEqual(captured["path"], "/orders")
-        self.assertEqual(captured["payload"]["amount"], 49900)          # paise
+        self.assertEqual(captured["payload"]["amount"], 399900)         # paise (Starter ₹3,999)
         self.assertEqual(captured["payload"]["currency"], "INR")
         self.assertEqual(captured["payload"]["notes"]["plan"], "starter")
         self.assertEqual(captured["payload"]["notes"]["user_id"], str(user["id"]))
@@ -498,7 +538,7 @@ class ApiTests(unittest.TestCase):
         res = self.client.get("/api/billing/plans")
         self.assertEqual(res.status_code, 200)
         ids = [p["id"] for p in res.json()["plans"]]
-        self.assertEqual(ids, ["free", "academic", "starter", "pro", "team"])
+        self.assertEqual(ids, ["free", "single", "academic", "starter", "pro", "team"])
 
     def test_a_session_resolves_to_its_account(self):
         email = self._sign_in_as("api-cycle@example.com")
@@ -515,11 +555,11 @@ class ApiTests(unittest.TestCase):
         res = self.client.post("/api/billing/create-order", json={"plan": "starter"})
         self.assertEqual(res.status_code, 200, res.text)
         order = res.json()
-        self.assertEqual(order["amount"], 49900)
+        self.assertEqual(order["amount"], 399900)
         self.assertEqual(order["key_id"], billing.KEY_ID)
 
         billing.fetch_payment = lambda pid: {"id": pid, "order_id": order["order_id"],
-                                             "amount": 49900, "status": "captured",
+                                             "amount": 399900, "status": "captured",
                                              "method": "upi"}
         signature = sign_checkout(order["order_id"], "pay_api_1", billing.KEY_SECRET)
         res = self.client.post("/api/billing/verify-payment", json={
@@ -534,7 +574,7 @@ class ApiTests(unittest.TestCase):
     def test_verify_payment_rejects_bad_signature(self):
         self._sign_in_as("api-badsig@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
-            "id": "order_api_2", "amount": 49900, "currency": "INR"}
+            "id": "order_api_2", "amount": 399900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
 
         res = self.client.post("/api/billing/verify-payment", json={
@@ -551,10 +591,10 @@ class ApiTests(unittest.TestCase):
     def test_payment_status_endpoint(self):
         self._sign_in_as("api-status@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
-            "id": "order_api000000003", "amount": 49900, "currency": "INR"}
+            "id": "order_api000000003", "amount": 399900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
         billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_api000000003",
-                                             "amount": 49900, "status": "captured"}
+                                             "amount": 399900, "status": "captured"}
         # Real Razorpay ids are `pay_<alphanumerics>`; the endpoint validates
         # the shape, so the fixture has to look like a real one.
         res = self.client.get("/api/billing/payment-status/pay_api000000003")
@@ -565,10 +605,10 @@ class ApiTests(unittest.TestCase):
         """A payment captured upstream but never verified must still land."""
         self._sign_in_as("api-reconcile@example.com")
         billing.rzp_request = lambda m, p, payload=None: {
-            "id": "order_rec0000000001", "amount": 49900, "currency": "INR"}
+            "id": "order_rec0000000001", "amount": 399900, "currency": "INR"}
         self.client.post("/api/billing/create-order", json={"plan": "starter"})
         billing.fetch_payment = lambda pid: {"id": pid, "order_id": "order_rec0000000001",
-                                             "amount": 49900, "status": "captured"}
+                                             "amount": 399900, "status": "captured"}
 
         res = self.client.get("/api/billing/payment-status/pay_rec0000000001")
         self.assertEqual(res.status_code, 200, res.text)
