@@ -41,6 +41,15 @@ export default function HomePage() {
     );
   });
 
+  const [fromSiteUrlConfirmation] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    // The default Supabase Redirect URL target is the Site URL with this query.
+    // Confirmations work without any dashboard Redirect URL change when the
+    // project's Site URL is the app origin and this parameter is present.
+    return params.get('confirmed') === '1';
+  });
+
   // The callback URL is not proof that the confirmation failed. If the link
   // yields no session -- a PKCE verifier from another browser, cleared storage,
   // or a link already opened once -- drop through to the ordinary page rather
@@ -241,8 +250,13 @@ export default function HomePage() {
 
   // Placed after every hook so none can be skipped by the early return. The
   // panel bootstraps the Supabase client itself, which is what lets it read
-  // the session out of the confirmation link.
-  if (fromAuthCallback && !callbackUnusable) {
+  // the session out of the confirmation link. This renders for either entry
+  // point: the dashboard Redirect URL (/?confirmed=1) and the dedicated
+  // /confirm-email path when it has been added there.
+  const fromConfirmationLink =
+    fromAuthCallback || fromSiteUrlConfirmation;
+
+  if (fromConfirmationLink && !callbackUnusable) {
     return (
       <div className="flex min-h-screen flex-col">
         <SiteHeader current="app" />

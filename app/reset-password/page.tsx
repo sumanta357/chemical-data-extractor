@@ -14,6 +14,7 @@ import { SiteFooter, SiteHeader } from '@/components/SiteChrome';
 import { AlertIcon, CheckIcon, SpinnerIcon } from '@/components/icons';
 import { btnPrimary, btnSecondary, note } from '@/components/ui';
 import { authErrorMessage, getSupabase } from '@/lib/supabase';
+import PasswordField from '@/components/PasswordField';
 
 export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
@@ -97,38 +98,37 @@ export default function ResetPasswordPage() {
                 link signs you in just long enough to set a new password.
               </p>
 
-              <div>
-                <label htmlFor="new-password" className="label">
-                  New password
-                </label>
-                <input
-                  id="new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  className="field"
-                />
-              </div>
+              <PasswordField
+                id="new-password"
+                label="New password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="new-password"
+                required
+                minLength={8}
+                placeholder="At least 8 characters"
+                hint="At least 8 characters."
+              />
 
-              <div>
-                <label htmlFor="confirm-password" className="label">
-                  Confirm new password
-                </label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="field"
-                />
-              </div>
+              <PasswordField
+                id="confirm-password"
+                label="Confirm new password"
+                value={confirm}
+                onChange={setConfirm}
+                autoComplete="new-password"
+                required
+                minLength={8}
+                placeholder="Re-enter your new password"
+                hint="Re-enter your new password to confirm it."
+              />
+              {password && confirm && password !== confirm && (
+                <p className={note('danger')} role="alert">
+                  <span className="inline-flex items-start gap-1.5">
+                    <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                    The two passwords do not match.
+                  </span>
+                </p>
+              )}
 
               {error && (
                 <p className={note('danger')} role="alert">

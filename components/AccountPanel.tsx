@@ -32,6 +32,7 @@ import {
   SpinnerIcon,
   UserIcon,
 } from '@/components/icons';
+import PasswordField from '@/components/PasswordField';
 import {
   btnGhost,
   btnPrimary,
@@ -113,6 +114,7 @@ export default function AccountPanel({
   const [displayName, setDisplayName] = useState('');
   const [opened, setOpened] = useState(false);
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -266,6 +268,9 @@ export default function AccountPanel({
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
         if (authError) throw authError;
         setPassword('');
+      } else if (password !== confirmPassword) {
+        setError('Your passwords do not match. Please try again.');
+        return;
       } else {
         const { data, error: authError } = await supabase.auth.signUp({
           email,
@@ -1070,22 +1075,39 @@ export default function AccountPanel({
                 />
               </div>
 
-              <div>
-                <label htmlFor="auth-password" className="label">
-                  Password
-                </label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="field"
-                />
-                <p className="mt-1.5 text-[11px] text-fg-subtle">At least 8 characters.</p>
-              </div>
+              <PasswordField
+                id="auth-password"
+                label="Password"
+                value={password}
+                onChange={setPassword}
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                required
+                minLength={8}
+                hint={mode === 'signup' ? 'At least 8 characters.' : undefined}
+              />
+
+              {mode === 'signup' && (
+                <div>
+                  <PasswordField
+                    id="auth-confirm-password"
+                    label="Confirm password"
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    hint="Re-enter your password to confirm it."
+                  />
+                  {password && confirmPassword && password !== confirmPassword && (
+                    <p className={note('danger')} role="alert">
+                      <span className="inline-flex items-start gap-1.5">
+                        <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+                        Your passwords do not match.
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <p className={note('danger')} role="alert">
