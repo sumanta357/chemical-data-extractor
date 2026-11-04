@@ -42,6 +42,11 @@ FROM python:3.10-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+# Export retention and the exports disk cap, set in the image so the container
+# and the code agree: 24 hours and 1 GB.
+ENV MAX_STORAGE_MB=1024 \
+    EXPORT_MAX_AGE_MINUTES=1440
+
 WORKDIR /app
 
 # Python dependencies for the engine + FastAPI layer

@@ -8,7 +8,7 @@ const searches = new Map<string, SearchState>();
 
 // ── Persistence ─────────────────────────────────────────────────────────
 const PERSIST_FILE = path.join(process.cwd(), '.scigraph_searches.json');
-const MAX_SEARCH_AGE_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_SEARCH_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // Run cleanup every 5 minutes
 
 // Load persisted searches on module init

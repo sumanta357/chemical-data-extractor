@@ -78,8 +78,8 @@ except Exception as _billing_import_error:  # pragma: no cover - defensive
 
 
 # ── Durable export storage (optional layer) ──────────────────────────────────
-# Exports are written to local disk and swept about half an hour after a search
-# finishes, so nothing a user ran is still there tomorrow. With GCS_BUCKET and
+# Exports are written to local disk and swept 24 hours after a search finishes,
+# so nothing a user ran is still there a day later. With GCS_BUCKET and
 # GOOGLE_APPLICATION_CREDENTIALS_JSON set, every completed search is also
 # archived to Google Cloud Storage and given a durable link. Unset, the search
 # path is unchanged.
@@ -2592,9 +2592,11 @@ def _guess_mime(filename: str) -> str:
 
 # ── Storage Management ───────────────────────────────────────────────────────
 
-MAX_STORAGE_MB = int(os.environ.get("MAX_STORAGE_MB", "500"))
+# Retention and the exports disk cap are both env-overridable so a deployment
+# can tune them without a code change. The defaults are 24 hours and 1GB.
+MAX_STORAGE_MB = int(os.environ.get("MAX_STORAGE_MB", "1024"))
 MAX_LOG_LINES_COMPLETED = 100  # Keep only last 100 log lines for completed searches
-EXPORT_MAX_AGE_MINUTES = 30  # Auto-delete exports older than 30 minutes
+EXPORT_MAX_AGE_MINUTES = int(os.environ.get("EXPORT_MAX_AGE_MINUTES", "1440"))  # 24 hours
 CLEANUP_INTERVAL_SECONDS = 1800  # Run cleanup every 30 minutes
 
 def _enrich_command(export_dir: str) -> list:
@@ -2707,7 +2709,8 @@ async def startup():
     LOG.info("   Engine dir: %s", ENGINE_DIR)
     LOG.info("   Exports dir: %s", EXPORTS_DIR)
     LOG.info("   Workspace dir: %s", WORKSPACE_DIR)
-    LOG.info("   Storage limit: %sMB | Export retention: %s min", MAX_STORAGE_MB, EXPORT_MAX_AGE_MINUTES)
+    LOG.info("   Storage limit: %sMB | Export retention: %.1f h", MAX_STORAGE_MB,
+             EXPORT_MAX_AGE_MINUTES / 60)
 
     # Accounts store: say out loud which backend is in use, and shout if it is
     # ephemeral (accounts silently disappear on every redeploy otherwise).

@@ -380,7 +380,7 @@ def fig_exports(c, x, y, w, h):
     ny = y + h - 40
     wire.box(x + 8, ny, w - 16, 32, fill=SURFACE, stroke=None, radius=3)
     wire.text(x + 14, ny + 8, "Exports are temporary — the server deletes", size=5.0, color=MUTED)
-    wire.text(x + 14, ny + 17, "generated files about 30 minutes after the", size=5.0, color=MUTED)
+    wire.text(x + 14, ny + 17, "generated files 24 hours after the search", size=5.0, color=MUTED)
     wire.text(x + 14, ny + 26, "search completes. Download what you keep.", size=5.0, color=MUTED)
 
 

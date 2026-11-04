@@ -3,8 +3,8 @@
 **Chemical Data Extractor v3.2 · what each downloaded file contains**
 
 Every completed search writes up to 15 files. This reference lists what each one
-holds and the tool to open it with. Files are removed from the server about
-30 minutes after the search completes.
+holds and the tool to open it with. Files are removed from the server 24 hours
+after the search completes.
 
 ---
 
@@ -132,5 +132,5 @@ file list can be shorter than this reference.
 | Handle a very large result set | `nodes.parquet`, `edges.parquet` |
 | Make a figure for a paper | `enriched_data.xlsx`, `structure_images/` |
 
-**Retention:** downloads are deleted from the server roughly 30 minutes after
-the search finishes. Save anything you need immediately.
+**Retention:** downloads are deleted from the server 24 hours after the search
+finishes. Save anything you need before then.

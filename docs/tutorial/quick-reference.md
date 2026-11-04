@@ -43,8 +43,7 @@
 ## Two limits to remember
 
 - **One search at a time.** A second search queues and starts automatically.
-- **Exports are deleted about 30 minutes after the run.** Download what you
-  need.
+- **Exports are deleted 24 hours after the run.** Download what you need.
 
 ## Plans
 

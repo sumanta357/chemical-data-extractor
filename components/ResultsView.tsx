@@ -390,8 +390,8 @@ export default function ResultsView({ search }: Props) {
         <AlertIcon className="mt-px h-4 w-4 shrink-0 text-fg-subtle" />
         <span>
           {search.storage
-            ? 'The individual files below are temporary — the server deletes them about 30 minutes after the search completes. The archive above is kept.'
-            : 'Exports are temporary. The server deletes generated files about 30 minutes after the search completes, so download anything you want to keep.'}
+            ? 'The individual files below are temporary — the server deletes them 24 hours after the search completes. The archive above is kept.'
+            : 'Exports are temporary. The server deletes generated files 24 hours after the search completes, so download anything you want to keep.'}
         </span>
       </p>
     </section>

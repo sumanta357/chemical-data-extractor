@@ -74,8 +74,8 @@ const FAQ = [
     question: 'Where do my own search results come from?',
     answer:
       'Every completed search lists its own export files in the workspace. Those are generated for ' +
-      'you and are removed from the server about 30 minutes after the search finishes, so download ' +
-      'them straight away. The files on this page are static and never expire.',
+      'you and are removed from the server 24 hours after the search finishes, so download ' +
+      'them before then. The files on this page are static and never expire.',
   },
   {
     question: 'Do I need an account to download these?',

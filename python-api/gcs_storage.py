@@ -1,7 +1,7 @@
 """Durable copies of search exports in Google Cloud Storage.
 
 Every export the engine produces lands on ephemeral local disk, and a sweep
-deletes them about half an hour after the search finishes
+deletes them 24 hours after the search finishes
 (EXPORT_MAX_AGE_MINUTES in app.py). On a free-tier host that disk is discarded
 on every deploy as well, so a completed search has no lasting artefact
 anywhere. When a bucket is configured the export directory is archived as one

@@ -137,8 +137,8 @@ export default function HistoryPanel({ onViewSearch }: Props) {
       {!loading && !error && searches.length > 0 && (
         <p className={cx(note('info'), 'mt-4')}>
           Opening a past search re-loads its status and log. The export files
-          themselves are deleted from the server about 30 minutes after that
-          search finished.
+          themselves are deleted from the server 24 hours after that search
+          finished.
         </p>
       )}
     </section>

@@ -131,8 +131,8 @@ Two operational limits are worth knowing:
 
 - **One search at a time.** If a search is already running, yours is queued and
   starts as soon as the first one finishes. Nothing is lost.
-- **Exports are temporary.** Generated files are deleted from the server about
-  30 minutes after the search completes. Download anything you need to keep.
+- **Exports are temporary.** Generated files are deleted from the server 24
+  hours after the search completes. Download anything you need to keep.
 
 ---
 
@@ -289,9 +289,9 @@ above is the usual set.
 Click any row in the **Export files** panel. The file opens in a new tab and
 your browser saves it. Downloading is per-file, so take the ones you need.
 
-**Downloads are removed from the server about 30 minutes after the search
-finishes.** If you need to keep a graph, download it straight away. Re-running
-a search regenerates the files.
+**Downloads are removed from the server 24 hours after the search finishes.**
+If you need to keep a graph, download it before then. Re-running a search
+regenerates the files.
 
 ## 5.3 Which file to use
 
