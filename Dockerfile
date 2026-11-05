@@ -44,8 +44,14 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Export retention and the exports disk cap, set in the image so the container
 # and the code agree: 24 hours and 1 GB.
+#
+# MAX_SEARCH_SECONDS=0 removes the per-search wall clock, so a query on this
+# dedicated box runs until it finishes instead of being killed at 50 minutes.
+# The watchdog still kills an engine that goes silent AND idle for
+# STALL_TIMEOUT_SECONDS, so a genuinely wedged process cannot hold a slot.
 ENV MAX_STORAGE_MB=1024 \
-    EXPORT_MAX_AGE_MINUTES=1440
+    EXPORT_MAX_AGE_MINUTES=1440 \
+    MAX_SEARCH_SECONDS=0
 
 WORKDIR /app
 

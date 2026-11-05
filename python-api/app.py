@@ -510,10 +510,14 @@ class SearchStatus(BaseModel):
 # Both limits are set generously for the memory-constrained free tier, where a
 # large query is slow rather than hung and a premature kill throws away real
 # work: a genuinely dead process is rare, and the ceiling still guarantees a
-# search slot is released.
+# search slot is released. Both limits read from the environment so a host sets
+# its own budget rather than living with a number compiled in for a smaller one.
+# MAX_SEARCH_SECONDS = 0 removes the wall clock entirely: a search that keeps
+# printing or burning CPU then runs until it finishes, however long it takes.
+# The idle detector still applies, so a genuinely wedged engine is cleaned up.
 STALL_POLL_SECONDS = 10.0
-STALL_TIMEOUT = 1500.0
-MAX_SEARCH_SECONDS = 3000.0
+STALL_TIMEOUT = float(os.environ.get("STALL_TIMEOUT_SECONDS", "1500"))
+MAX_SEARCH_SECONDS = float(os.environ.get("MAX_SEARCH_SECONDS", "3000"))
 
 
 def _process_cpu_seconds(pid: int) -> Optional[float]:
@@ -567,7 +571,7 @@ def _is_stalled(quiet_for: float, running_for: float) -> bool:
     a process can spin without ever printing, and a search must not hold a
     search slot for ever.
     """
-    if running_for >= MAX_SEARCH_SECONDS:
+    if MAX_SEARCH_SECONDS > 0 and running_for >= MAX_SEARCH_SECONDS:
         return True
     return quiet_for >= STALL_TIMEOUT
 
@@ -683,29 +687,53 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
 
         if stall_detected:
             quiet_for = time.monotonic() - quiet_since
-            LOG.error("search subprocess stalled (no output for %.0fs, no CPU "
-                      "advance, ran %.0fs) — killing pid=%s",
-                      quiet_for, time.monotonic() - started_monotonic, process.pid)
+            ran_for = time.monotonic() - started_monotonic
+            # Two rules can trip this, and they mean opposite things. The ceiling
+            # fires while the engine is still busy, so reporting silence then
+            # would name a cause the watchdog never observed.
+            hit_ceiling = MAX_SEARCH_SECONDS > 0 and ran_for >= MAX_SEARCH_SECONDS
+            LOG.error("search subprocess killed (%s) after %.0fs, quiet for %.0fs "
+                      "— pid=%s",
+                      "time limit" if hit_ceiling else "no progress",
+                      ran_for, quiet_for, process.pid)
             try:
                 process.kill()
             except ProcessLookupError:
                 pass
             read_task.cancel()
             state["status"] = "failed"
-            state["error"] = (
-                "This search was stopped because the engine stopped making progress. "
-                f"It either printed nothing for {STALL_TIMEOUT / 60:g} minutes while using "
-                f"no CPU, or it ran past the {MAX_SEARCH_SECONDS / 60:g}-minute time limit "
-                "for a single query. That normally means the free container could not keep "
-                "up with this particular query rather than anything being broken. Running it "
-                "again often works; the Render Starter plan (1GB) is the permanent fix."
-            )
-            state["progress"] = "Failed: engine stalled"
-            state["log"].append(
-                f"[engine] no output for {quiet_for:.0f}s with no CPU advance "
-                f"({time.monotonic() - started_monotonic:.0f}s total) — subprocess "
-                "killed. This was a slow query on a small container, not an engine fault."
-            )
+            if hit_ceiling:
+                state["error"] = (
+                    "This search was stopped because it ran past the "
+                    f"{MAX_SEARCH_SECONDS / 60:g}-minute time limit for a single query. "
+                    "The engine was still working when it was stopped, so nothing is "
+                    "broken — this query is just larger than this container finishes "
+                    "inside that budget. Raise MAX_SEARCH_SECONDS (or set it to 0 for no "
+                    "time limit) to let it run to completion, or ask for fewer hops."
+                )
+            else:
+                state["error"] = (
+                    "This search was stopped because the engine stopped making progress: "
+                    f"it printed nothing for {STALL_TIMEOUT / 60:g} minutes while using "
+                    "no CPU. That is a wedged engine rather than a slow query — run it "
+                    "again, and if it repeats the log above shows the step it died in."
+                )
+            state["progress"] = (
+                "Failed: time limit reached" if hit_ceiling
+                else "Failed: engine stalled")
+            if hit_ceiling:
+                state["log"].append(
+                    f"[engine] stopped at the {MAX_SEARCH_SECONDS / 60:g}-minute time "
+                    f"limit ({ran_for:.0f}s total) while still working — subprocess "
+                    "killed. The query outran the time budget, it did not crash. Set "
+                    "MAX_SEARCH_SECONDS=0 to remove the limit."
+                )
+            else:
+                state["log"].append(
+                    f"[engine] no output for {quiet_for:.0f}s with no CPU advance "
+                    f"({ran_for:.0f}s total) — subprocess killed. The engine wedged "
+                    "rather than running long."
+                )
             state["elapsed_seconds"] = time.time() - start_time
             _save_search(state)
             _discard_failed_export(export_dir)
@@ -2711,6 +2739,8 @@ async def startup():
     LOG.info("   Workspace dir: %s", WORKSPACE_DIR)
     LOG.info("   Storage limit: %sMB | Export retention: %.1f h", MAX_STORAGE_MB,
              EXPORT_MAX_AGE_MINUTES / 60)
+    LOG.info("   Search watchdog: idle %.0f min | time limit %s", STALL_TIMEOUT / 60,
+             f"{MAX_SEARCH_SECONDS / 60:g} min" if MAX_SEARCH_SECONDS > 0 else "none")
 
     # Accounts store: say out loud which backend is in use, and shout if it is
     # ephemeral (accounts silently disappear on every redeploy otherwise).

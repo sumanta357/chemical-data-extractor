@@ -154,6 +154,18 @@ reach the threshold no matter how long it stays quiet.
         self.assertTrue(engine_app._is_stalled(quiet_for=0, running_for=3000))
         self.assertTrue(engine_app._is_stalled(quiet_for=0, running_for=5000))
 
+    def test_a_zero_ceiling_lets_a_busy_search_run_to_completion(self):
+        """MAX_SEARCH_SECONDS=0 lifts the wall clock, not the idle check.
+
+        A dedicated host would rather wait out a large query than throw the
+        work away at an arbitrary minute mark, but a wedged engine must still
+        be cleaned up or it holds a search slot for ever.
+        """
+        engine_app.MAX_SEARCH_SECONDS = 0
+        self.assertFalse(engine_app._is_stalled(quiet_for=0, running_for=86_400))
+        self.assertFalse(engine_app._is_stalled(quiet_for=900, running_for=86_400))
+        self.assertTrue(engine_app._is_stalled(quiet_for=1501, running_for=86_400))
+
     def test_the_ceiling_is_wider_than_the_stall_timeout(self):
         """A busy engine deserves more than five minutes before giving up."""
         self.assertGreater(engine_app.MAX_SEARCH_SECONDS, engine_app.STALL_TIMEOUT)
