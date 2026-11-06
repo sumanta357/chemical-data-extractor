@@ -1,7 +1,13 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import type { SearchState, ExportFile } from './types';
+import type {
+  SearchState,
+  ExportFile,
+  SearchGraph,
+  GraphNode,
+  GraphEdge,
+} from './types';
 
 // ── In-memory search state ──────────────────────────────────────────────
 const searches = new Map<string, SearchState>();
@@ -181,6 +187,11 @@ async function refreshRemoteState(state: SearchState): Promise<void> {
     state.remote_failures = 0;
     state.status = data.status || state.status;
     state.progress = data.progress ?? state.progress;
+    // The engine reports the pipeline step it is inside; carried through so the
+    // UI can show real stages instead of a spinner with a guess attached.
+    if (typeof data.step === 'number') state.step = data.step;
+    if (typeof data.step_total === 'number') state.step_total = data.step_total;
+    if (typeof data.step_label === 'string') state.step_label = data.step_label;
 
     // Stall watchdog: if the engine keeps answering 200 but nothing changes
     // (status, progress, log size, elapsed) for 5 minutes on an active job,
@@ -378,11 +389,18 @@ function runSearch(
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
+  const keepLine = createLogFilter();
   const handleOutput = (data: Buffer) => {
     const lines = data.toString('utf-8').split('\n');
     for (const raw of lines) {
       const line = raw.replace(/\r$/, '');
       if (line.trim()) {
+        // Interpreter internals belong in the server console, not in the run
+        // log a customer reads.
+        if (!keepLine(line)) {
+          console.error('[engine]', line);
+          continue;
+        }
         state.log.push(line);
         updateProgress(line, state);
       }
@@ -449,17 +467,52 @@ function runSearch(
   });
 }
 
+/**
+ * Interpreter internals (missing wheels, tracebacks) are an operator problem,
+ * not something a customer can act on. They are written to the server console
+ * and kept out of the run log; the search still reports the failure in words.
+ */
+function createLogFilter(): (line: string) => boolean {
+  let inTraceback = false;
+  return (line: string) => {
+    if (line.includes('Traceback (most recent call last)')) {
+      inTraceback = true;
+      return false;
+    }
+    if (inTraceback) {
+      // Frames and echoed source are indented; the first unindented line ends
+      // the traceback and is the exception itself, judged below.
+      if (/^\s/.test(line) || !line.trim()) return false;
+      inTraceback = false;
+    }
+    if (
+      line.includes('Missing critical dependencies') ||
+      line.includes('Please run: pip install')
+    ) {
+      return false;
+    }
+    if (/^\s+File "/.test(line) || /^[A-Za-z_][\w.]*(Error|Exception):/.test(line.trim())) {
+      return false;
+    }
+    return true;
+  };
+}
+
 function updateProgress(line: string, state: SearchState): void {
-  if (
-    line.includes('[1/6]') ||
-    line.includes('[2/6]') ||
-    line.includes('[3/6]') ||
-    line.includes('[4/6]') ||
-    line.includes('[5/6]') ||
-    line.includes('[6/6]')
-  ) {
+  // `── Step 2/6: Entity Resolution & Deduplication` and the bare section
+  // headers like `[3/6] ENTITIES & CONNECTIONS SUMMARY` are the engine's own
+  // step markers, so the UI can name the stage actually running.
+  const stepHeader =
+    /──\s*Step\s+(\d+)\s*\/\s*(\d+):\s*(.+)$/.exec(line) ??
+    /^\s*\[(\d+)\s*\/\s*(\d+)\]\s*(.+)$/.exec(line);
+  if (stepHeader) {
+    state.step = Number(stepHeader[1]);
+    state.step_total = Number(stepHeader[2]);
+    state.step_label = stepHeader[3].trim().replace(/:$/, '');
     state.progress = line.trim();
-  } else if (line.includes('╔══ Hop')) {
+    return;
+  }
+  if (line.includes('╔══ Hop')) {
     state.progress = line.trim();
   } else if (line.includes('Pipeline finished') || line.includes('finished successfully')) {
     state.progress = '✅ scigraph complete!';
@@ -508,11 +561,17 @@ function runEnrichment(
       }
     });
 
+    const keepErr = createLogFilter();
     proc.stderr?.on('data', (data: Buffer) => {
       const lines = data.toString('utf-8').split('\n');
       for (const raw of lines) {
         const line = raw.replace(/\r$/, '');
-        if (line.trim()) state.log.push(line);
+        if (!line.trim()) continue;
+        if (!keepErr(line)) {
+          console.error('[enrich]', line);
+          continue;
+        }
+        state.log.push(line);
       }
     });
 
@@ -581,6 +640,164 @@ export async function getSearchLog(
 ): Promise<{ state: SearchState | undefined }> {
   const state = await getSearch(searchId);
   return { state };
+}
+
+// ── Graph reader (interactive network view) ─────────────────────────────
+
+/** Canvas budget: the CSV is relevance-ordered, so the first N are the useful
+ *  ones. Everything else stays in the downloadable exports. */
+const GRAPH_NODE_LIMIT = 450;
+const GRAPH_EDGE_LIMIT = 1200;
+
+/** Split one CSV line, honouring quoted fields that contain commas. */
+function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ',') {
+      out.push(field);
+      field = '';
+    } else {
+      field += ch;
+    }
+  }
+  out.push(field);
+  return out;
+}
+
+function readCsvRecords(file: string): Record<string, string>[] {
+  if (!fs.existsSync(file)) return [];
+  const rows: Record<string, string>[] = [];
+  const text = fs.readFileSync(file, 'utf-8').replace(/\r\n/g, '\n');
+  const lines = text.split('\n').filter((l) => l.length > 0);
+  if (lines.length < 2) return rows;
+  const header = splitCsvLine(lines[0]);
+  for (const line of lines.slice(1)) {
+    const cells = splitCsvLine(line);
+    const row: Record<string, string> = {};
+    header.forEach((key, i) => {
+      row[key] = cells[i] ?? '';
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+const TYPE_COLOR: Record<string, string> = {
+  COMPOUND: '#3b82f6',
+  LIGAND: '#3b82f6',
+  PROTEIN: '#ef4444',
+  TARGET: '#ef4444',
+  STRUCTURE: '#22c55e',
+  PDB: '#22c55e',
+  ENZYME: '#f97316',
+  GENE: '#a855f7',
+  PATHWAY: '#eab308',
+};
+
+/**
+ * The graph behind a finished search, read from its own nodes.csv / edges.csv
+ * (or proxied from the hosted engine when this app is only the UI).
+ *
+ * Returns null when the search has no graph yet — a running search has no CSV
+ * to read, and that is not an error.
+ */
+export async function getSearchGraph(
+  searchId: string
+): Promise<SearchGraph | null> {
+  const state = searches.get(searchId);
+  if (!state) return null;
+
+  if (state.remote_engine_url && state.remote_search_id) {
+    try {
+      return await fetchJson(
+        `${state.remote_engine_url}/api/search/${state.remote_search_id}/graph`,
+        { signal: AbortSignal.timeout(30_000) }
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  const dir = state.export_dir;
+  if (!dir) return null;
+  const nodeRows = readCsvRecords(path.join(dir, 'nodes.csv'));
+  const edgeRows = readCsvRecords(path.join(dir, 'edges.csv'));
+  if (nodeRows.length === 0 || edgeRows.length === 0) return null;
+
+  const nodes: GraphNode[] = [];
+  const kept = new Set<string>();
+  for (const row of nodeRows) {
+    const id = (row['uid:ID'] ?? '').trim();
+    if (!id) continue;
+    if (nodes.length >= GRAPH_NODE_LIMIT) break;
+    kept.add(id);
+    const rawLabel = (row[':LABEL'] ?? 'Other').trim();
+    const kind = rawLabel.split(';').pop() || 'Other';
+    const name = (row.name || id).trim();
+    nodes.push({
+      data: {
+        id,
+        label: name.slice(0, 48),
+        name,
+        type: kind,
+        color: TYPE_COLOR[kind.toUpperCase()] ?? '#6b7280',
+        canonical_id: (row.canonical_id ?? '').trim(),
+        cross_references: (row.cross_references ?? '').trim(),
+        smiles: (row.smiles ?? '').trim(),
+        formula: (row.formula ?? '').trim(),
+        molecular_weight: (row.molecular_weight ?? '').trim(),
+        bioactivity_summary: (row.bioactivity_summary ?? '').trim().slice(0, 160),
+      },
+    });
+  }
+
+  const edges: GraphEdge[] = [];
+  for (const row of edgeRows) {
+    const source = (row[':START_ID'] ?? '').trim();
+    const target = (row[':END_ID'] ?? '').trim();
+    if (!source || !target) continue;
+    if (!kept.has(source) || !kept.has(target)) continue;
+    if (edges.length >= GRAPH_EDGE_LIMIT) continue;
+    const relation = (row[':TYPE'] ?? 'interacts').trim();
+    const value = (row.activity_value ?? '').trim();
+    const units = (row.units ?? '').trim();
+    const activity = (row.activity_type ?? '').trim();
+    edges.push({
+      data: {
+        source,
+        target,
+        label: (value ? `${activity} ${value} ${units}`.trim() : relation).slice(0, 48),
+        relation,
+        pchembl: (row.pchembl_value ?? '').trim() || null,
+      },
+    });
+  }
+
+  return {
+    nodes,
+    edges,
+    node_count: nodes.length,
+    edge_count: edges.length,
+    node_total: nodeRows.length,
+    edge_total: edgeRows.length,
+    truncated: nodes.length < nodeRows.length || edges.length < edgeRows.length,
+  };
 }
 
 export function listSearches(limit: number = 20): SearchState[] {

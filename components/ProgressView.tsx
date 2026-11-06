@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { AlertIcon } from '@/components/icons';
-import { STATUS_LABEL, note, statusKey, statusPill } from '@/components/ui';
+import { STATUS_LABEL, cx, note, statusKey, statusPill } from '@/components/ui';
 import type { SearchState } from '@/lib/types';
 
 interface Props {
@@ -42,6 +42,20 @@ function tone(line: string): Tone {
   }
   return 'default';
 }
+
+/*
+ * The engine prints its own step headers ("── Step 2/6: Entity Resolution &
+ * Deduplication"), so these are short labels for the same steps — the current
+ * one always shows the engine's own wording, these only fill in the others.
+ */
+const STEP_LABELS: Record<number, string> = {
+  1: 'Routing',
+  2: 'Resolution',
+  3: 'Connections',
+  4: 'Analytics',
+  5: 'Insights',
+  6: 'Exports',
+};
 
 export default function ProgressView({ search, logLines }: Props) {
   const key = statusKey(search.status);
@@ -142,6 +156,52 @@ export default function ProgressView({ search, logLines }: Props) {
           The search engine wakes from idle on the first request — this can take
           up to a minute. Later searches start immediately.
         </p>
+      )}
+
+      {/* Where the run actually is. The engine reports its own step number, so
+          this is a measurement of the pipeline, not an invented percentage. */}
+      {typeof search.step === 'number' && (
+        <div className="mx-5 mt-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="truncate text-[11px] font-medium text-fg-muted">
+              {search.step_label ?? STEP_LABELS[search.step] ?? `Step ${search.step}`}
+            </span>
+            <span className="shrink-0 text-[11px] tabular-nums text-fg-subtle">
+              Step {search.step} of {search.step_total ?? 6}
+            </span>
+          </div>
+          <ol className="mt-1.5 flex gap-1" aria-label="Engine pipeline steps">
+            {Array.from(
+              { length: search.step_total ?? 6 },
+              (_, i) => i + 1
+            ).map((n) => (
+              <li
+                key={n}
+                className="min-w-0 flex-1"
+                aria-current={n === search.step ? 'step' : undefined}
+              >
+                <div
+                  className={cx(
+                    'h-1 rounded-full transition-colors',
+                    n < search.step!
+                      ? 'bg-accent/60'
+                      : n === search.step
+                        ? 'bg-accent'
+                        : 'bg-surface-3'
+                  )}
+                />
+                <div
+                  className={cx(
+                    'mt-1 truncate text-[10px]',
+                    n === search.step ? 'text-fg-muted' : 'text-fg-subtle'
+                  )}
+                >
+                  {STEP_LABELS[n] ?? `Step ${n}`}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       {/* Live log */}

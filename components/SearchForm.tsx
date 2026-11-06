@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ChevronIcon, SearchIcon, SpinnerIcon } from '@/components/icons';
 import {
   btnPrimary,
@@ -8,6 +8,7 @@ import {
   segmentItemClass,
   segmentWrap,
 } from '@/components/ui';
+import { authHeaders } from '@/lib/billing';
 
 interface Props {
   onSearch: (query: string, queryType: string, hops: number) => void;
@@ -31,10 +32,76 @@ const HOP_NOTES: Record<number, string> = {
   4: 'Maximum depth across all databases. Broadest and slowest.',
 };
 
+/* One line per depth for the card header: what it adds, not how it is built. */
+const HOP_SCOPE: Record<number, string> = {
+  1: 'Direct bindings',
+  2: 'Plus pathway partners',
+  3: 'Plus linked targets',
+  4: 'Full network',
+};
+
+function formatDuration(seconds: number): string {
+  if (seconds < 90) return `${Math.round(seconds)}s`;
+  if (seconds < 5400) return `${Math.round(seconds / 60)} min`;
+  return `${(seconds / 3600).toFixed(1)} h`;
+}
+
 export default function SearchForm({ onSearch, isRunning }: Props) {
   const [query, setQuery] = useState('');
   const [queryType, setQueryType] = useState('auto');
   const [hops, setHops] = useState(1);
+  /*
+   * Median runtime of this account's own finished searches, per depth. Shown on
+   * the cards so the depth choice is informed by measurement instead of a
+   * marketing number: a depth that has never been run says so.
+   */
+  const [measured, setMeasured] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/searches?limit=50', {
+          headers: await authHeaders(),
+        });
+        if (!res.ok) return;
+        const rows: Array<{
+          hops?: number | null;
+          status?: string;
+          elapsed_seconds?: number | null;
+        }> = await res.json();
+        if (!alive || !Array.isArray(rows)) return;
+
+        const byHop = new Map<number, number[]>();
+        for (const row of rows) {
+          if (row.status !== 'completed') continue;
+          const seconds = row.elapsed_seconds;
+          const depth = Number(row.hops);
+          if (typeof seconds !== 'number' || !Number.isFinite(seconds)) continue;
+          if (!Number.isInteger(depth) || depth < 1) continue;
+          byHop.set(depth, [...(byHop.get(depth) ?? []), seconds]);
+        }
+
+        const next: Record<number, number> = {};
+        byHop.forEach((values, depth) => {
+          const sorted = [...values].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          next[depth] =
+            sorted.length % 2 === 0
+              ? (sorted[mid - 1] + sorted[mid]) / 2
+              : sorted[mid];
+        });
+        if (alive) setMeasured(next);
+      } catch {
+        // Timings are a nicety; the control works without them.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const hasMeasured = Object.keys(measured).length > 0;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -149,23 +216,60 @@ export default function SearchForm({ onSearch, isRunning }: Props) {
         <span id="hops-label" className="label">
           Expansion depth
         </span>
-        <div role="group" aria-labelledby="hops-label" className={segmentWrap}>
-          {HOPS.map((h) => (
-            <button
-              key={h}
-              type="button"
-              aria-pressed={hops === h}
-              onClick={() => setHops(h)}
-              disabled={isRunning}
-              className={segmentItemClass(hops === h)}
-            >
-              {h}
-            </button>
-          ))}
+        <div
+          role="group"
+          aria-labelledby="hops-label"
+          className="mt-1.5 grid grid-cols-2 gap-1.5"
+        >
+          {HOPS.map((h) => {
+            const active = hops === h;
+            const median = measured[h];
+            return (
+              <button
+                key={h}
+                type="button"
+                aria-pressed={active}
+                aria-label={`${h}-hop: ${HOP_SCOPE[h]}${
+                  median != null ? `, median ${formatDuration(median)} on your runs` : ''
+                }`}
+                onClick={() => setHops(h)}
+                disabled={isRunning}
+                className={cx(
+                  'rounded-lg border px-3 py-2 text-left transition-colors',
+                  active
+                    ? 'border-accent bg-accent-soft'
+                    : 'border-line bg-surface-2 hover:border-accent/50',
+                  isRunning && 'opacity-60'
+                )}
+              >
+                <span className="flex items-baseline justify-between gap-2">
+                  <span
+                    className={cx(
+                      'text-xs font-semibold',
+                      active ? 'text-fg' : 'text-fg-muted'
+                    )}
+                  >
+                    {h} hop{h > 1 ? 's' : ''}
+                  </span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-fg-subtle">
+                    {median != null ? formatDuration(median) : 'not run yet'}
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-fg-muted">
+                  {HOP_SCOPE[h]}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <p className="mt-2 text-xs leading-relaxed text-fg-subtle">
           {HOP_NOTES[hops]}
         </p>
+        {hasMeasured && (
+          <p className="mt-1 text-[11px] leading-relaxed text-fg-subtle">
+            Times are the median of your own finished searches at that depth.
+          </p>
+        )}
       </div>
 
       <button

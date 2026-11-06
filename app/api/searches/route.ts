@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     searches.map((s) => ({
       search_id: s.search_id,
       query: s.query,
+      hops: s.hops,
       status: s.status,
       progress: s.progress,
       created_at: s.created_at,

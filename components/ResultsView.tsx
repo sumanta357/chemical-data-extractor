@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { AlertIcon, DownloadIcon } from '@/components/icons';
+import GraphViewer from '@/components/GraphViewer';
 import { cx, note } from '@/components/ui';
 import type { DecisionIntel, SearchState } from '@/lib/types';
 import { authHeaders } from '@/lib/billing';
@@ -343,6 +344,8 @@ export default function ResultsView({ search }: Props) {
             ` · finished in ${search.elapsed_seconds.toFixed(1)}s`}
         </p>
       </div>
+
+      {files.length > 0 && <GraphViewer search={search} />}
 
       {files.length > 0 && <DecisionIntelPanel search={search} />}
 

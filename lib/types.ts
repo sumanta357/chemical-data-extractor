@@ -28,6 +28,11 @@ export interface SearchState {
   hops: number;
   status: 'queued' | 'running' | 'completed' | 'failed';
   progress: string | null;
+  /** Which of the engine's own pipeline steps is running (1..step_total). */
+  step?: number | null;
+  step_total?: number | null;
+  /** The engine's title for the current step, as it printed it. */
+  step_label?: string | null;
   log: string[];
   export_files: ExportFile[];
   /** Durable archive in Google Cloud Storage, when the engine made one. */
@@ -53,6 +58,7 @@ export interface SearchState {
 export interface SearchSummary {
   search_id: string;
   query: string;
+  hops?: number | null;
   status: string;
   progress: string | null;
   created_at: string;
@@ -66,6 +72,52 @@ export interface LogResponse {
   offset: number;
   total_lines: number;
   new_lines: string[];
+}
+
+/** One entity in the interactive network view, straight from nodes.csv. */
+export interface GraphNodeData {
+  id: string;
+  label: string;
+  name: string;
+  type: string;
+  color: string;
+  canonical_id: string;
+  cross_references: string;
+  smiles: string;
+  formula: string;
+  molecular_weight: string;
+  bioactivity_summary: string;
+}
+
+export interface GraphEdgeData {
+  source: string;
+  target: string;
+  label: string;
+  relation: string;
+  pchembl: string | null;
+}
+
+export interface GraphNode {
+  data: GraphNodeData;
+}
+
+export interface GraphEdge {
+  data: GraphEdgeData;
+}
+
+/**
+ * The real graph behind a finished search, read from its own nodes.csv and
+ * edges.csv. Capped for the canvas: `truncated` says so, and the totals let
+ * the UI state honestly how much of the network is on screen.
+ */
+export interface SearchGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  node_count: number;
+  edge_count: number;
+  node_total: number;
+  edge_total: number;
+  truncated: boolean;
 }
 
 /** Decision intelligence computed by the engine from the finished graph. */

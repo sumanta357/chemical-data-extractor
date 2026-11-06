@@ -489,6 +489,12 @@ class SearchStatus(BaseModel):
     query: str
     status: str  # queued | running | completed | failed
     progress: Optional[str] = None
+    # Which of the engine's own pipeline steps is running (1..step_total), and
+    # the title the engine printed for it. Taken from the engine's output, so
+    # the UI shows the work that is actually happening rather than a guess.
+    step: Optional[int] = None
+    step_total: Optional[int] = None
+    step_label: Optional[str] = None
     log: list[str] = []
     export_files: list[dict] = []
     created_at: str = ""
@@ -657,11 +663,16 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
         stall_detected = False
         output_generation = 0
 
+        log_filter = _UserLogFilter()
+
         async def _read_output():
             nonlocal output_generation
             async for raw_line in process.stdout:
                 output_generation += 1
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
+                if not log_filter.keep(line):
+                    LOG.warning("engine[%s] internal: %s", search_id, line)
+                    continue
                 state["log"].append(line)
                 _update_progress(state, line)
 
@@ -760,8 +771,12 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
                     cwd=str(ENGINE_DIR),
                 )
                 assert enrich_proc.stdout is not None
+                enrich_filter = _UserLogFilter()
                 async for raw_line in enrich_proc.stdout:
                     line = raw_line.decode("utf-8", errors="replace").rstrip("\n\r")
+                    if not enrich_filter.keep(line):
+                        LOG.warning("enrich[%s] internal: %s", search_id, line)
+                        continue
                     state["log"].append(line)
                     if "Enriching compounds" in line:
                         state["progress"] = "🧪 " + line.strip()[:80]
@@ -804,7 +819,11 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             _record_search_usage(search_id)
         else:
             state["status"] = "failed"
-            state["error"] = f"Process exited with code {rc}"
+            state["error"] = (
+                "The engine stopped before it finished, which is a fault on our "
+                f"side rather than a problem with your query (exit code {rc}). "
+                "Run the search again — the log above shows how far it got."
+            )
             _discard_failed_export(export_dir)
             state["elapsed_seconds"] = time.time() - start_time
             _save_search(state)
@@ -817,11 +836,60 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
         _discard_failed_export(export_dir)
 
 
+class _UserLogFilter:
+    """Decide whether one engine output line belongs in the customer's log.
+
+    A Python traceback or a missing wheel is an operator problem: it needs a
+    `pip install`, not a chemist's attention, and printing it in the run log of
+    a paid search suggests the product is broken when it is really the build.
+    Those lines go to the server log for whoever runs the container; the search
+    itself reports the same failure, in words, through `error`. Everything the
+    engine prints about the actual work is kept — including warnings, which a
+    user does need to see.
+    """
+
+    _TRACEBACK_START = "Traceback (most recent call last)"
+    _FRAME = re.compile(r'^\s+File "')
+    _EXCEPTION = re.compile(r"^[A-Za-z_][\w.]*(Error|Exception):")
+    _ADVICE = ("Missing critical dependencies", "Please run: pip install")
+
+    def __init__(self) -> None:
+        self._in_traceback = False
+
+    def keep(self, line: str) -> bool:
+        if self._TRACEBACK_START in line:
+            self._in_traceback = True
+            return False
+        if self._in_traceback:
+            # Frames and echoed source are indented; the first unindented line
+            # ends the traceback and is the exception itself, judged below.
+            if line[:1].isspace() or not line.strip():
+                return False
+            self._in_traceback = False
+        if any(marker in line for marker in self._ADVICE):
+            return False
+        if self._FRAME.match(line) or self._EXCEPTION.match(line.strip()):
+            return False
+        return True
+
+
+# `── Step 2/6: Entity Resolution & Deduplication` — the engine's own step
+# headers. Parsing them means the UI can show which part of the pipeline is
+# running without inventing phases the engine does not have.
+_STEP_HEADER = re.compile(r"──\s*Step\s+(\d+)\s*/\s*(\d+):\s*(.+)$")
+# The engine also prints bare section headers, e.g. "[3/6] ENTITIES & ...".
+_SECTION_HEADER = re.compile(r"^\s*\[(\d+)\s*/\s*(\d+)\]\s*(.+)$")
+
+
 def _update_progress(state: dict, line: str):
-    if ("[1/6]" in line or "[2/6]" in line or "[3/6]" in line
-            or "[4/6]" in line or "[5/6]" in line or "[6/6]" in line):
+    step = _STEP_HEADER.search(line) or _SECTION_HEADER.search(line)
+    if step:
+        state["step"] = int(step.group(1))
+        state["step_total"] = int(step.group(2))
+        state["step_label"] = step.group(3).strip().rstrip(":")
         state["progress"] = line.strip()
-    elif "╔══ Hop" in line:
+        return
+    if "╔══ Hop" in line:
         state["progress"] = line.strip()
     elif "Pipeline finished" in line or "finished successfully" in line:
         state["progress"] = "✅ Complete!"
@@ -1060,24 +1128,42 @@ async def get_search_graph(search_id: str, http_request: Request = None):
         "GENE": "#a855f7", "PATHWAY": "#eab308",       # Purple, Yellow
     }
 
+    # A hop-4 graph can hold thousands of entities; a browser canvas cannot draw
+    # that usefully and nobody can read it. The CSV is already ordered by the
+    # engine's relevance score, so the first N are the ones worth showing — the
+    # rest stay in the downloadable exports, and the response says so.
+    node_limit, edge_limit = 450, 1200
+
     nodes: list[dict] = []
+    node_total = 0
+    kept: set[str] = set()
     try:
         with open(nodes_file, "r", encoding="utf-8", newline="") as f:
             for row in _csv.DictReader(f):
                 uid = row.get("uid:ID", "").strip()
                 if not uid:
                     continue
-                label = row.get(":LABEL", "Other")
-                name = row.get("name", uid)
-                color = COLOR_MAP.get(label.upper(), "#6b7280")
+                node_total += 1
+                if len(nodes) >= node_limit:
+                    continue
+                kept.add(uid)
+                raw_label = (row.get(":LABEL") or "Other").strip()
+                # "Entity;Compound" -> "Compound": the useful half of the label.
+                kind = raw_label.split(";")[-1] or "Other"
+                name = (row.get("name") or uid).strip()
                 nodes.append({
                     "data": {
                         "id": uid,
-                        "label": name[:30],
-                        "type": label,
-                        "color": color,
-                        "smiles": row.get("smiles", ""),
-                        "formula": row.get("formula", ""),
+                        "label": name[:48],
+                        "name": name,
+                        "type": kind,
+                        "color": COLOR_MAP.get(kind.upper(), "#6b7280"),
+                        "canonical_id": (row.get("canonical_id") or "").strip(),
+                        "cross_references": (row.get("cross_references") or "").strip(),
+                        "smiles": (row.get("smiles") or "").strip(),
+                        "formula": (row.get("formula") or "").strip(),
+                        "molecular_weight": (row.get("molecular_weight") or "").strip(),
+                        "bioactivity_summary": (row.get("bioactivity_summary") or "").strip()[:160],
                     }
                 })
     except OSError as e:
@@ -1085,6 +1171,7 @@ async def get_search_graph(search_id: str, http_request: Request = None):
         raise HTTPException(status_code=500, detail="Graph node read error")
 
     edges: list[dict] = []
+    edge_total = 0
     try:
         with open(edges_file, "r", encoding="utf-8", newline="") as f:
             for row in _csv.DictReader(f):
@@ -1092,16 +1179,25 @@ async def get_search_graph(search_id: str, http_request: Request = None):
                 tgt = row.get(":END_ID", "").strip()
                 if not src or not tgt:
                     continue
+                edge_total += 1
+                # An edge to a node outside the window would draw a line to
+                # nowhere, so only edges between shown entities are returned.
+                if src not in kept or tgt not in kept:
+                    continue
+                if len(edges) >= edge_limit:
+                    continue
                 rel = row.get(":TYPE", "interacts")
                 activity = row.get("activity_type", "")
                 value = row.get("activity_value", "")
-                edge_label = f"{activity}={value}" if value else rel
+                units = row.get("units", "")
+                edge_label = f"{activity} {value} {units}".strip() if value else rel
                 edges.append({
                     "data": {
                         "source": src,
                         "target": tgt,
-                        "label": edge_label[:40],
+                        "label": edge_label[:48],
                         "relation": rel,
+                        "pchembl": row.get("pchembl_value", "") or None,
                     }
                 })
     except OSError as e:
@@ -1113,6 +1209,9 @@ async def get_search_graph(search_id: str, http_request: Request = None):
         "edges": edges,
         "node_count": len(nodes),
         "edge_count": len(edges),
+        "node_total": node_total,
+        "edge_total": edge_total,
+        "truncated": len(nodes) < node_total or len(edges) < edge_total,
     }
 
 
@@ -1262,6 +1361,7 @@ async def list_searches(limit: int = Query(20, ge=1, le=100),
         mine.append({
             "search_id": s["search_id"],
             "query": s["query"],
+            "hops": s.get("hops"),
             "status": s["status"],
             "progress": s["progress"],
             "created_at": s["created_at"],
