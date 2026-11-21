@@ -1,8 +1,8 @@
 {
   "generated_at": "2026-10-04T08:03:31Z",
-  "implemented_total": 18,
+  "implemented_total": 19,
   "counts": {
-    "working": 17,
+    "working": 18,
     "partial": 0,
     "unavailable": 1,
     "unverified": 0
@@ -47,6 +47,10 @@
     {
       "name": "Patents",
       "description": "Patent records and patent landscape."
+    },
+    {
+      "name": "Toxicology",
+      "description": "Hazard classifications and measured lethal doses."
     }
   ],
   "sources": [
@@ -315,6 +319,21 @@
         "EGFR": {
           "entities": 20,
           "relations": 20,
+          "error": null
+        }
+      },
+      "answers_common_queries": true
+    },
+    {
+      "name": "PubChem Toxicity",
+      "status": "working",
+      "covers": "Hazard classification, lethal doses, target organs",
+      "group": "Toxicology",
+      "note": "Reads the Toxicity section of the compound's PubChem record, so it covers what PubChem publishes for that compound -- in practice the well-studied ones. A compound PubChem lists no toxicity statements for returns none, which is not a statement that it is safe.",
+      "plain_query": {
+        "Aspirin": {
+          "entities": 10,
+          "relations": 10,
           "error": null
         }
       },

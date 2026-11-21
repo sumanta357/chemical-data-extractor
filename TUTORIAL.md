@@ -50,9 +50,10 @@ The web app runs search on a hosted Python engine:
 
 ## 📦 Supported Active Data Sources (50+ Repositories)
 
-- **Chemistry & Bioactivity**: ChEMBL, PubChem, BindingDB, DrugBank, Guide to Pharmacology (GtoPdb), CompTox.
+- **Chemistry & Bioactivity**: ChEMBL, PubChem, BindingDB, DrugBank, Guide to Pharmacology (GtoPdb).
 - **Proteins & Structures**: UniProt, PDB, PDBe-KB, AlphaFold DB, STRING PPI.
 - **Genomics & Taxonomy**: NCBI Gene, NCBI Taxonomy, Ensembl, dbSNP, ClinVar.
-- **Literature & Patents**: PubMed, Europe PMC, CrossRef, OpenAlex, PatentsView.
+- **Literature & Patents**: PubMed, Europe PMC, CrossRef, OpenAlex, Google Patents.
+- **Toxicity**: PubChem Toxicity — carcinogen classification, lethal doses and target organs.
 - **Enzymes & Pathways**: BRENDA, Rhea, KEGG, Reactome, Gene Ontology.
 - **Clinical**: ClinicalTrials.gov.

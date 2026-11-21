@@ -50,6 +50,7 @@ QUERIES = {
     "EuropePMC": ("10.1038/nature12373", "auto"),
     "OpenAlex": ("aspirin", "auto"),
     "Patents": ("Aspirin", "auto"),
+    "PubChem Toxicity": ("Aspirin", "auto"),
 }
 
 # Extra probes for the patent question specifically.
@@ -139,6 +140,13 @@ NOTES = {
                 "number depends on a public endpoint that rate-limits under load; when "
                 "that happens you get a direct patent search link instead of a record.",
                 "partial"),
+    "PubChem Toxicity": ("Hazard classification, lethal doses, target organs", "Toxicology",
+                          "Reads the Toxicity section of the compound's PubChem record, so "
+                          "it covers what PubChem publishes for that compound -- in practice "
+                          "the well-studied ones. A compound PubChem lists no toxicity "
+                          "statements for returns none, which is not a statement that it is "
+                          "safe.",
+                          "working"),
     "BindingDB": ("Measured ligand-target affinities", "Bioactivity",
                   "Returns curated affinities for protein accessions and, via a "
                   "name-to-structure lookup, for compound names. Coverage varies by "
@@ -161,6 +169,7 @@ GROUPS = [
     ("Organisms", "Taxonomy."),
     ("Literature", "Publications and citation evidence."),
     ("Patents", "Patent records and patent landscape."),
+    ("Toxicology", "Hazard classifications and measured lethal doses."),
 ]
 
 

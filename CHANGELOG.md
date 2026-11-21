@@ -1,5 +1,38 @@
 # SciGraph Enterprise Version Changelog
 
+## [Unreleased]
+
+### Fixed
+- **Patent rows could be empty for a whole search.** Two independent causes:
+  - `QueryRouter` sent identifier-shaped queries (`CHEMBL25`, `2244`, `CHEBI:2244`,
+    `C00003`, `DB#####`) to connector lists that did not include `Patents`, so an
+    accession search never ran the patent connector at all.
+  - A compound with tens of thousands of patents (Atrazine, 71,220) answers
+    PubChem with a multi-megabyte payload. The 8s request timeout expired, the
+    slower fallbacks ran past the expander's 25s per-connector limit, and the
+    cancelled connector returned nothing — everything it had found was thrown
+    away. Patents now load large payloads with a 14s timeout, run to an internal
+    18s budget with a longer 40s connector limit, use a single bounded Google
+    Patents attempt, and always emit at least the Google Patents search link so a
+    search can never come back with zero patent rows.
+
+### Added
+- **PubChem Toxicity connector** (`PubChem Toxicity`). The catalogue entries
+  `EPA CompTox`, `CompTox Toxicity`, `DSSTox` and `TOXNET` were auto-generated
+  no-op connectors, so no toxicity data could ever reach a user. The new
+  connector reads the Toxicity section of a compound's PubChem PUG-View record
+  and emits one `Toxicity` node per statement — carcinogen classification,
+  human and non-human toxicity values, lethal doses, target organs, acute
+  effects, ecotoxicity and the HSDB summary — joined to the compound by
+  `has_toxicity`, each carrying its section, citation and PubChem link.
+  `decision-intel` now reports those statements (`toxicity` block, shown in the
+  verdict panel) instead of a "not computed" note, and an empty result is
+  reported as "PubChem lists none", never as "non-toxic".
+
+### Note
+- The data-source audit and `data_sources_status.json` now include a Toxicology
+  group with 19 implemented connectors.
+
 ## [3.2.0] - 2026-09-22 (CLI/Docker Version Parity)
 
 ### Changed

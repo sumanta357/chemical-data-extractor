@@ -179,6 +179,22 @@ export interface DecisionIntel {
     registry: string;
     note: string;
   };
+  toxicity: {
+    statement_count: number;
+    compound_count: number;
+    compounds: Array<{
+      uid: string;
+      name: string;
+      statements: Array<{
+        uid: string;
+        section: string;
+        statement: string;
+        citation: string;
+      }>;
+    }>;
+    reading: string;
+    caveat: string;
+  };
   not_assessed: string[];
 }
 

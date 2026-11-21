@@ -192,7 +192,12 @@ class DecisionEndpoint(unittest.TestCase):
         self.assertEqual(body["ip"]["status"], "red")  # WO2099111 vs real now-year
         self.assertIn("dark_literature", body)
         self.assertIn("vendors", body)
-        self.assertIn("CompTox", "".join(body["not_assessed"]))
+        # Toxicity is real data now, not a limitation note: this fixture graph
+        # has no Toxicity nodes, so the block is empty and says why.
+        self.assertEqual(body["toxicity"]["statement_count"], 0)
+        self.assertEqual(body["toxicity"]["compounds"], [])
+        self.assertIn("not evidence of safety", body["toxicity"]["caveat"])
+        self.assertIn("Predicted toxicity", "".join(body["not_assessed"]))
 
     def test_owner_scoped_like_every_other_search_endpoint(self):
         anon = TestClient(engine_app.app)

@@ -396,6 +396,7 @@ class EntityType(str, Enum):
     BIOASSAY = "Bioassay"
     PUBLICATION = "Publication"
     PATENT = "Patent"
+    TOXICITY = "Toxicity"
     DISEASE = "Disease"
     ORGANISM = "Organism"
     STRUCTURE = "Structure"
@@ -1652,6 +1653,12 @@ class BaseConnector(abc.ABC):
     NAME: str = "Base"
     DEPENDENCIES: List[str] = []
     RATE_LIMIT_HZ: float = 5.0
+    # Wall clock the expander allows one connector for one query. A connector
+    # that needs longer -- Patents follows several fallbacks, Toxicity reads a
+    # 300 KB PUG-View document -- raises it, and must stay inside it: a
+    # connector cancelled at the limit returns nothing at all, so the data it
+    # had already collected is thrown away.
+    TIMEOUT: float = 25.0
 
     def __init__(self, cache: KnowledgeCache, translator: UniversalIDTranslator):
         self.cache = cache
@@ -1823,12 +1830,12 @@ class QueryRouter:
     """Intelligent Query Router selecting target databases based on query pattern."""
 
     PATTERNS = [
-        (re.compile(r"^CHEMBL\d+$", re.I), ["ChEMBL", "PubChem", "BindingDB", "Guide to Pharmacology", "PDBe-KB"]),
-        (re.compile(r"^(?:CID)?:?\d+$", re.I), ["PubChem", "ChEMBL", "BindingDB", "PDBe-KB"]),
+        (re.compile(r"^CHEMBL\d+$", re.I), ["ChEMBL", "PubChem", "BindingDB", "Guide to Pharmacology", "PDBe-KB", "Patents", "PubChem Toxicity"]),
+        (re.compile(r"^(?:CID)?:?\d+$", re.I), ["PubChem", "ChEMBL", "BindingDB", "PDBe-KB", "Patents", "PubChem Toxicity"]),
         (re.compile(r"^GO:\d{7}$", re.I), ["GeneOntology"]),
-        (re.compile(r"^DB\d{5}$", re.I), ["PubChem", "ChEMBL"]),
-        (re.compile(r"^CHEBI:\d+$", re.I), ["ChEBI", "PubChem", "ChEMBL"]),
-        (re.compile(r"^C\d{5}$", re.I), ["KEGG", "PubChem", "ChEBI", "ChEMBL"]),
+        (re.compile(r"^DB\d{5}$", re.I), ["PubChem", "ChEMBL", "Patents", "PubChem Toxicity"]),
+        (re.compile(r"^CHEBI:\d+$", re.I), ["ChEBI", "PubChem", "ChEMBL", "Patents", "PubChem Toxicity"]),
+        (re.compile(r"^C\d{5}$", re.I), ["KEGG", "PubChem", "ChEBI", "ChEMBL", "Patents", "PubChem Toxicity"]),
         (re.compile(r"^R\d{5}$", re.I), ["KEGG", "Reactome"]),
         (re.compile(r"^R-[A-Z]{3}-\d+(-\d+)?$"), ["Reactome", "UniProt"]),
         (re.compile(r"^10\.\d{4,9}/[-._;()/:A-Za-z0-9]+$", re.I), ["EuropePMC", "OpenAlex"]),
@@ -1841,7 +1848,7 @@ class QueryRouter:
         # connector -- "PatentsView"/"LensPatent" are not registered, so this
         # route used to resolve to nothing at all.
         (PATENT_NUMBER_RE, ["Patents", "PubChem"]),
-        (re.compile(r"^[A-Z0-9]{6,10}$", re.I), ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy"]),
+        (re.compile(r"^[A-Z0-9]{6,10}$", re.I), ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PubChem Toxicity", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy"]),
         (re.compile(r"^rs\d+$", re.I), ["NCBI Gene"]),
     ]
 
@@ -1851,8 +1858,8 @@ class QueryRouter:
         for pattern, connector_names in cls.PATTERNS:
             if pattern.match(q_clean):
                 return connector_names
-        # Default: broad multi-database fanout (18 active database connectors)
-        return ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy", "PubMed"]
+        # Default: broad multi-database fanout
+        return ["PubChem", "UniProt", "ChEMBL", "BRENDA", "BindingDB", "Patents", "PubChem Toxicity", "PDBe-KB", "KEGG", "ChEBI", "Reactome", "Guide to Pharmacology", "STRING", "EuropePMC", "GeneOntology", "OpenAlex", "NCBI Gene", "NCBI Taxonomy", "PubMed"]
 
 
     @classmethod
@@ -2098,6 +2105,13 @@ class PatentConnector(BaseConnector):
     Always generates Google Patents search links as fallback.
     """
     NAME = "Patents"
+    # PubChem answers a popular compound with tens of thousands of patent IDs
+    # in a multi-megabyte payload, and the Google Patents fallbacks are slow
+    # when Google bot-checks us. This connector therefore runs to an internal
+    # deadline and always emits at least the search link, instead of being
+    # cancelled by the expander with nothing to show for the work.
+    TIMEOUT = 40.0
+    BUDGET_SECONDS = 18.0
 
     # Google Patents answers bursts of automated requests with a 503 bot check.
     # Once seen, stop asking for a cooldown instead of paying the retry cost on
@@ -2108,6 +2122,10 @@ class PatentConnector(BaseConnector):
         entities, relations = [], []
         q_clean = query.strip()
         q_upper = q_clean.upper()
+        started = time.monotonic()
+
+        def remaining() -> float:
+            return self.BUDGET_SECONDS - (time.monotonic() - started)
 
         # Skip EC number and pathway prefix queries
         if q_upper.startswith("EC:") or q_upper.startswith("RHEA:") or q_upper.startswith("REACTOME:"):
@@ -2143,9 +2161,15 @@ class PatentConnector(BaseConnector):
         for name in names_to_try:
             if len(name) < 2 or len(name) > 200:
                 continue
+            if remaining() <= 2:
+                logger.info(f"[{self.NAME}] out of time before the name lookup for {name}")
+                break
             try:
                 url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(name)}/xrefs/PatentID/JSON"
-                data = await self._safe_get(session, url)
+                # A common compound answers with tens of thousands of patent IDs;
+                # this payload never fit the 8s default and silently produced
+                # zero patents for exactly the compounds users care about.
+                data = await self._safe_get(session, url, timeout=max(6.0, min(14.0, remaining())))
                 if data and "InformationList" in data and "Information" in data["InformationList"]:
                     for info in data["InformationList"]["Information"]:
                         pat_ids = info.get("PatentID", [])
@@ -2168,7 +2192,7 @@ class PatentConnector(BaseConnector):
                 continue
 
         # Strategy 2: Name -> CID -> Patents (more reliable fallback)
-        if not seen_patents and not q_clean.isdigit():
+        if not seen_patents and not q_clean.isdigit() and remaining() > 3:
             try:
                 cid_url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{quote(q_clean)}/cids/JSON"
                 cid_data = await self._safe_get(session, cid_url)
@@ -2185,15 +2209,18 @@ class PatentConnector(BaseConnector):
         # documents about unrelated subjects, so a 2-hop run would import a
         # block of irrelevant patents for every structure it expanded into.
         is_structure_code = bool(re.match(r"^[0-9][A-Za-z0-9]{3}$", q_clean))
-        if not seen_patents and not is_structure_code:
-            found = await self._search_patents_by_keyword(session, q_clean, entities, relations)
+        if not seen_patents and not is_structure_code and remaining() > 3:
+            found = await self._search_patents_by_keyword(
+                session, q_clean, entities, relations, budget=remaining())
             for e in entities:
                 if e.entity_type == EntityType.PATENT:
                     seen_patents.add(e.canonical_id)
             if found:
                 return entities, relations
 
-        # Strategy 4: Google Patents search link (always generated as fallback)
+        # Strategy 4: Google Patents search link (always generated as fallback).
+        # This is built locally, so it is emitted even when the budget is gone:
+        # a patent search link is a real result, an empty connector is not.
         if not seen_patents:
             search_url = f"https://patents.google.com/?q={quote(q_clean)}&language=ENGLISH"
             search_ent = Entity(
@@ -2216,7 +2243,8 @@ class PatentConnector(BaseConnector):
 
         return entities, relations
 
-    async def _google_patents_records(self, session: aiohttp.ClientSession, query: str) -> List[Dict[str, Any]]:
+    async def _google_patents_records(self, session: aiohttp.ClientSession, query: str,
+                                     budget: Optional[float] = None) -> List[Dict[str, Any]]:
         """Fetch raw patent records from the public Google Patents XHR endpoint.
 
         Returns an empty list when the endpoint is unavailable or rate-limiting,
@@ -2237,18 +2265,22 @@ class PatentConnector(BaseConnector):
                 except Exception:
                     payload = None
             if payload is None:
+                # One attempt inside the connector's budget. Two 15s attempts
+                # plus the backoff used to exceed the expander's limit, and a
+                # cancelled connector returns nothing -- the worst outcome.
+                request_timeout = 8.0 if budget is None else max(3.0, min(8.0, budget))
                 body = None
                 for attempt in range(2):
                     await self.rate_limiter.acquire()
                     async with session.get(
                         url,
                         headers={"User-Agent": "Mozilla/5.0 (compatible; SciGraphEnterprise/3.2)"},
-                        timeout=aiohttp.ClientTimeout(total=15),
+                        timeout=aiohttp.ClientTimeout(total=request_timeout),
                     ) as resp:
                         if resp.status == 200:
                             body = await resp.text()
                             break
-                        if resp.status in (429, 503) and attempt == 0:
+                        if resp.status in (429, 503) and attempt == 0 and (budget is None or budget > 6):
                             logger.info(f"[{self.NAME}] patent lookup rate-limited; retrying once")
                             await asyncio.sleep(1.5)
                             continue
@@ -2279,7 +2311,8 @@ class PatentConnector(BaseConnector):
 
     async def _search_patents_by_keyword(self, session: aiohttp.ClientSession, query: str,
                                          entities: List[Entity], relations: List[Relation],
-                                         limit: int = 10) -> int:
+                                         limit: int = 10,
+                                         budget: Optional[float] = None) -> int:
         """Search Google Patents directly for an arbitrary term.
 
         PubChem patent cross-references only exist for compounds, so a protein
@@ -2293,7 +2326,7 @@ class PatentConnector(BaseConnector):
         """
         added = 0
         seen: Set[str] = set()
-        for rec in (await self._google_patents_records(session, query))[:limit]:
+        for rec in (await self._google_patents_records(session, query, budget=budget))[:limit]:
             pub = str(rec.get("publication_number") or "").strip().upper()
             if not pub or pub in seen:
                 continue
@@ -2507,7 +2540,9 @@ class PatentConnector(BaseConnector):
         """Fetch patent cross-references for a PubChem CID."""
         try:
             url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/xrefs/PatentID/JSON"
-            data = await self._safe_get(session, url)
+            # Same large-payload problem as the name lookup: a popular compound
+            # returns tens of thousands of IDs. 14s, not the 8s default.
+            data = await self._safe_get(session, url, timeout=14.0)
             if data and "InformationList" in data and "Information" in data["InformationList"]:
                 name = query_name or f"CID {cid}"
                 for info in data["InformationList"]["Information"]:
@@ -3199,6 +3234,253 @@ class PubChemConnector(BaseConnector):
                     ent.add_cross_ref("INCHIKEY", inchikey)
                 entities.append(ent)
         return entities, relations
+
+
+# PubChem's own Toxicity section, in the order a chemist reads it: the
+# classification first, then measured values, then the narrative. Everything
+# the connector emits comes from one of these headings; nothing is inferred.
+TOXICITY_HEADINGS: Tuple[str, ...] = (
+    "Carcinogen Classification",
+    "Non-Human Toxicity Values",
+    "Human Toxicity Values",
+    "Lethal Dose",
+    "Effect Level",
+    "Toxicity Data",
+    "Target Organs",
+    "Acute Effects",
+    "Signs and Symptoms",
+    "Health Effects",
+    "Ecotoxicity Values",
+    "Toxicity Summary",
+)
+
+
+@ConnectorRegistry.register
+class PubChemToxicityConnector(BaseConnector):
+    """Hazard and toxicity statements from PubChem's Toxicity section.
+
+    PubChem publishes a compound's curated toxicity record as structured
+    PUG-View data: GHS/IARC carcinogen classification, LD50 and lethal-dose
+    values, target organs, acute effects, and the HSDB toxicity summary. This
+    connector reads that section and turns each statement into a Toxicity node
+    joined to the compound by `has_toxicity`, so the statement reaches the CSV,
+    the Excel workbook and the graph instead of stopping at a summary field.
+
+    Every node carries the PubChem citation the statement came from, and a
+    compound with no toxicity section produces no nodes -- an empty result is
+    reported as "not listed", never as "non-toxic".
+    """
+
+    NAME = "PubChem Toxicity"
+    # The PUG-View document for one compound is ~300 KB before any of it is
+    # parsed, so this connector needs more than the default budget.
+    TIMEOUT = 30.0
+    MAX_FACTS = 10
+    MAX_CHARS = 600
+
+    async def search(self, session: aiohttp.ClientSession, query: str,
+                     query_type: str = "auto") -> Tuple[List[Entity], List[Relation]]:
+        entities: List[Entity] = []
+        relations: List[Relation] = []
+        q_clean = query.strip()
+        if not q_clean:
+            return entities, relations
+
+        # Toxicity is a property of a chemical. A protein query has none of its
+        # own, and these identifier shapes are not compound names at all --
+        # asking PubChem would only burn a request per hop.
+        if query_type == "protein":
+            return entities, relations
+        if q_clean.upper().startswith(("EC:", "GO:", "RHEA:", "REACTOME:", "PMID:")):
+            return entities, relations
+        if PATENT_NUMBER_RE.match(q_clean) or re.match(r"^10\.\d{4,9}/", q_clean):
+            return entities, relations
+
+        cid = q_clean if q_clean.isdigit() else await self._resolve_cid(session, q_clean)
+        if not cid:
+            return entities, relations
+
+        props = await self._safe_get(
+            session,
+            "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/"
+            f"{cid}/property/InChIKey,Title,MolecularFormula/JSON",
+        )
+        prop = {}
+        if props and "PropertyTable" in props:
+            rows = props["PropertyTable"].get("Properties") or []
+            if rows:
+                prop = rows[0]
+        inchikey = str(prop.get("InChIKey") or "").strip()
+        title = str(prop.get("Title") or "").strip() or q_clean
+
+        document = await self._safe_get(
+            session,
+            f"https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/{cid}/JSON?heading=Toxicity",
+            timeout=15.0,
+        )
+        facts = self._facts(document)
+        if not facts:
+            # PubChem has no toxicity section for this compound. Saying nothing
+            # is the honest answer; a "no toxicity" node would be a claim the
+            # source does not make.
+            return entities, relations
+
+        section_url = f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}#section=Toxicity"
+        compound_uid = f"COMPOUND:{inchikey or cid}"
+        compound = Entity(
+            uid=compound_uid,
+            entity_type=EntityType.COMPOUND,
+            preferred_name=title,
+            canonical_id=inchikey or str(cid),
+            evidence=[Evidence(
+                database=DatabaseSource.PUBCHEM,
+                source_url=f"https://pubchem.ncbi.nlm.nih.gov/compound/{cid}",
+                evidence_type="PubChem compound record",
+            )],
+            attributes={"formula": str(prop.get("MolecularFormula") or "")},
+        )
+        compound.add_cross_ref(DatabaseSource.PUBCHEM, str(cid))
+        entities.append(compound)
+
+        seen_statements: Set[str] = set()
+        for heading, statement, citation in facts:
+            fingerprint = re.sub(r"\W+", "", statement.lower())[:160]
+            if fingerprint in seen_statements:
+                continue
+            seen_statements.add(fingerprint)
+            digest = hashlib.md5(statement.encode("utf-8")).hexdigest()[:10]
+            tox = Entity(
+                uid=f"TOXICITY:{cid}:{digest}",
+                entity_type=EntityType.TOXICITY,
+                preferred_name=f"{heading}: {statement[:110]}".strip(),
+                canonical_id=f"PUBCHEM-TOX-{cid}-{digest}",
+                evidence=[Evidence(
+                    database=self.NAME,
+                    source_url=section_url,
+                    citation=citation or None,
+                    evidence_type="PubChem Toxicity section",
+                )],
+                attributes={
+                    "toxicity_section": heading,
+                    "toxicity_statement": statement,
+                    "source_citation": citation,
+                    "pubchem_cid": str(cid),
+                    "bioactivity_summary": statement[:400],
+                },
+            )
+            # Deliberately no PubChem CID cross-reference here: the resolver
+            # merges entities that share a Cid, so a statement keyed to the
+            # compound would be folded into the compound node and its section
+            # and citation lost. The statement's link lives on its evidence.
+            entities.append(tox)
+            relations.append(Relation(
+                source_uid=compound_uid,
+                target_uid=tox.uid,
+                relation_type=RelationType.HAS_TOXICITY,
+                evidence=[Evidence(
+                    database=self.NAME,
+                    source_url=section_url,
+                    evidence_type="PubChem Toxicity section",
+                )],
+                attributes={
+                    "activity_type": heading,
+                    "mechanism_of_action": statement[:400],
+                    "assay_id": f"PUBCHEM-TOX-{cid}",
+                },
+            ))
+
+        return entities, relations
+
+    async def _resolve_cid(self, session: aiohttp.ClientSession, query: str) -> Optional[str]:
+        """PubChem CID for a compound name or a registry identifier.
+
+        A ChEMBL or CAS number resolves through PubChem's xref index, which is
+        how a user who searches "CHEMBL25" still gets its toxicity record.
+        """
+        for path in (f"name/{quote(query)}", f"xref/RegistryID/{quote(query)}"):
+            data = await self._safe_get(
+                session, f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/{path}/cids/JSON"
+            )
+            if data and "IdentifierList" in data:
+                cids = data["IdentifierList"].get("CID") or []
+                if cids:
+                    return str(cids[0])
+        return None
+
+    @classmethod
+    def _facts(cls, document: Optional[Dict[str, Any]]) -> List[Tuple[str, str, str]]:
+        """(heading, statement, citation) for every usable toxicity statement."""
+        collected: List[Tuple[int, str, str, str]] = []
+        if not isinstance(document, dict):
+            return []
+
+        def walk(section: Dict[str, Any]) -> None:
+            heading = str(section.get("TOCHeading") or "")
+            if heading in TOXICITY_HEADINGS:
+                for info in section.get("Information") or []:
+                    statement = cls._information_text(info)
+                    if not statement:
+                        continue
+                    if len(statement) > cls.MAX_CHARS:
+                        statement = statement[: cls.MAX_CHARS - 1].rstrip() + "\u2026"
+                    citation = ""
+                    refs = info.get("Reference") or []
+                    if refs:
+                        citation = re.sub(r"\s+", " ", str(refs[0])).strip()[:240]
+                    collected.append((TOXICITY_HEADINGS.index(heading), heading, statement, citation))
+            for child in section.get("Section") or []:
+                walk(child)
+
+        record = document.get("Record") or {}
+        for section in record.get("Section") or []:
+            walk(section)
+
+        # Breadth before depth: one statement from every section first, then a
+        # second round. Otherwise a compound with six carcinogen-classification
+        # entries would fill the node budget and hide its LD50 values.
+        by_rank: Dict[int, List[Tuple[str, str, str]]] = {}
+        for rank, heading, statement, citation in collected:
+            by_rank.setdefault(rank, []).append((heading, statement, citation))
+
+        out: List[Tuple[str, str, str]] = []
+        round_index = 0
+        while len(out) < cls.MAX_FACTS:
+            progressed = False
+            for rank in sorted(by_rank):
+                facts = by_rank[rank]
+                if round_index < len(facts):
+                    out.append(facts[round_index])
+                    progressed = True
+                    if len(out) >= cls.MAX_FACTS:
+                        break
+            if not progressed:
+                break
+            round_index += 1
+        return out
+
+    @staticmethod
+    def _information_text(info: Dict[str, Any]) -> str:
+        """The human-readable text of one PUG-View Information block."""
+        value = info.get("Value") or {}
+        parts: List[str] = []
+        markup = value.get("StringWithMarkup")
+        if isinstance(markup, list):
+            parts = [str(m.get("String") or "").strip() for m in markup if isinstance(m, dict)]
+        elif isinstance(value.get("String"), str):
+            parts = [value["String"].strip()]
+        elif isinstance(value.get("Number"), list):
+            parts = [
+                " ".join(str(x) for x in (n.get("Number"), n.get("Unit") or "") if x).strip()
+                for n in value["Number"] if isinstance(n, dict)
+            ]
+        elif value.get("Number") is not None:
+            parts = [str(value["Number"])]
+
+        text = re.sub(r"\s+", " ", " ".join(p for p in parts if p)).strip()
+        name = str(info.get("Name") or "").strip()
+        if name and text and not text.lower().startswith(name.lower()):
+            text = f"{name}: {text}"
+        return text
 
 
 @ConnectorRegistry.register
@@ -4131,9 +4413,12 @@ class RecursiveGraphExpander:
         if not q_active: q_active = list(self.connectors.values())[:3]
         print(f"    Searching '{q}' via {len(q_active)} connectors... ", end="", flush=True)
 
-        async def _search_with_connector_timeout(c, sess, q, qt, timeout=25):
+        async def _search_with_connector_timeout(c, sess, q, qt, timeout=None):
+            # Each connector declares its own budget; 25s is the default so a
+            # slow source cannot hold up the whole hop.
+            limit = timeout if timeout is not None else getattr(c, "TIMEOUT", 25.0)
             try:
-                return await asyncio.wait_for(c.search(sess, q, qt), timeout=timeout)
+                return await asyncio.wait_for(c.search(sess, q, qt), timeout=limit)
             except asyncio.TimeoutError:
                 return [], []
             except Exception:

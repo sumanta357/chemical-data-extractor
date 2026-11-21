@@ -140,6 +140,15 @@ function gradeTone(grade: string): string {
   return 'text-fg-muted';
 }
 
+/** One line of a long PubChem statement, without cutting mid-word. */
+function shorten(text: string, max = 200): string {
+  const clean = (text || '').trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 60 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 function ipTone(status: 'green' | 'yellow' | 'red'): string {
   if (status === 'green') return 'text-emerald-600 dark:text-emerald-400';
   if (status === 'yellow') return 'text-amber-600 dark:text-amber-400';
@@ -239,6 +248,29 @@ function DecisionIntelPanel({ search }: Props) {
             </div>
           </div>
 
+          {intel.toxicity.statement_count > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+                Toxicity on record — {intel.toxicity.statement_count} statement
+                {intel.toxicity.statement_count === 1 ? '' : 's'} from PubChem
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {intel.toxicity.compounds
+                  .flatMap((c) => c.statements.map((s) => ({ ...s, compound: c.name })))
+                  .slice(0, 4)
+                  .map((s) => (
+                    <li key={s.uid} className="text-xs leading-relaxed text-fg-muted">
+                      <span className="font-medium text-fg">{s.compound}</span>{' '}
+                      <span className="rounded border border-line bg-surface-2 px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-fg-subtle">
+                        {s.section}
+                      </span>{' '}
+                      {shorten(s.statement)}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
           {intel.feasibility.compounds.length > 0 && (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
@@ -314,6 +346,7 @@ function DecisionIntelPanel({ search }: Props) {
               <li>{intel.feasibility.note}</li>
               <li>{intel.ip.caveat}</li>
               <li>{intel.dark_literature.caveat}</li>
+              <li>{intel.toxicity.caveat}</li>
               {intel.not_assessed.map((n) => (
                 <li key={n}>{n}</li>
               ))}

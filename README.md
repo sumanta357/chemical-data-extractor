@@ -77,10 +77,10 @@ In the sandbox/preview, if `SEARCH_ENGINE_URL` is unset, the Next.js app runs `p
 | **Chemical & Bioactivity** | PubChem, ChEMBL, BindingDB, GtoPdb, ChEBI | SMILES, IC₅₀, Kᵢ, Kd, pChEMBL |
 | **Enzyme & Pathways** | BRENDA, KEGG, Reactome, GO (QuickGO) | EC numbers, metabolic pathways |
 | **3D Structures** | RCSB PDB, PDBe-KB, AlphaFold DB | PDB IDs, binding pockets, pLDDT |
-| **Patents** | Google Patents, PubChem Patents, Lens.org | Patent IDs, assignees |
+| **Patents** | PubChem patent cross-references, Google Patents | Patent IDs, titles, assignees |
 | **Proteins & Genes** | UniProt, STRING, NCBI Gene/Taxonomy | Accessions, PPI networks |
 | **Literature** | Europe PMC, PubMed, OpenAlex | DOIs, PMCIDs, citations |
-| **Toxicity** | EPA CompTox | Environmental hazard profiles |
+| **Toxicity** | PubChem Toxicity | Carcinogen classification, LD50 values, target organs |
 
 [Full CLI reference and export format details below...]
 

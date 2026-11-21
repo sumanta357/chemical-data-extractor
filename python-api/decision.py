@@ -354,6 +354,97 @@ def dark_literature(nodes: List[Dict[str, str]], edges: List[Dict[str, str]]) ->
     }
 
 
+# ── Toxicity on record ──────────────────────────────────────────────────────
+
+
+def toxicity_profile(nodes: List[Dict[str, str]], edges: List[Dict[str, str]]) -> Dict[str, Any]:
+    """The toxicity statements this search actually collected, per compound.
+
+    The engine writes one Toxicity node per statement quoted from a compound's
+    PubChem Toxicity section, joined to the compound by `has_toxicity`. Nothing
+    is predicted or graded here: the section, the statement and its citation are
+    passed through as recorded. A compound PubChem lists nothing for simply has
+    no entries — which is not the same as being shown safe, and the caveat says
+    so.
+    """
+    statements: Dict[str, Dict[str, Any]] = {}
+    for row in nodes:
+        uid = _row_uid(row)
+        label = _label(row.get(":LABEL", ""))
+        if not (uid.upper().startswith("TOXICITY:") or label == "TOXICITY"):
+            continue
+        text = (
+            row.get("bioactivity_summary")
+            or row.get("toxicity_statement")
+            or row.get("name")
+            or ""
+        ).strip()
+        if not text:
+            continue
+        statements[uid] = {
+            "uid": uid,
+            "section": (row.get("toxicity_section") or "Toxicity").strip(),
+            "statement": text,
+            "citation": (row.get("source_citation") or "").strip(),
+        }
+
+    by_compound: Dict[str, List[str]] = {}
+    for edge in edges:
+        if (edge.get(":TYPE") or "").strip().upper() != "HAS_TOXICITY":
+            continue
+        src = (edge.get(":START_ID") or "").strip()
+        tgt = (edge.get(":END_ID") or "").strip()
+        if tgt in statements:
+            by_compound.setdefault(src, []).append(tgt)
+
+    names = {
+        _row_uid(row): (row.get("name") or _row_uid(row)).strip() for row in nodes
+    }
+    compounds: List[Dict[str, Any]] = []
+    for uid, uids in sorted(by_compound.items(), key=lambda kv: -len(kv[1]))[:MAX_COMPOUND_VERDICTS]:
+        compounds.append({
+            "uid": uid,
+            "name": names.get(uid, uid),
+            "statements": [statements[u] for u in uids[:8]],
+        })
+
+    total = len(statements)
+    if not total:
+        return {
+            "statement_count": 0,
+            "compound_count": 0,
+            "compounds": [],
+            "reading": (
+                "No toxicity statements were collected for this graph. That "
+                "means PubChem lists none for these compounds, not that they "
+                "are safe."
+            ),
+            "caveat": (
+                "Toxicity here is what PubChem's Toxicity section records — "
+                "hazard classifications and measured lethal doses — not a "
+                "prediction. Absence of a statement is not evidence of safety."
+            ),
+        }
+
+    return {
+        "statement_count": total,
+        "compound_count": len(by_compound),
+        "compounds": compounds,
+        "reading": (
+            f"{total} toxicity statements on record from PubChem cover "
+            f"{len(by_compound)} compound{'s' if len(by_compound) != 1 else ''} "
+            "in this graph — read the classification and lethal-dose values "
+            "before committing to in-vivo work."
+        ),
+        "caveat": (
+            "Statements are quoted from PubChem's Toxicity section, which "
+            "aggregates HSDB, IARC and national-authority records; each entry "
+            "carries its own citation. Absence of a statement is not evidence "
+            "of safety."
+        ),
+    }
+
+
 # ── 3. Mechanism-of-Action storyboard ────────────────────────────────────────
 
 
@@ -531,6 +622,7 @@ def decision_intel(
     dark = dark_literature(nodes, edges)
     moa = moa_storyboard(nodes, edges, query)
     vendors = vendor_sourcing(nodes)
+    toxicity = toxicity_profile(nodes, edges)
 
     return {
         "search_id": "",
@@ -542,9 +634,10 @@ def decision_intel(
         "dark_literature": dark,
         "moa": moa,
         "vendors": vendors,
+        "toxicity": toxicity,
         "not_assessed": [
-            "Toxicity (EPA CompTox Ames / hERG): not computed — the engine "
-            "does not hold CompTox assay data, and a fabricated toxicity flag "
-            "would be worse than none.",
+            "Predicted toxicity (hERG, Ames mutagenicity): not computed — this "
+            "bundle reports the statements PubChem publishes, not a model's "
+            "guess, and an invented flag would be worse than none.",
         ],
     }
