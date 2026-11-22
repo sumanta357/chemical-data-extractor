@@ -1084,6 +1084,83 @@ def _extra_attribute_columns(items: List[Any], base: set) -> List[str]:
     return sorted(extras - base)
 
 
+def repoint_relation_endpoints(entities: List[Entity], relations: List[Relation]) -> Tuple[List[Relation], int]:
+    """Make every exported relation join two nodes that exist, or drop it.
+
+    A connector names its neighbour by the identifier it happens to know: the
+    patent cross-references produce ``COMPOUND:ATRAZINE``, a KEGG expansion
+    produces ``COMPOUND:C06552``, a PDB search produces
+    ``PROTEIN:PDBQUERY:<hash>``. The graph, after merging, holds those nodes as
+    ``COMPOUND:MXWJVTOOROXGIU-UHFFFAOYSA-N`` and ``COMPOUND:KEGG:C06552``. The
+    relation was exported as written, so the edge dangled: in a 2-hop Atrazine
+    run 982 of 1180 patent edges pointed at nothing, which is why the patents
+    were drawn unattached and prior-art counting saw no link at all.
+
+    Resolution order, strongest first: the exact uid, an alias the entity is
+    known by (canonical id, cross-reference accession, ``COMPOUND:<accession>``,
+    preferred name), then the query string the relation itself records. A
+    relation that still matches nothing is dropped rather than exported
+    dangling, and the count is reported.
+    """
+    known = {e.uid for e in entities}
+    aliases: Dict[str, str] = {}
+
+    def remember(key: str, uid: str) -> None:
+        if key:
+            aliases.setdefault(key, uid)
+
+    for e in entities:
+        if e.canonical_id:
+            remember(str(e.canonical_id), e.uid)
+        if e.preferred_name:
+            remember("NAME:" + e.preferred_name.strip().lower(), e.uid)
+        # The common name a connector wrote ("Atrazine") usually arrives as a
+        # synonym of the merged node, whose preferred name is the IUPAC one.
+        for synonym in e.synonyms:
+            remember("NAME:" + str(synonym).strip().lower(), e.uid)
+        for xr in e.cross_references:
+            acc = str(xr.accession).strip()
+            if not acc:
+                continue
+            remember(acc, e.uid)
+            if "COMPOUND" in str(e.entity_type).upper():
+                remember(f"COMPOUND:{acc}", e.uid)
+                remember(f"COMPOUND:{str(xr.database).upper()}:{acc}", e.uid)
+
+    def match(uid: str, rel: Relation) -> Optional[str]:
+        if uid in known:
+            return uid
+        found = aliases.get(uid)
+        if found:
+            return found
+        # "COMPOUND:ATRAZINE" -> try the bare id, the prefixed form, the name.
+        for prefix in ("COMPOUND:", "PROTEIN:", "TARGET:"):
+            if uid.upper().startswith(prefix):
+                tail = uid[len(prefix):]
+                for candidate in (tail, f"COMPOUND:{tail}", f"NAME:{tail.lower()}"):
+                    if candidate in aliases:
+                        return aliases[candidate]
+        # Last resort: the connector recorded what it was searching for.
+        for key in ("query", "queried_compound", "queried_term", "compound", "target"):
+            value = str(rel.attributes.get(key) or "").strip()
+            if value and f"NAME:{value.lower()}" in aliases:
+                return aliases[f"NAME:{value.lower()}"]
+        return None
+
+    kept: List[Relation] = []
+    dropped = 0
+    for rel in relations:
+        source = match(rel.source_uid, rel)
+        target = match(rel.target_uid, rel)
+        if not source or not target or source == target:
+            dropped += 1
+            continue
+        rel.source_uid = source
+        rel.target_uid = target
+        kept.append(rel)
+    return kept, dropped
+
+
 def _pubchem_smiles(props: Dict[str, Any]) -> str:
     """The SMILES string in a PubChem property record.
 
@@ -1260,7 +1337,9 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
         ws1.append([_sanitize_excel_string(v) for v in [
             e.uid,
             e.preferred_name,
-            str(e.entity_type),
+            # "EntityType.PATENT" is an internal enum repr, not a category a
+            # reader of the workbook should have to decode.
+            str(e.entity_type).replace("EntityType.", ""),
             e.canonical_id,
             e.attributes.get("smiles", ""),
             e.attributes.get("formula", ""),
@@ -1305,9 +1384,12 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
     for p in [e for e in entities if e.entity_type == EntityType.PATENT or e.uid.startswith("PATENT:")]:
         pat_id = p.canonical_id
         title = p.attributes.get("title", p.preferred_name)
-        assignee = p.attributes.get("assignee", "Global Patent Office")
+        # Blank, not a placeholder: "Global Patent Office" in an assignee column
+        # is a value no source supplied, and a reader has no way to tell it
+        # apart from a recorded one.
+        assignee = p.attributes.get("assignee", "")
         year = p.attributes.get("publication_year", "")
-        compound = p.attributes.get("queried_compound", "Patented Small Molecule")
+        compound = p.attributes.get("queried_compound", "")
         link = f"https://patents.google.com/patent/{pat_id}"
         pat_rows.add((pat_id, title, assignee, year, compound, link))
 
@@ -1316,7 +1398,7 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
             if str(xr.database).upper() in ("PATENT", "PATENTSVIEW", "LENSPATENT"):
                 pat_id = xr.accession.upper()
                 link = f"https://patents.google.com/patent/{pat_id}"
-                pat_rows.add((pat_id, f"Patent for {e.preferred_name}", "Global Patent Office", "", e.preferred_name, link))
+                pat_rows.add((pat_id, f"Patent for {e.preferred_name}", "", "", e.preferred_name, link))
 
     for r in sorted(list(pat_rows), key=lambda x: x[0]):
         ws3.append(list(r))
@@ -4796,6 +4878,12 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
 
     # Sort entities using Multi-Factor Scientific Relevance Score (S_rel)
     entities = BioactivityRankingEngine.rank_entities(entities)
+
+    # Every export below reads `relations`, so the endpoints are fixed once, at
+    # the point where the graph is complete.
+    relations, dropped_relations = repoint_relation_endpoints(entities, relations)
+    if dropped_relations:
+        print(f"  * Relations not exported (no matching node): {dropped_relations}")
 
     repo.save_entities_bulk(entities)
     if relations:

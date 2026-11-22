@@ -227,6 +227,71 @@ class PatentNeverEmpty(unittest.TestCase):
                            scigraph.BaseConnector.TIMEOUT)
 
 
+class RelationEndpoints(unittest.TestCase):
+    """Edges are exported only when both of their nodes are exported."""
+
+    def setUp(self):
+        self.compound = scigraph.Entity(
+            uid="COMPOUND:MXWJVTOOROXGIU-UHFFFAOYSA-N",
+            entity_type=scigraph.EntityType.COMPOUND,
+            preferred_name="6-chloro-4-N-ethyl-2-N-propan-2-yl-1,3,5-triazine-2,4-diamine",
+            canonical_id="MXWJVTOOROXGIU-UHFFFAOYSA-N",
+            synonyms={"Atrazine"},
+        )
+        self.compound.add_cross_ref(scigraph.DatabaseSource.PUBCHEM, "2256")
+        self.compound.add_cross_ref("KEGG", "C06552")
+        self.patent = scigraph.Entity(
+            uid="PATENT:US-20190021252-A1",
+            entity_type=scigraph.EntityType.PATENT,
+            preferred_name="US Patent US-20190021252-A1 (Atrazine)",
+            canonical_id="US-20190021252-A1",
+        )
+
+    def _relation(self, source, target, **attributes):
+        return scigraph.Relation(
+            source_uid=source,
+            target_uid=target,
+            relation_type=scigraph.RelationType.PATENTED_IN,
+            attributes=attributes,
+        )
+
+    def test_invented_compound_ids_are_pointed_at_the_real_node(self):
+        entities = [self.compound, self.patent]
+        relations = [
+            self._relation("COMPOUND:C06552", self.patent.uid),
+            self._relation("COMPOUND:2256", self.patent.uid),
+            self._relation("COMPOUND:ATRAZINE", self.patent.uid),
+        ]
+        kept, dropped = scigraph.repoint_relation_endpoints(entities, relations)
+        self.assertEqual(dropped, 0)
+        self.assertEqual({rel.source_uid for rel in kept}, {self.compound.uid})
+        self.assertEqual(len(kept), 3)
+
+    def test_the_connectors_own_query_string_is_the_last_resort(self):
+        entities = [self.compound, self.patent]
+        relations = [self._relation("PROTEIN:PDBQUERY:c4002849", self.patent.uid,
+                                    query="Atrazine")]
+        kept, dropped = scigraph.repoint_relation_endpoints(entities, relations)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(kept[0].source_uid, self.compound.uid)
+
+    def test_a_truly_unknown_endpoint_is_dropped_not_exported(self):
+        kept, dropped = scigraph.repoint_relation_endpoints(
+            [self.compound, self.patent],
+            [self._relation("COMPOUND:NOSUCHTHING", self.patent.uid)],
+        )
+        self.assertEqual(kept, [])
+        self.assertEqual(dropped, 1)
+
+    def test_a_self_loop_is_dropped(self):
+        kept, dropped = scigraph.repoint_relation_endpoints(
+            [self.compound, self.patent],
+            [self._relation("COMPOUND:ATRAZINE", self.compound.uid)],
+        )
+        self.assertEqual(kept, [])
+        self.assertEqual(dropped, 1)
+
+
 class ToxicityVerdict(unittest.TestCase):
     """The verdict reads the statements the engine actually wrote."""
 
