@@ -1215,6 +1215,47 @@ async def get_search_graph(search_id: str, http_request: Request = None):
     }
 
 
+@app.get("/api/search/{search_id}/patents")
+async def search_patents(search_id: str, http_request: Request = None):
+    """The patents behind a finished search, as a readable list.
+
+    The graph is where patents were technically present but practically
+    invisible: hundreds of grey dots, no numbers, no links. This returns the
+    same rows the workbook carries, newest first, so the results screen can
+    show what was found without a download.
+    """
+    import csv as _csv
+
+    if _decision is None:
+        raise HTTPException(status_code=501, detail="Patent register unavailable")
+
+    state = searches.get(search_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Search not found")
+    _require_search_owner(search_id, state, http_request)
+
+    export_dir = Path(state.get("export_dir", ""))
+    if not _export_dir_is_safe(str(export_dir)):
+        raise HTTPException(status_code=404, detail="Patent data not available yet")
+    nodes_file = export_dir / "nodes.csv"
+    edges_file = export_dir / "edges.csv"
+    if not nodes_file.exists() or not edges_file.exists():
+        raise HTTPException(status_code=404, detail="Patent data not available yet")
+
+    def rows(path: Path) -> list:
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            return list(_csv.DictReader(handle))
+
+    try:
+        nodes = rows(nodes_file)
+        edges = rows(edges_file)
+    except OSError as e:
+        LOG.warning("Failed to read patents for search_id=%s: %s", search_id, e)
+        raise HTTPException(status_code=500, detail="Patent read error")
+
+    return {"search_id": search_id, **_decision.patent_register(nodes, edges)}
+
+
 @app.get("/api/search/{search_id}/decision-intel")
 async def search_decision_intel(search_id: str, http_request: Request = None):
     """Instant decision intelligence for a finished search.

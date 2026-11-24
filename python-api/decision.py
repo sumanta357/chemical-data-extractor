@@ -354,6 +354,66 @@ def dark_literature(nodes: List[Dict[str, str]], edges: List[Dict[str, str]]) ->
     }
 
 
+def patent_register(
+    nodes: List[Dict[str, str]],
+    edges: List[Dict[str, str]],
+    limit: int = 12,
+) -> Dict[str, Any]:
+    """The patents this search surfaced, newest first, with their links.
+
+    The patents were only ever readable by opening the workbook; the results
+    screen showed a graph full of grey patent dots and no way to see a single
+    patent number. This is the same data the export holds, shaped for a list:
+    one entry per patent with what the source actually supplied, and an empty
+    register when there is nothing rather than a placeholder row.
+    """
+    patents: List[Dict[str, Any]] = []
+    for row in nodes:
+        uid = _row_uid(row)
+        label = _label(row.get(":LABEL", ""))
+        if not (_has_prefix(uid, _PATENT_PREFIXES) or label == "PATENT"):
+            continue
+        name = (row.get("name") or "").strip()
+        number = (
+            row.get("patent_number")
+            or row.get("canonical_id")
+            or uid.split(":")[-1]
+        ).strip()
+        if not number:
+            continue
+        title = (row.get("title") or "").strip()
+        patents.append({
+            "uid": uid,
+            "number": number,
+            "title": title or name,
+            "year": _patent_year(
+                uid, name, row.get("canonical_id", ""), row.get("publication_year", "") or ""
+            ),
+            "assignee": (row.get("assignee") or "").strip(),
+            "compound": (row.get("queried_compound") or "").strip(),
+            "url": (row.get("google_patents_url") or "").strip()
+            or f"https://patents.google.com/patent/{number}",
+        })
+
+    patent_uids = {p["uid"] for p in patents}
+    names = {_row_uid(row): (row.get("name") or _row_uid(row)).strip() for row in nodes}
+    linked: set = set()
+    for edge in edges:
+        if (edge.get(":TYPE") or "").strip().upper() != "PATENTED_IN":
+            continue
+        if (edge.get(":END_ID") or "").strip() in patent_uids:
+            linked.add((edge.get(":START_ID") or "").strip())
+
+    patents.sort(key=lambda p: (-(p["year"] or 0), p["number"]))
+    return {
+        "patent_count": len(patents),
+        "compound_count": len(linked),
+        "compounds": [names.get(uid, uid) for uid in sorted(linked)][:8],
+        "patents": patents[:limit],
+        "truncated": len(patents) > limit,
+    }
+
+
 # ── Toxicity on record ──────────────────────────────────────────────────────
 
 

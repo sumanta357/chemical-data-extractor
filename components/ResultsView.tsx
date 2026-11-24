@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { AlertIcon, DownloadIcon } from '@/components/icons';
 import GraphViewer from '@/components/GraphViewer';
 import { cx, note } from '@/components/ui';
-import type { DecisionIntel, SearchState } from '@/lib/types';
+import type { DecisionIntel, SearchPatents, SearchState } from '@/lib/types';
 import { authHeaders } from '@/lib/billing';
 
 interface Props {
@@ -364,6 +364,92 @@ function DecisionIntelPanel({ search }: Props) {
   );
 }
 
+/**
+ * The patents behind this search, listed as they were retrieved.
+ *
+ * Patents used to exist only as unlabelled dots in the graph and rows in the
+ * workbook, so "what patents came back" had no answer on this screen. This
+ * reads the same export rows and shows the numbers, years and links, and says
+ * plainly when nothing was retrieved instead of showing an empty box.
+ */
+function PatentPanel({ search }: Props) {
+  const [register, setRegister] = useState<SearchPatents | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/search/${encodeURIComponent(search.search_id)}/patents`,
+          { headers: await authHeaders() }
+        );
+        // A search with no exports yet has nothing to list; stay quiet.
+        if (!res.ok) return;
+        const body = (await res.json()) as SearchPatents;
+        if (alive && body) setRegister(body);
+      } catch {
+        // Secondary information: a failed lookup must not break the page.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [search.search_id]);
+
+  if (!register) return null;
+
+  return (
+    <div className="border-t border-line px-5 py-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-sm font-medium text-fg">Patents</h3>
+        <p className="text-xs text-fg-subtle tabular-nums">
+          {register.patent_count} record{register.patent_count === 1 ? '' : 's'}
+          {register.compound_count > 0 &&
+            ` · ${register.compound_count} compound${register.compound_count === 1 ? '' : 's'}`}
+        </p>
+      </div>
+
+      {register.patent_count === 0 ? (
+        <p className="mt-1.5 text-xs leading-relaxed text-fg-muted">
+          No patent records were retrieved for this query. Patent coverage comes
+          from compound cross-references, so a query with none returns none —
+          that is not evidence that no patent exists.
+        </p>
+      ) : (
+        <>
+          <ul className="mt-2 space-y-1">
+            {register.patents.map((p) => (
+              <li key={p.uid} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-accent hover:underline"
+                >
+                  {p.number}
+                </a>
+                <span className="min-w-0 flex-1 truncate text-fg-muted" title={p.title}>
+                  {p.title}
+                </span>
+                {p.year && (
+                  <span className="tabular-nums text-fg-subtle">{p.year}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {register.truncated && (
+            <p className="mt-2 text-xs text-fg-subtle">
+              Showing the newest {register.patents.length} of {register.patent_count}{' '}
+              — the workbook&apos;s &ldquo;Patents &amp; Patented Molecules&rdquo; sheet
+              lists every one.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ResultsView({ search }: Props) {
   const { export_files: files } = search;
 
@@ -379,6 +465,8 @@ export default function ResultsView({ search }: Props) {
       </div>
 
       {files.length > 0 && <GraphViewer search={search} />}
+
+      {files.length > 0 && <PatentPanel search={search} />}
 
       {files.length > 0 && <DecisionIntelPanel search={search} />}
 

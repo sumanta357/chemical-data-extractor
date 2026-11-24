@@ -7,7 +7,13 @@ import type {
   SearchGraph,
   GraphNode,
   GraphEdge,
+  PatentRecord,
+  SearchPatents,
+  DecisionIntel,
 } from './types';
+
+// python-api lives next to the Next app; decision.py owns the verdict maths.
+const PY_API_DIR = path.join(process.cwd(), 'python-api');
 
 // ── In-memory search state ──────────────────────────────────────────────
 const searches = new Map<string, SearchState>();
@@ -798,6 +804,219 @@ export async function getSearchGraph(
     edge_total: edgeRows.length,
     truncated: nodes.length < nodeRows.length || edges.length < edgeRows.length,
   };
+}
+
+/**
+ * The earliest plausible year in a patent's identifiers, or null.
+ *
+ * Mirrors `_patent_year` in python-api/decision.py, so the number shown here
+ * matches the year the IP verdict used.
+ */
+function patentYear(...texts: string[]): number | null {
+  const nowYear = new Date().getFullYear();
+  let earliest: number | null = null;
+  for (const text of texts) {
+    for (const match of (text || '').matchAll(/(19|20)\d{2}/g)) {
+      const year = Number(match[0]);
+      if (year >= 1980 && year <= nowYear && (earliest === null || year < earliest)) {
+        earliest = year;
+      }
+    }
+  }
+  return earliest;
+}
+
+/**
+ * Patent rows recovered from a graph response.
+ *
+ * Used when the engine serving the search predates the patents endpoint. The
+ * graph is already capped for display, so the list can be shorter than the
+ * export — `truncated` says so.
+ */
+export function patentsFromGraph(graph: SearchGraph): SearchPatents {
+  const patents: PatentRecord[] = [];
+  const names = new Map<string, string>();
+  for (const node of graph.nodes ?? []) {
+    names.set(node.data.id, node.data.name);
+    if ((node.data.type ?? '').toUpperCase() !== 'PATENT') continue;
+    const number = (node.data.canonical_id || node.data.id.split(':').pop() || '').trim();
+    if (!number) continue;
+    patents.push({
+      uid: node.data.id,
+      number,
+      title: node.data.name || number,
+      year: patentYear(node.data.id, node.data.name, node.data.canonical_id),
+      assignee: '',
+      compound: '',
+      url: `https://patents.google.com/patent/${number}`,
+    });
+  }
+
+  const patentUids = new Set(patents.map((p) => p.uid));
+  const linked = new Set<string>();
+  for (const edge of graph.edges ?? []) {
+    if ((edge.data.relation ?? '').toUpperCase() !== 'PATENTED_IN') continue;
+    if (patentUids.has(edge.data.target)) linked.add(edge.data.source);
+  }
+
+  patents.sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.number.localeCompare(b.number));
+  return {
+    patent_count: patents.length,
+    compound_count: linked.size,
+    compounds: Array.from(linked)
+      .sort()
+      .map((uid) => names.get(uid) || uid)
+      .slice(0, 8),
+    patents: patents.slice(0, 12),
+    truncated: patents.length > 12 || Boolean(graph.truncated),
+  };
+}
+
+/**
+ * The patents behind a search, read from its own nodes.csv and edges.csv.
+ *
+ * Mirrors `GET /api/search/{id}/patents` in python-api/app.py. The graph is
+ * where patents used to be technically present and practically invisible; this
+ * is the list a reader can actually scan.
+ */
+export async function getSearchPatents(
+  searchId: string,
+  limit: number = 12
+): Promise<SearchPatents | null> {
+  const state = searches.get(searchId);
+  if (!state) return null;
+
+  if (state.remote_engine_url && state.remote_search_id) {
+    const base = `${state.remote_engine_url}/api/search/${state.remote_search_id}`;
+    try {
+      return await fetchJson(`${base}/patents`, { signal: AbortSignal.timeout(30_000) });
+    } catch {
+      // A hosted engine built before this endpoint existed answers with its
+      // index page or a 404. The graph endpoint carries the same patent nodes,
+      // so fall back to it rather than showing the customer nothing until the
+      // engine is rebuilt.
+      try {
+        const graph = (await fetchJson(`${base}/graph`, {
+          signal: AbortSignal.timeout(30_000),
+        })) as SearchGraph;
+        return patentsFromGraph(graph);
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  const dir = state.export_dir;
+  if (!dir) return null;
+  const nodeRows = readCsvRecords(path.join(dir, 'nodes.csv'));
+  const edgeRows = readCsvRecords(path.join(dir, 'edges.csv'));
+  if (nodeRows.length === 0) return null;
+
+  const patents: PatentRecord[] = [];
+  for (const row of nodeRows) {
+    const uid = (row['uid:ID'] ?? '').trim();
+    const label = (row[':LABEL'] ?? '').split(';').pop()?.trim().toUpperCase() ?? '';
+    if (!uid.startsWith('PATENT:') && label !== 'PATENT') continue;
+    const name = (row.name ?? '').trim();
+    const number = (row.patent_number || row.canonical_id || uid.split(':').pop() || '').trim();
+    if (!number) continue;
+    patents.push({
+      uid,
+      number,
+      title: (row.title ?? '').trim() || name,
+      year: patentYear(uid, name, row.canonical_id ?? '', row.publication_year ?? ''),
+      assignee: (row.assignee ?? '').trim(),
+      compound: (row.queried_compound ?? '').trim(),
+      url:
+        (row.google_patents_url ?? '').trim() ||
+        `https://patents.google.com/patent/${number}`,
+    });
+  }
+
+  const patentUids = new Set(patents.map((p) => p.uid));
+  const names = new Map(nodeRows.map((r) => [(r['uid:ID'] ?? '').trim(), (r.name ?? '').trim()]));
+  const linked = new Set<string>();
+  for (const row of edgeRows) {
+    if ((row[':TYPE'] ?? '').trim().toUpperCase() !== 'PATENTED_IN') continue;
+    if (patentUids.has((row[':END_ID'] ?? '').trim())) {
+      linked.add((row[':START_ID'] ?? '').trim());
+    }
+  }
+
+  patents.sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.number.localeCompare(b.number));
+  return {
+    patent_count: patents.length,
+    compound_count: linked.size,
+    compounds: Array.from(linked)
+      .sort()
+      .map((uid) => names.get(uid) || uid)
+      .slice(0, 8),
+    patents: patents.slice(0, limit),
+    truncated: patents.length > limit,
+  };
+}
+
+/**
+ * The verdict bundle for a finished search: efficacy grade, IP freedom,
+ * prior-art overlap, MoA evidence, vendor links and the toxicity statements.
+ *
+ * The arithmetic lives in python-api/decision.py, so this either proxies to the
+ * hosted engine or runs that module locally — it never reimplements it. The
+ * Next app had no route for this at all, so the panel 404'd in production and
+ * none of the IP, prior-art or toxicity information could be seen.
+ */
+export async function getDecisionIntel(
+  searchId: string
+): Promise<DecisionIntel | null> {
+  const state = searches.get(searchId);
+  if (!state) return null;
+
+  if (state.remote_engine_url && state.remote_search_id) {
+    try {
+      return (await fetchJson(
+        `${state.remote_engine_url}/api/search/${state.remote_search_id}/decision-intel`,
+        { signal: AbortSignal.timeout(30_000) }
+      )) as DecisionIntel;
+    } catch {
+      return null;
+    }
+  }
+
+  const dir = state.export_dir;
+  if (!dir || !fs.existsSync(path.join(dir, 'nodes.csv'))) return null;
+
+  const script = [
+    'import json, sys, pathlib',
+    'sys.path.insert(0, sys.argv[1])',
+    'import decision',
+    'bundle = decision.decision_intel(sys.argv[2], sys.argv[3])',
+    'print(json.dumps(bundle) if bundle else "null")',
+  ].join('\n');
+
+  try {
+    const out = await new Promise<string>((resolve, reject) => {
+      const child = spawn('python3', ['-c', script, PY_API_DIR, dir, state.query], {
+        cwd: path.dirname(PY_API_DIR),
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+      });
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code === 0) resolve(stdout);
+        else reject(new Error(stderr.slice(0, 300) || `decision.py exited ${code}`));
+      });
+    });
+    const parsed = JSON.parse(out);
+    return parsed ? ({ search_id: searchId, ...parsed } as DecisionIntel) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function listSearches(limit: number = 20): SearchState[] {

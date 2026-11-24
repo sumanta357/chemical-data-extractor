@@ -198,6 +198,27 @@ export interface DecisionIntel {
   not_assessed: string[];
 }
 
+/** One patent row, exactly as the export recorded it. */
+export interface PatentRecord {
+  uid: string;
+  number: string;
+  title: string;
+  year: number | null;
+  assignee: string;
+  compound: string;
+  url: string;
+}
+
+/** The patent register for a finished search. */
+export interface SearchPatents {
+  search_id?: string;
+  patent_count: number;
+  compound_count: number;
+  compounds: string[];
+  patents: PatentRecord[];
+  truncated: boolean;
+}
+
 interface MoaEvidence {
   compound: string;
   target: string;
