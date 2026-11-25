@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { buildExportLink, type ExportLink } from './export-token';
 import type {
   SearchState,
   ExportFile,
@@ -151,6 +152,7 @@ function guessMime(filename: string): string {
     '.json': 'application/json',
     '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     '.graphml': 'application/xml',
+    '.cyjs': 'application/json',
     '.ttl': 'text/turtle',
     '.cypher': 'text/plain',
     '.parquet': 'application/octet-stream',
@@ -595,7 +597,8 @@ function runEnrichment(
 export function createSearch(
   query: string,
   queryType: string,
-  hops: number
+  hops: number,
+  ownerKey?: string | null
 ): SearchState {
   const searchId = generateId(8);
   const cleanQ = query
@@ -616,6 +619,7 @@ export function createSearch(
     created_at: new Date().toISOString(),
     elapsed_seconds: null,
     error: null,
+    owner_key: ownerKey ?? null,
   };
 
   searches.set(searchId, state);
@@ -827,6 +831,29 @@ function patentYear(...texts: string[]): number | null {
 }
 
 /**
+ * True only for a row that identifies a patent document.
+ *
+ * The connector's fallback "Patent Search: <query>" entity is typed PATENT and
+ * carries a `SEARCH:` identifier. It is a useful link, but it is not a patent:
+ * listing it produced a row whose Google Patents URL 404s and inflated the
+ * patent count. Mirrors `_is_patent_document` in python-api/decision.py.
+ *
+ * Real documents include the US series that put a letter after the office
+ * code: reissues (`USRE45123E1`), designs (`USD123456S1`), plant patents
+ * (`USPP12345P2`), statutory invention registrations (`USH1234H1`) and
+ * defensive publications (`UST123456I4`). Those letters are listed rather than
+ * left open, so a title like `EGFR2024` cannot pass as a number.
+ */
+function isPatentDocument(uid: string, number: string): boolean {
+  const upperUid = (uid || '').toUpperCase();
+  if (upperUid.startsWith('PATENTSEARCH:') || upperUid.startsWith('SEARCH:')) return false;
+  const upperNumber = (number || '').toUpperCase();
+  if (upperNumber.startsWith('SEARCH:') || upperNumber.startsWith('PATENTSEARCH:')) return false;
+  const normalised = upperNumber.replace(/[^A-Z0-9]/g, '');
+  return /^[A-Z]{2}(?:RE|PP|D|T|H)?\d{4,}(?:[A-Z]\d*)?$/.test(normalised);
+}
+
+/**
  * Patent rows recovered from a graph response.
  *
  * Used when the engine serving the search predates the patents endpoint. The
@@ -840,7 +867,7 @@ export function patentsFromGraph(graph: SearchGraph): SearchPatents {
     names.set(node.data.id, node.data.name);
     if ((node.data.type ?? '').toUpperCase() !== 'PATENT') continue;
     const number = (node.data.canonical_id || node.data.id.split(':').pop() || '').trim();
-    if (!number) continue;
+    if (!number || !isPatentDocument(node.data.id, number)) continue;
     patents.push({
       uid: node.data.id,
       number,
@@ -919,7 +946,7 @@ export async function getSearchPatents(
     if (!uid.startsWith('PATENT:') && label !== 'PATENT') continue;
     const name = (row.name ?? '').trim();
     const number = (row.patent_number || row.canonical_id || uid.split(':').pop() || '').trim();
-    if (!number) continue;
+    if (!number || !isPatentDocument(uid, number)) continue;
     patents.push({
       uid,
       number,
@@ -1028,16 +1055,38 @@ export function listSearches(limit: number = 20): SearchState[] {
     .slice(0, limit);
 }
 
+/**
+ * The ownership record for a search, or undefined when there is no such search.
+ *
+ * `ownerKey` is null for a search created before owners were recorded; those
+ * stay readable, like the engine's guest-tier searches. `hosted` says whether a
+ * Python engine owns the files, and therefore the account, too.
+ */
+export function getSearchOwnership(
+  searchId: string
+): { ownerKey: string | null; hosted: boolean } | undefined {
+  const state = searches.get(searchId);
+  if (!state) return undefined;
+  return {
+    ownerKey: state.owner_key ?? null,
+    hosted: Boolean(state.remote_engine_url && state.remote_search_id),
+  };
+}
+
 export function getExportFilePath(
   filename: string,
   searchId?: string
 ): string | null {
   if (searchId) {
+    // Scoped to one search: never fall through to another search's directory,
+    // or an identically named file (nodes.csv, graph.graphml) would be served
+    // from whichever run happened to be scanned first.
     const state = searches.get(searchId);
-    if (state) {
-      const p = path.resolve(state.export_dir, filename);
-      if (fs.existsSync(p)) return p;
-    }
+    if (!state?.export_dir) return null;
+    const base = path.resolve(state.export_dir);
+    const p = path.resolve(base, filename);
+    if (!p.startsWith(base + path.sep)) return null;
+    return fs.existsSync(p) ? p : null;
   }
 
   // Fallback: search all export dirs
@@ -1087,6 +1136,51 @@ export function getRemoteExportUrl(
     )}?search_id=${state.remote_search_id}`;
   }
   return null;
+}
+
+/**
+ * A signed, expiring URL for one export file.
+ *
+ * Cytoscape imports a network from a URL but cannot send a session cookie, so
+ * the owner mints a capability URL here: from the hosted engine when there is
+ * one (the engine mints it against its own public origin), otherwise locally.
+ */
+export async function getSearchExportLink(
+  searchId: string,
+  filename: string,
+  origin: string,
+  authorization?: string | null
+): Promise<ExportLink | null> {
+  const state = searches.get(searchId);
+  if (!state) return null;
+
+  if (state.remote_engine_url && state.remote_search_id) {
+    const engineOrigin = state.remote_engine_url.replace(/\/+$/, '');
+    const query = new URLSearchParams({
+      file: filename,
+      // The link points at the engine, because that is the host that signs it
+      // and the one that verifies it when Cytoscape fetches the file.
+      base_url: engineOrigin,
+    });
+    try {
+      return (await fetchJson(
+        `${engineOrigin}/api/search/${state.remote_search_id}/export-link?${query.toString()}`,
+        {
+          headers: authorization ? { authorization } : undefined,
+          signal: AbortSignal.timeout(30_000),
+        }
+      )) as ExportLink;
+    } catch {
+      return null;
+    }
+  }
+
+  const dir = state.export_dir;
+  if (!dir) return null;
+  const base = path.resolve(dir);
+  const resolved = path.resolve(base, filename);
+  if (path.dirname(resolved) !== base || !fs.existsSync(resolved)) return null;
+  return buildExportLink(origin, searchId, filename);
 }
 
 export { guessMime, EXPORTS_DIR };

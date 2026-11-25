@@ -44,6 +44,12 @@ export interface SearchState {
   remote_engine_url?: string;
   /** Search id on the hosted Python engine */
   remote_search_id?: string;
+  /**
+   * Who created this search, as the browser that ran it identifies itself.
+   * `null` for a search created before ownership was recorded; those stay
+   * readable, matching the engine's guest-tier behaviour.
+   */
+  owner_key?: string | null;
   /** Consecutive failed refreshes against the hosted engine */
   remote_failures?: number;
   /** Epoch ms of the last observed change in remote status/progress/log size */
@@ -145,10 +151,18 @@ export interface DecisionIntel {
     note: string;
   };
   ip: {
-    status: 'green' | 'yellow' | 'red';
+    /**
+     * `insufficient_data` is the honest answer when no patent document was
+     * retrieved: it is not a green light, and it must not be rendered as one.
+     */
+    status: 'green' | 'yellow' | 'red' | 'insufficient_data';
     reason: string;
     patents: Array<{ uid: string; name: string; year: number | null }>;
     caveat: string;
+    /** What was (and was not) searched for this signal. */
+    scope?: string;
+    /** The date the signal was computed, ISO YYYY-MM-DD. */
+    assessed_at?: string;
   };
   dark_literature: {
     patent_count: number;

@@ -67,6 +67,23 @@ tools.
 
 Use this file whenever the shape of the network is the result you need.
 
+`graph.cyjs` holds the same network as Cytoscape element JSON, which Cytoscape
+Desktop, Cytoscape Web and Cytoscape.js read natively. In both files numeric
+values such as `pchembl_value` stay numeric, so they can drive visual mappings
+and filters instead of arriving as text.
+
+**Opening it without downloading:** press **Cytoscape link** next to the
+GraphML or .cyjs row, then paste the copied URL into
+**File → Import → Network from URL**. The link is signed and expires, and it
+works without signing in to this app — which is what Cytoscape needs, since its
+importer sends no cookies.
+
+Every download from the results screen takes the same route: the row mints a
+signed link for that one file and follows it. A bare
+`/api/exports/<file>?search_id=…` URL — no signature, and not signed in as the
+search's owner — answers 404. Search ids are short enough to guess, and exports
+are customer data.
+
 ---
 
 ## 5. `neo4j_import.cypher` — for Neo4j

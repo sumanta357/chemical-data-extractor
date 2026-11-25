@@ -4,18 +4,57 @@ import {
   getExportFilePath,
   getBase64File,
   getRemoteExportUrl,
+  getSearchOwnership,
   guessMime,
 } from '@/lib/search-engine';
+import { verifyExportToken } from '@/lib/export-token';
+import { requestOwnsSearch } from '@/lib/search-owner';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Download one export file.
+ *
+ * Two ways in, the same two the Python engine accepts:
+ *   * a signed, expiring token — this is how Cytoscape imports a network, since
+ *     its fetcher sends no cookie at all;
+ *   * the search's owner.
+ *
+ * Anything else gets the same 404 as a file that does not exist, so the
+ * response never confirms that somebody else's search is there.
+ */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { filename: string } }
 ) {
   const filename = params.filename;
-  const url = new URL(_request.url);
+  const url = new URL(request.url);
   const searchId = url.searchParams.get('search_id') || undefined;
+  const expiresRaw = url.searchParams.get('expires');
+  const signature = url.searchParams.get('signature');
+  const authorization = request.headers.get('authorization');
+
+  let authorized = false;
+  if (expiresRaw || signature) {
+    // A signature that is present but wrong must never fall through to the
+    // owner path.
+    const expiresAt = Number(expiresRaw);
+    authorized =
+      Boolean(searchId && signature) &&
+      Number.isFinite(expiresAt) &&
+      verifyExportToken(searchId!, filename, expiresAt, signature!);
+  } else if (searchId) {
+    const ownership = getSearchOwnership(searchId);
+    authorized =
+      ownership !== undefined && requestOwnsSearch(request, ownership.ownerKey);
+  }
+
+  if (!authorized) {
+    return NextResponse.json(
+      { detail: `File not found: ${filename}` },
+      { status: 404 }
+    );
+  }
 
   const filePath = getExportFilePath(filename, searchId);
 
@@ -29,12 +68,15 @@ export async function GET(
     if (b64) fileBuffer = Buffer.from(b64, 'base64');
   }
 
-  // Production: proxy the download to the hosted Python engine.
+  // Production: proxy the download to the hosted Python engine. The engine owns
+  // the file and its account, so it gets the caller's token and applies its own
+  // ownership check.
   if (!fileBuffer) {
     const remoteUrl = getRemoteExportUrl(searchId, filename);
     if (remoteUrl) {
       try {
         const remoteRes = await fetch(remoteUrl, {
+          headers: authorization ? { authorization } : undefined,
           signal: AbortSignal.timeout(60_000),
         });
         if (remoteRes.ok) {

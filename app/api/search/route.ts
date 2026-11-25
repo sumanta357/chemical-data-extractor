@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSearch, getSearch } from '@/lib/search-engine';
+import { ownerKeyForNewSearch, rememberOwner } from '@/lib/search-owner';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +22,10 @@ export async function POST(request: NextRequest) {
       ? query_type
       : 'auto';
 
-    // Create search (starts background process)
-    const state = createSearch(query.trim(), validatedType, validatedHops);
+    // The search belongs to the browser that started it: exports accept either
+    // a signed token or that owner, never a bare search id.
+    const ownerKey = ownerKeyForNewSearch(request);
+    const state = createSearch(query.trim(), validatedType, validatedHops, ownerKey);
 
     // Wait briefly for initial state
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -34,17 +37,21 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    return NextResponse.json({
-      search_id: current.search_id,
-      query: current.query,
-      status: current.status,
-      progress: current.progress,
-      log: current.log,
-      export_files: current.export_files,
-      created_at: current.created_at,
-      elapsed_seconds: current.elapsed_seconds,
-      error: current.error,
-    });
+    return rememberOwner(
+      NextResponse.json({
+        search_id: current.search_id,
+        query: current.query,
+        status: current.status,
+        progress: current.progress,
+        log: current.log,
+        export_files: current.export_files,
+        created_at: current.created_at,
+        elapsed_seconds: current.elapsed_seconds,
+        error: current.error,
+      }),
+      ownerKey,
+      request
+    );
   } catch (err: any) {
     return NextResponse.json(
       { detail: err.message || 'Invalid request' },

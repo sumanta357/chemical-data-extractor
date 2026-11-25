@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### Fixed
+- **Real reissue, design and plant patents were dropped as "not patents".**
+  The publication-number filter that keeps the "Patent Search: …" link row out
+  of the register accepted only an office code followed by digits, so
+  `USRE45123E1` (reissue), `USD123456S1` (design) and `USPP12345P2` (plant)
+  failed it and disappeared from the register and the IP signal. The filter now
+  accepts the US series letters as well (reissue `RE`, design `D`, plant `PP`,
+  statutory invention registration `H`, defensive publication `T`), in both the
+  Python verdict and the Next.js reader, and the engine's ingestion check no
+  longer rejects those numbers before they reach a graph. The link rows stay
+  excluded: only those series letters count, so query text such as `EGFR2024`
+  is still not a publication number.
 - **Patent rows could be empty for a whole search.** Two independent causes:
   - `QueryRouter` sent identifier-shaped queries (`CHEMBL25`, `2244`, `CHEBI:2244`,
     `C00003`, `DB#####`) to connector lists that did not include `Patents`, so an
@@ -15,6 +26,13 @@
     18s budget with a longer 40s connector limit, use a single bounded Google
     Patents attempt, and always emit at least the Google Patents search link so a
     search can never come back with zero patent rows.
+- **A patent search link was listed and counted as a patent.** The connector's
+  fallback entity ("Patent Search: EGFR", canonical id `SEARCH:EGFR`, typed
+  `PATENT` like a real document) reached `patent_register()` and the IP verdict.
+  It appeared at the top of the register with a 404 Google Patents link, and a
+  protein query with no patents could report that "patents exist". Only rows
+  carrying a real publication number are patents now, in both the Python
+  verdict and the Next.js local reader.
 
 ### Added
 - **PubChem Toxicity connector** (`PubChem Toxicity`). The catalogue entries
@@ -28,6 +46,34 @@
   `decision-intel` now reports those statements (`toxicity` block, shown in the
   verdict panel) instead of a "not computed" note, and an empty result is
   reported as "PubChem lists none", never as "non-toxic".
+
+### Changed
+- **`/api/exports` is no longer open to anyone holding a search id.** Search ids
+  are eight characters, so a bare id was enough to fetch any search's files. A
+  download now needs either a signed link or the search's owner — the account
+  on the engine, and, for a search this Next app ran itself, the browser that
+  created it (an httpOnly `scigraph_owner` cookie set when the search starts).
+  Minting an export link is owner-only for the same reason, and a request with
+  neither gets the same 404 as a missing file. The results screen mints a signed
+  link on download, so the ordinary browser path keeps working.
+- **The IP verdict no longer calls an empty result "green".** A search that
+  surfaced no patent document now reports `insufficient_data` — zero records is
+  the most common outcome of a name lookup and the most dangerous answer to
+  colour green. Every verdict carries its `scope` (sources searched, and that
+  legal status, claims, families and jurisdictions were not checked) and an
+  `assessed_at` date, and the results screen labels the block "Patent signal"
+  rather than "IP freedom".
+- **GraphML carries attribute types, and every search writes `graph.cyjs`.**
+  Attributes are no longer coerced to strings, so `pchembl_value`,
+  `molecular_weight` and the other numeric fields stay numeric and can drive
+  Cytoscape visual mappings; `graph.cyjs` is Cytoscape element JSON for
+  Cytoscape Desktop, Web and Cytoscape.js.
+- **Signed export links for Cytoscape.** `GET /api/search/{id}/export-link?file=…`
+  mints an owner-scoped, expiring HMAC URL that works without a session cookie,
+  which is what Cytoscape's "Network from URL" needs. Each GraphML/.cyjs row in
+  the results screen has a **Cytoscape link** button that copies it. Set
+  `EXPORT_SIGNING_SECRET` to keep links valid across restarts (otherwise a
+  warning is logged and links expire with the process).
 
 ### Note
 - The data-source audit and `data_sources_status.json` now include a Toxicology

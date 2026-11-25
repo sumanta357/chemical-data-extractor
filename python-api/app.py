@@ -17,9 +17,12 @@ Run: uvicorn app:app --host 0.0.0.0 --port $PORT
 """
 
 import asyncio
+import hashlib
+import hmac
 import logging
 import os
 import re
+import secrets
 import shutil
 import sys
 import time
@@ -27,6 +30,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -55,6 +59,39 @@ WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Persistent runtime logger (stderr/stdout outside poll logs)
 LOG = logging.getLogger("scigraph.runtime")
+
+# ── Signed export links ─────────────────────────────────────────────────────
+# Browser downloads carry a session cookie. Cytoscape's "Network from URL"
+# does not — it fetches the URL with no cookie at all — so a graph cannot be
+# opened directly in Cytoscape without a capability URL. A link is an HMAC over
+# (search_id, filename, expiry) and is minted only for the search's owner.
+EXPORT_LINK_TTL_SECONDS = int(os.environ.get("EXPORT_LINK_TTL_SECONDS", "604800"))
+
+_EXPORT_SIGNING_SECRET = (os.environ.get("EXPORT_SIGNING_SECRET") or "").strip()
+if not _EXPORT_SIGNING_SECRET:
+    # Keep local development working without a configured secret, but say
+    # plainly that links become invalid on restart.
+    _EXPORT_SIGNING_SECRET = secrets.token_urlsafe(32)
+    LOG.warning(
+        "EXPORT_SIGNING_SECRET is not set: signed export links will stop working "
+        "when this process restarts. Set it to keep links valid across restarts."
+    )
+
+
+def _export_link_signature(search_id: str, filename: str, expires_at: int) -> str:
+    payload = f"{search_id}:{filename}:{expires_at}".encode("utf-8")
+    return hmac.new(
+        _EXPORT_SIGNING_SECRET.encode("utf-8"), payload, hashlib.sha256
+    ).hexdigest()
+
+
+def _export_link_is_valid(
+    search_id: str, filename: str, expires_at: int, signature: str
+) -> bool:
+    if expires_at < int(time.time()):
+        return False
+    expected = _export_link_signature(search_id, filename, expires_at)
+    return hmac.compare_digest(expected, signature or "")
 LOG.setLevel(logging.DEBUG)
 if not LOG.handlers:
     h = logging.StreamHandler(sys.stderr)
@@ -798,7 +835,7 @@ async def _run_search_locked(search_id: str, query: str, query_type: str, hops: 
             # --- Finalize ---
             state["status"] = "completed"
             state["elapsed_seconds"] = time.time() - start_time
-            state["export_files"] = _list_export_files(export_dir)
+            state["export_files"] = _list_export_files(export_dir, search_id)
             # Archive before saving, so the durable link is present in the state
             # the very first completed poll sees. Best-effort by construction —
             # upload_search_exports swallows its own failures, because a
@@ -897,8 +934,13 @@ def _update_progress(state: dict, line: str):
         state["progress"] = f"⚠️ {line.strip()[:100]}"
 
 
-def _list_export_files(export_dir: str) -> list[dict]:
-    """List files in the export directory. Directory missing means nothing to list."""
+def _list_export_files(export_dir: str, search_id: str = "") -> list[dict]:
+    """List files in the export directory. Directory missing means nothing to list.
+
+    The `url` carries the search id because a download needs it: the export
+    route accepts a signed link or the search's owner, and neither can be
+    resolved from a bare filename.
+    """
     files: list[dict] = []
     path = Path(export_dir)
     if not path.exists():
@@ -913,7 +955,10 @@ def _list_export_files(export_dir: str) -> list[dict]:
                 "name": f.name,
                 "size_bytes": st.st_size,
                 "size_display": _format_size(st.st_size),
-                "url": f"/api/exports/{f.name}",
+                "url": (
+                    f"/api/exports/{f.name}?search_id={search_id}"
+                    if search_id else f"/api/exports/{f.name}"
+                ),
             })
     return files
 
@@ -1068,7 +1113,8 @@ async def get_search_status(search_id: str, http_request: Request = None):
     _require_search_owner(search_id, state, http_request)
 
     if state.get("status") == "completed" and not state.get("export_files"):
-        state["export_files"] = _list_export_files(state.get("export_dir", ""))
+        state["export_files"] = _list_export_files(
+            state.get("export_dir", ""), search_id)
         _save_search(state)
 
     # Purge cached state that is no longer useful.
@@ -1322,9 +1368,91 @@ async def search_cloud_link(search_id: str, http_request: Request = None):
     }
 
 
+@app.get("/api/search/{search_id}/export-link")
+async def search_export_link(
+    search_id: str,
+    filename: str = Query(..., alias="file", min_length=1),
+    base_url: Optional[str] = Query(None),
+    http_request: Request = None,
+):
+    """Mint a signed, expiring URL for one export file.
+
+    This is what makes "open directly in Cytoscape" possible: Cytoscape imports
+    a network from a URL but cannot send the browser's session cookie, so the
+    owner asks this endpoint for a capability URL and pastes that into
+    File -> Import -> Network from URL.
+    """
+    state = searches.get(search_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Search not found")
+    _require_search_owner(search_id, state, http_request)
+
+    filename = filename.strip()
+    if not filename or filename in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if Path(filename).parts != (filename,):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    export_dir = Path(state.get("export_dir", ""))
+    target = export_dir / filename
+    if not target.is_file():
+        raise HTTPException(
+            status_code=404, detail=f"File not found: {filename}"
+        )
+
+    origin = (base_url or "").strip().rstrip("/")
+    if origin:
+        # Only a bare web origin is accepted, so a link can never be minted
+        # that points somewhere the owner did not intend.
+        parsed = urlparse(origin)
+        if (
+            parsed.scheme not in ("http", "https")
+            or not parsed.netloc
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="base_url must be an http(s) origin, e.g. https://app.example.com",
+            )
+    elif http_request is not None:
+        origin = str(http_request.base_url).rstrip("/")
+
+    expires_at = int(time.time()) + EXPORT_LINK_TTL_SECONDS
+    signature = _export_link_signature(search_id, filename, expires_at)
+    path = (
+        f"/api/exports/{quote(filename)}?search_id={quote(search_id)}"
+        f"&expires={expires_at}&signature={signature}"
+    )
+    return {
+        "file": filename,
+        "path": path,
+        "url": f"{origin}{path}" if origin else path,
+        "expires_at": expires_at,
+        "expires_in": EXPORT_LINK_TTL_SECONDS,
+    }
+
+
 @app.get("/api/exports/{filename:path}")
-async def download_export(filename: str, search_id: Optional[str] = Query(None)):
-    """Download an export file. Optionally specify a search_id to find the right directory."""
+async def download_export(
+    filename: str,
+    search_id: Optional[str] = Query(None),
+    expires: Optional[int] = Query(None),
+    signature: Optional[str] = Query(None),
+    http_request: Request = None,
+):
+    """Download an export file.
+
+    Two ways in, and no third:
+      * a signed link (search_id + expires + signature), which is how Cytoscape
+        and notebooks fetch a result — neither carries a session;
+      * the search's owner, signed in.
+
+    Every export lives inside one search's directory, so a request with neither
+    is refused rather than scanning every account's directory for a file of
+    that name.
+    """
     filename = filename.strip()
     if not filename or filename in (".", ".."):
         raise HTTPException(status_code=400, detail="Invalid filename")
@@ -1332,22 +1460,36 @@ async def download_export(filename: str, search_id: Optional[str] = Query(None))
     if safe.parts != (filename,):
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    file_path: Optional[Path] = None
-    if search_id:
-        state = searches.get(search_id)
-        if state:
-            file_path = Path(state.get("export_dir", "")) / filename
+    if not search_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Use a signed export link, or sign in as the search's owner.",
+        )
+
+    state = searches.get(search_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+
+    if expires is not None or signature:
+        if expires is None or not signature:
+            raise HTTPException(
+                status_code=403,
+                detail="A signed link needs search_id, expires and signature.",
+            )
+        if not _export_link_is_valid(search_id, filename, expires, signature):
+            raise HTTPException(
+                status_code=403,
+                detail="This export link has expired or is not valid for this file.",
+            )
     else:
-        for s in searches.values():
-            candidate = Path(s.get("export_dir", "")) / filename
-            if candidate.exists() and candidate.is_file():
-                file_path = candidate
-                break
-    if file_path is None:
-        candidate = EXPORTS_DIR / filename
-        if candidate.exists() and candidate.is_file():
-            file_path = candidate
-    if file_path is None or not file_path.exists() or not file_path.is_file():
+        # A present, valid signature is proof on its own; without one the caller
+        # has to be the account the search belongs to.
+        _require_search_owner(search_id, state, http_request)
+
+    file_path = Path(state.get("export_dir", "")) / filename
+    if not _export_dir_is_safe(str(state.get("export_dir", ""))):
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+    if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail=f"File not found: {filename}")
 
     return FileResponse(
@@ -2747,6 +2889,7 @@ def _guess_mime(filename: str) -> str:
         ".json": "application/json",
         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ".graphml": "application/xml",
+        ".cyjs": "application/json",
         ".ttl": "text/turtle",
         ".cypher": "text/plain",
         ".parquet": "application/octet-stream",

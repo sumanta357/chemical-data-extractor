@@ -491,7 +491,13 @@ PMID_REGEX = re.compile(r"^\d+$")
 # numbers put a letter between the country code and the digits
 # (JPS63188694A, from "JP-S63188694-A"). The stricter former pattern rejected
 # every legacy number.
-PATENT_REGEX = re.compile(r"^[A-Z]{2}[A-Z]?\d+[A-Z0-9]*$", re.IGNORECASE)
+# A publication number: office code, an optional letter series, digits, an
+# optional kind code. The series can be two letters (US reissues RE…, plant
+# patents PP…), which a single optional letter used to reject — so real
+# documents were failing validation and being dropped before they reached a
+# graph. See PATENT_DOCUMENT_RE in python-api/decision.py for the stricter
+# check applied when reading a graph back.
+PATENT_REGEX = re.compile(r"^[A-Z]{2}[A-Z]{0,3}\d{3,}[A-Z0-9]*$", re.IGNORECASE)
 # A publication number with an optional kind code: US6280349, US 6,280,349 B1,
 # WO2004018667A1. Distinguishes "search this patent" from a compound name.
 PATENT_NUMBER_RE = re.compile(
@@ -1026,14 +1032,73 @@ def rank_matches(query: str, entities: List[Entity]) -> List[Tuple[Entity, float
     return scored
 
 
+# GraphML and Cytoscape carry attribute *types*, not just values. Everything
+# used to be coerced with str(), so a graph opened in Cytoscape had a text
+# pchembl_value that could not drive a numeric visual mapping or filter.
+_GRAPH_NUMERIC_KEYS = {
+    "activity_value", "pchembl_value", "molecular_weight", "confidence",
+    "confidence_score", "max_phase", "publication_year", "year",
+}
+
+
+def _enum_text(value: Any) -> str:
+    """The vocabulary word ('Compound'), not 'EntityType.COMPOUND'."""
+    return str(getattr(value, "value", value))
+
+
+def _graph_attr_value(key: str, value: Any) -> Any:
+    """Keep a number a number; stringify everything else.
+
+    Only the known numeric fields are coerced, and only when the text really
+    parses. Identifiers (patent numbers, accessions) must stay strings even
+    when they are all digits.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool) or isinstance(value, (int, float)):
+        return value
+    text = str(value).strip()
+    if key in _GRAPH_NUMERIC_KEYS and text:
+        try:
+            number = float(text)
+        except ValueError:
+            return str(value)
+        return int(number) if number.is_integer() else number
+    return str(value)
+
+
 def export_to_networkx(entities: List[Entity], relations: List[Relation]) -> Any:
     G = nx.DiGraph()
     for e in entities:
-        clean_attrs = {k: str(v) for k, v in e.attributes.items() if v is not None}
-        G.add_node(e.uid, type=str(e.entity_type), name=e.preferred_name, canonical_id=e.canonical_id, **clean_attrs)
+        attrs = {
+            k: _graph_attr_value(k, v) for k, v in e.attributes.items() if v is not None
+        }
+        # Never let an attribute overwrite the identity columns; two keyword
+        # arguments with the same name would be a TypeError at export time.
+        for reserved in ("label", "name", "type", "canonical_id"):
+            attrs.pop(reserved, None)
+        G.add_node(
+            e.uid,
+            label=e.preferred_name,
+            name=e.preferred_name,
+            type=_enum_text(e.entity_type),
+            canonical_id=e.canonical_id,
+            **attrs,
+        )
     for r in relations:
-        clean_attrs = {k: str(v) for k, v in r.attributes.items() if v is not None}
-        G.add_edge(r.source_uid, r.target_uid, relation_type=str(r.relation_type), **clean_attrs)
+        attrs = {
+            k: _graph_attr_value(k, v) for k, v in r.attributes.items() if v is not None
+        }
+        for reserved in ("label", "interaction", "relation_type"):
+            attrs.pop(reserved, None)
+        G.add_edge(
+            r.source_uid,
+            r.target_uid,
+            label=_enum_text(r.relation_type),
+            interaction=r.relationship_type(),
+            relation_type=_enum_text(r.relation_type),
+            **attrs,
+        )
     return G
 
 
@@ -1233,6 +1298,49 @@ def export_to_csv(entities: List[Entity], relations: List[Relation], entity_file
 def export_to_graphml(entities: List[Entity], relations: List[Relation], filepath: str) -> None:
     G = export_to_networkx(entities, relations)
     nx.write_graphml(G, filepath)
+
+
+def export_to_cyjs(entities: List[Entity], relations: List[Relation], filepath: str) -> None:
+    """Cytoscape.js element JSON — the format Cytoscape Desktop and Web import.
+
+    The same element shape the graph endpoint serves, written to the export
+    directory so a finished search can be opened in Cytoscape without the web
+    app: File -> Import -> Network from File (graph.cyjs).
+    """
+    elements: Dict[str, List[Dict[str, Any]]] = {"nodes": [], "edges": []}
+
+    for e in entities:
+        data: Dict[str, Any] = {
+            "id": e.uid,
+            "label": e.preferred_name,
+            "name": e.preferred_name,
+            "type": _enum_text(e.entity_type),
+            "canonical_id": e.canonical_id,
+        }
+        for key, value in e.attributes.items():
+            if value is None or key in data:
+                continue
+            data[key] = _graph_attr_value(key, value)
+        elements["nodes"].append({"data": data})
+
+    for index, r in enumerate(relations):
+        data = {
+            "id": f"e{index}",
+            "source": r.source_uid,
+            "target": r.target_uid,
+            "label": r.relationship_type(),
+            "relation": _enum_text(r.relation_type),
+            "interaction": r.relationship_type(),
+        }
+        for key, value in r.attributes.items():
+            if value is None or key in data:
+                continue
+            data[key] = _graph_attr_value(key, value)
+        elements["edges"].append({"data": data})
+
+    Path(filepath).write_text(
+        json.dumps({"elements": elements}, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def export_to_rdf_ready_dicts(entities: List[Entity], relations: List[Relation]) -> Dict[str, List[Dict[str, Any]]]:
@@ -1871,6 +1979,7 @@ class ValidationFramework:
             out_dir / "nodes.csv",
             out_dir / "edges.csv",
             out_dir / "graph.graphml",
+            out_dir / "graph.cyjs",
             out_dir / "graph.ttl",
             out_dir / "rdf_graph.json",
             out_dir / "neo4j_import.cypher",
@@ -4929,7 +5038,7 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
     print(f"  * Potential Hypotheses Generated: {len(repurposing)}")
 
     progress.step_start(6, 6, "Generating Multi-Format Export Files & Excel Spreadsheets")
-    print(f"  * Formats: Excel (.xlsx) | CSV | Cypher | GraphML | RDF JSON-LD | Turtle | Parquet")
+    print(f"  * Formats: Excel (.xlsx) | CSV | Cypher | GraphML | Cytoscape (.cyjs) | RDF JSON-LD | Turtle | Parquet")
     export_start = time.time()
     first_term = query.split(',')[0].strip()
     clean_q_filename = re.sub(r'[^a-zA-Z0-9_\-]', '_', first_term).strip('_')
@@ -4940,6 +5049,7 @@ def run_automated_search(query: str, workspace_dir: str = "./scigraph_data", exp
     (out_dir / "neo4j_import.cypher").write_text(export_to_neo4j_cypher(entities, relations), encoding="utf-8")
     export_to_csv(entities, relations, str(out_dir / "nodes.csv"), str(out_dir / "edges.csv"))
     export_to_graphml(entities, relations, str(out_dir / "graph.graphml"))
+    export_to_cyjs(entities, relations, str(out_dir / "graph.cyjs"))
     (out_dir / "rdf_graph.json").write_text(json.dumps(export_to_rdf_ready_dicts(entities, relations), indent=2), encoding="utf-8")
     export_to_turtle(entities, relations, str(out_dir / "graph.ttl"))
     export_to_parquet(entities, relations, str(out_dir / "nodes.parquet"), str(out_dir / "edges.parquet"))

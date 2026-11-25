@@ -100,11 +100,84 @@ class DecisionMath(unittest.TestCase):
         # the parser must ignore it rather than back a verdict on it.
         self.assertIsNone(decision._patent_year("PATENT:WO2999111"))
 
-    def test_ip_green_when_no_patents_at_all(self):
+    def test_no_patents_is_insufficient_data_not_green(self):
+        # Zero records is the most common outcome of a name lookup and the most
+        # dangerous answer to dress in green: it must never read as
+        # freedom to operate.
         nodes = [n for n in self.nodes if "Entity;Patent" not in n[":LABEL"]]
         edges = [e for e in self.edges if e[":TYPE"] != "PATENTED_IN"]
         result = decision.ip_status(nodes, edges, now_year=2095)
-        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["status"], "insufficient_data")
+        self.assertEqual(result["patents"], [])
+        self.assertIn("not evidence that no patent exists", result["reason"])
+        self.assertIn("not an FTO opinion", result["scope"])
+        self.assertTrue(result["assessed_at"])
+
+    def test_patent_search_link_is_not_a_patent(self):
+        """The connector's fallback entity is a link, not a document."""
+        search_link = {
+            "uid:ID": "PATENTSEARCH:abc12345",
+            "name": "Patent Search: kinase y",
+            ":LABEL": "Entity;Patent",
+            "canonical_id": "SEARCH:kinase y",
+        }
+
+        # A search that found only the link has no patent evidence at all.
+        nodes = [n for n in self.nodes if "Entity;Patent" not in n[":LABEL"]]
+        verdict = decision.ip_status(nodes + [search_link], [], now_year=2026)
+        self.assertEqual(verdict["status"], "insufficient_data")
+        self.assertEqual(verdict["patents"], [])
+
+        # The link must not be listed alongside real documents either.
+        register = decision.patent_register(list(self.nodes) + [search_link], self.edges)
+        self.assertNotIn(
+            "PATENTSEARCH:abc12345", {p["uid"] for p in register["patents"]}
+        )
+        self.assertEqual(register["patent_count"], 2)
+
+    def test_us_series_documents_are_still_patents(self):
+        """Reissues, designs, plant patents, SIRs and defensive publications put
+        a letter series after the office code. They are real documents and used
+        to be silently dropped by the number filter."""
+        documents = [
+            ("USRE45123E1", "Reissue of US5444444"),
+            ("USD123456S1", "Design for a tablet"),
+            ("USPP12345P2", "Plant patent for a rose"),
+            ("USH1234H1", "Statutory invention registration"),
+            ("UST123456I4", "Defensive publication"),
+        ]
+        nodes = [n for n in self.nodes if "Entity;Patent" not in n[":LABEL"]]
+        for number, name in documents:
+            with self.subTest(number=number):
+                row = {
+                    "uid:ID": f"PATENT:{number}",
+                    "name": name,
+                    ":LABEL": "Entity;Patent",
+                    "canonical_id": number,
+                }
+                register = decision.patent_register(nodes + [row], [])
+                self.assertEqual(
+                    [p["number"] for p in register["patents"]], [number],
+                    f"{number} is a real document and was dropped",
+                )
+                verdict = decision.ip_status(nodes + [row], [], now_year=2026)
+                self.assertNotEqual(verdict["status"], "insufficient_data")
+
+    def test_a_search_link_with_a_year_is_not_a_patent(self):
+        """Widening the series must not readmit the link rows: only the known
+        series letters count, so query text is never a publication number."""
+        link = {
+            "uid:ID": "PATENT:PATENTSEARCH:egfr2024",
+            "name": "Patent Search: EGFR 2024",
+            ":LABEL": "Entity;Patent",
+            "canonical_id": "EGFR2024",
+        }
+        nodes = [n for n in self.nodes if "Entity;Patent" not in n[":LABEL"]]
+        self.assertEqual(decision.patent_register(nodes + [link], [])["patents"], [])
+        self.assertEqual(
+            decision.ip_status(nodes + [link], [], now_year=2026)["status"],
+            "insufficient_data",
+        )
 
     def test_dark_literature_counts_overlap(self):
         result = decision.dark_literature(self.nodes, self.edges)

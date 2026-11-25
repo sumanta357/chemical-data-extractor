@@ -53,6 +53,25 @@ _YEAR_RE = re.compile(r"(19|20)\d{2}")
 _COMPOUND_PREFIXES = ("COMPOUND:", "LIGAND:", "CHEMDOC:")
 _PATENT_PREFIXES = ("PATENT:",)
 
+# A patent *document* identifier: two-letter office code, an optional letter
+# series, at least four digits, and an optional kind code — US5444444,
+# US20190021252A1, US-2019-0021252-A1, EP0248548B1, WO2024111111, and the US
+# series that share the office code with a letter: reissues (USRE45123E1),
+# designs (USD123456S1), plant patents (USPP12345P2), statutory invention
+# registrations (USH1234H1) and defensive publications (UST123456I4).
+#
+# The series letters are listed rather than opened up to any letters, so a text
+# value that merely starts with an office code and ends in a year ("EGFR2024")
+# is not mistaken for a publication number.
+#
+# This is what separates a real patent row from the "Patent Search: <query>"
+# link entity the connector emits when it finds no document. That entity is
+# typed PATENT as well, so without this check it was listed, counted and even
+# used to colour the IP verdict.
+_PATENT_DOCUMENT_RE = re.compile(r"^[A-Z]{2}(?:RE|PP|D|T|H)?\d{4,}(?:[A-Z]\d*)?$")
+# Non-document entities: a search link, not a patent.
+_PATENT_PLACEHOLDER_PREFIXES = ("PATENTSEARCH:", "SEARCH:")
+
 
 def _now_year() -> int:
     return datetime.now(timezone.utc).year
@@ -72,6 +91,22 @@ def _row_uid(row: Dict[str, str]) -> str:
 def _has_prefix(uid: str, prefixes: Tuple[str, ...]) -> bool:
     upper = uid.upper()
     return any(upper.startswith(p) for p in prefixes)
+
+
+def _is_patent_document(uid: str, number: str) -> bool:
+    """True only for a row that identifies a patent document.
+
+    A patent row must carry a publication number. The connector's fallback
+    entity ("Patent Search: EGFR", canonical_id "SEARCH:EGFR") is a useful
+    link but it is not a patent, and treating it as one both inflates the
+    register and makes the IP verdict claim that "patents exist".
+    """
+    if _has_prefix(uid, _PATENT_PLACEHOLDER_PREFIXES):
+        return False
+    if _has_prefix(number, _PATENT_PLACEHOLDER_PREFIXES):
+        return False
+    normalised = re.sub(r"[^A-Z0-9]", "", (number or "").upper())
+    return bool(_PATENT_DOCUMENT_RE.match(normalised))
 
 
 def _parse_number(value: str) -> Optional[float]:
@@ -225,20 +260,46 @@ def ip_status(
     for row in nodes:
         uid = _row_uid(row)
         label = _label(row.get(":LABEL", ""))
-        is_patent = _has_prefix(uid, _PATENT_PREFIXES) or label == "PATENT"
-        if not is_patent:
+        if not (_has_prefix(uid, _PATENT_PREFIXES) or label == "PATENT"):
+            continue
+        number = (
+            row.get("patent_number")
+            or row.get("canonical_id")
+            or uid.split(":")[-1]
+        ).strip()
+        if not _is_patent_document(uid, number):
             continue
         pub_year = _patent_year(
             uid, row.get("name", ""), row.get("canonical_id", ""), row.get("synonyms", "")
         )
         patents.append({"uid": uid, "name": row.get("name", uid), "year": pub_year})
 
+    scope = (
+        "Patent documents retrieved by this search (PubChem patent cross-references "
+        "and Google Patents). Legal status, claims, patent families and "
+        "jurisdictions were not checked, so this is a signal, not an FTO opinion."
+    )
+    assessed_at = datetime.now(timezone.utc).date().isoformat()
+
     if not patents:
+        # Zero records is the most common outcome of a name lookup and the most
+        # dangerous answer to dress in green. It is reported as an absence of
+        # data, never as freedom to operate.
         return {
-            "status": "green",
-            "reason": "No patent records surfaced for this query.",
+            "status": "insufficient_data",
+            "reason": (
+                "No patent document was retrieved for this query, so there is no "
+                "patent signal either way. This is an absence of records in the "
+                "sources searched, not evidence that no patent exists."
+            ),
             "patents": [],
-            "caveat": "Absence of a patent in this graph is not a freedom-to-operate opinion.",
+            "scope": scope,
+            "assessed_at": assessed_at,
+            "caveat": (
+                "Absence of a patent in this graph is not a freedom-to-operate "
+                "opinion. Search Espacenet, EPO OPS or a patent attorney before "
+                "relying on it."
+            ),
         }
 
     dated = [p for p in patents if p["year"] is not None]
@@ -247,6 +308,8 @@ def ip_status(
             "status": "yellow",
             "reason": "Patents exist but their years could not be parsed from identifiers.",
             "patents": patents,
+            "scope": scope,
+            "assessed_at": assessed_at,
             "caveat": "Verify protection status manually before relying on this.",
         }
 
@@ -255,8 +318,9 @@ def ip_status(
     if remaining <= 0:
         status = "green"
         reason = (
-            f"Newest patent found was published in {latest}; its {PATENT_TERM_YEARS}-year "
-            "term has lapsed."
+            f"Newest patent found was published in {latest}; a {PATENT_TERM_YEARS}-year "
+            "term counted from that publication year has lapsed. Legal status was "
+            "not verified."
         )
     elif remaining <= EXPIRY_WINDOW_YEARS:
         status = "yellow"
@@ -275,9 +339,12 @@ def ip_status(
         "status": status,
         "reason": reason,
         "patents": patents,
+        "scope": scope,
+        "assessed_at": assessed_at,
         "caveat": (
-            "Publication year stands in for the filing date; patent families "
-            "and extensions can shift real expiry by years."
+            "Publication year stands in for the filing date and legal status was "
+            "not checked; patent families, term adjustments and lapses for "
+            "non-payment can shift real expiry by years."
         ),
     }
 
@@ -379,7 +446,7 @@ def patent_register(
             or row.get("canonical_id")
             or uid.split(":")[-1]
         ).strip()
-        if not number:
+        if not number or not _is_patent_document(uid, number):
             continue
         title = (row.get("title") or "").strip()
         patents.append({
