@@ -72,17 +72,32 @@ Desktop, Cytoscape Web and Cytoscape.js read natively. In both files numeric
 values such as `pchembl_value` stay numeric, so they can drive visual mappings
 and filters instead of arriving as text.
 
-**Opening it without downloading:** press **Cytoscape link** next to the
-GraphML or .cyjs row, then paste the copied URL into
-**File → Import → Network from URL**. The link is signed and expires, and it
-works without signing in to this app — which is what Cytoscape needs, since its
-importer sends no cookies.
+**In the app:** the results workspace has a **Network** tab that renders the
+graph with Cytoscape.js — switch between force-directed, concentric, hierarchy,
+circle and grid layouts, filter by entity type, hover to isolate a
+neighbourhood, click a node for its identifiers, evidence and relationships,
+and expand the canvas or save it as a PNG. This is the same node and edge data
+as the exports, capped to the highest-ranked entities; the files below hold the
+complete graph.
+
+**In Cytoscape desktop:** press **Copy Cytoscape link** in the Network tab (or
+**Cytoscape link** beside a GraphML/.cyjs file under **Files**), then paste the
+copied URL into **File → Import → Network from URL**. The link is signed and
+expires, and it works without signing in to this app — which is what Cytoscape
+needs, since its importer sends no cookies.
 
 Every download from the results screen takes the same route: the row mints a
 signed link for that one file and follows it. A bare
 `/api/exports/<file>?search_id=…` URL — no signature, and not signed in as the
 search's owner — answers 404. Search ids are short enough to guess, and exports
 are customer data.
+
+**If a download is blocked:** Chrome refuses a file served over `http` from an
+`https` page with “can't be downloaded securely”. The engine builds signed links
+from `PUBLIC_BASE_URL` when it is set, otherwise from the proxy's
+`X-Forwarded-Proto`/`X-Forwarded-Host`. Set `PUBLIC_BASE_URL` to the site's
+public origin (for example `https://chemical-data-extractor.onrender.com`) on a
+host that does not forward those headers, and restart.
 
 ---
 

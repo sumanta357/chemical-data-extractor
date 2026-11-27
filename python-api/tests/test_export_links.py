@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import parse_qs, urlparse
@@ -188,6 +189,45 @@ class ExportLinks(unittest.TestCase):
     def test_base_url_overrides_the_request_origin(self):
         body = self._mint(base_url="https://app.example.com").json()
         self.assertTrue(body["url"].startswith("https://app.example.com/api/exports/"))
+
+    def test_forwarded_proto_gives_an_https_link_behind_a_proxy(self):
+        """Render terminates TLS and speaks http to uvicorn.
+
+        The minted link used to inherit ``http://`` from the request's own
+        scheme, and Chrome then refused the download with "can't be downloaded
+        securely". The browser-facing origin comes from the proxy headers.
+        """
+        res = self.client.get(
+            "/api/search/lnk00001/export-link",
+            params={"file": "graph.graphml"},
+            headers={"x-forwarded-proto": "https", "x-forwarded-host": "chem.example.com"},
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(
+            res.json()["url"].startswith("https://chem.example.com/api/exports/")
+        )
+
+    def test_public_base_url_wins_over_forwarded_headers(self):
+        with mock.patch.dict(
+            os.environ, {"PUBLIC_BASE_URL": "https://scigraph.example.org"}
+        ):
+            res = self.client.get(
+                "/api/search/lnk00001/export-link",
+                params={"file": "graph.graphml"},
+                headers={"x-forwarded-proto": "http", "x-forwarded-host": "internal:8000"},
+            )
+        self.assertTrue(
+            res.json()["url"].startswith("https://scigraph.example.org/api/exports/")
+        )
+
+    def test_a_download_is_served_as_an_attachment_that_cannot_be_sniffed(self):
+        res = self.client.get(
+            "/api/exports/graph.graphml", params={"search_id": "lnk00001"}
+        )
+        self.assertIn("attachment", res.headers["content-disposition"])
+        self.assertIn("graph.graphml", res.headers["content-disposition"])
+        self.assertEqual(res.headers["x-content-type-options"], "nosniff")
+        self.assertEqual(res.headers["cache-control"], "private, no-store")
 
 
 if __name__ == "__main__":  # pragma: no cover

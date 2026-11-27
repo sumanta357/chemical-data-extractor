@@ -3,6 +3,50 @@
 ## [Unreleased]
 
 ### Fixed
+- **Downloads failed with "… can't be downloaded securely".** Signed export
+  links were built from `request.base_url`, which is `http://` behind Render's
+  TLS-terminating proxy (uvicorn only trusts forwarded headers from localhost,
+  and the proxy is not localhost). Chrome blocks a download from an `http` URL
+  on an `https` page, so every Excel/graph download was refused. The engine now
+  derives the browser-facing origin from `PUBLIC_BASE_URL`, then
+  `X-Forwarded-Proto`/`X-Forwarded-Host`, and only then the request URL. The
+  download response also carries `Content-Disposition: attachment`,
+  `X-Content-Type-Options: nosniff` and `Cache-Control: private, no-store`, and
+  the Next.js route emits RFC 5987 `filename*` for non-ASCII names. The browser
+  download path additionally refuses to navigate to a plain-`http` link from an
+  `https` page, falling back to the same-origin route instead of a blocked
+  download.
+- **Patent links did not open.** Links were built by pasting the recorded number
+  into `patents.google.com/patent/`, but sources record the punctuated form
+  (`US-20190021252-A1`) while Google Patents addresses the document without it
+  (`US20190021252A1`). A recorded URL is now kept only when it is already a
+  document URL; otherwise the canonical number is used, and a number that
+  cannot be parsed falls back to a Google Patents search rather than a dead
+  link. Applied to the verdict register, the Next.js reader, the workbook's
+  patent sheet and the engine's patent connector.
+- **The Cytoscape link did not open anything.** It copied a signed URL minted
+  against an `http://` origin, so the import failed — and nothing in the app
+  rendered a network at all. The Network tab now draws the search's own graph
+  with Cytoscape.js (force-directed, concentric, hierarchy, circle and grid
+  layouts; type filters; hover highlighting; zoom/pan; node inspector; PNG
+  export; expanded view), and offers the signed `.cyjs` URL for Cytoscape
+  desktop.
+
+### Changed
+- **Results workspace instead of a file list.** The finished search opens on a
+  KPI strip (entities, relationships, patents, exports) and five tabs —
+  Overview, Network, Patents, Evidence, Files — with the potency grade,
+  per-compound pChEMBL bars, mechanism evidence, prior art, toxicity records,
+  sourcing and caveats laid out as tables and cards rather than paragraphs.
+- **Patents moved out of the top of the page.** Patent rows are a dedicated tab
+  with a **View patent** action per row, so the main view stays on the data;
+  the overview shows only the aggregate signal.
+- **File centre.** Exports are grouped (Tables, Graph, Database & RDF,
+  Structure & reports) with what each file contains, its size, a download
+  button and, for graph files, the Cytoscape hand-off.
+- **Dependency:** `cytoscape` (MIT) for the in-app network renderer.
+
+### Fixed
 - **Real reissue, design and plant patents were dropped as "not patents".**
   The publication-number filter that keeps the "Patent Search: …" link row out
   of the register accepted only an office code followed by digits, so

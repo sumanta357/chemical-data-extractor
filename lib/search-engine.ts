@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { buildExportLink, type ExportLink } from './export-token';
+import { isPatentDocument, patentLink } from './patents';
 import type {
   SearchState,
   ExportFile,
@@ -830,28 +831,6 @@ function patentYear(...texts: string[]): number | null {
   return earliest;
 }
 
-/**
- * True only for a row that identifies a patent document.
- *
- * The connector's fallback "Patent Search: <query>" entity is typed PATENT and
- * carries a `SEARCH:` identifier. It is a useful link, but it is not a patent:
- * listing it produced a row whose Google Patents URL 404s and inflated the
- * patent count. Mirrors `_is_patent_document` in python-api/decision.py.
- *
- * Real documents include the US series that put a letter after the office
- * code: reissues (`USRE45123E1`), designs (`USD123456S1`), plant patents
- * (`USPP12345P2`), statutory invention registrations (`USH1234H1`) and
- * defensive publications (`UST123456I4`). Those letters are listed rather than
- * left open, so a title like `EGFR2024` cannot pass as a number.
- */
-function isPatentDocument(uid: string, number: string): boolean {
-  const upperUid = (uid || '').toUpperCase();
-  if (upperUid.startsWith('PATENTSEARCH:') || upperUid.startsWith('SEARCH:')) return false;
-  const upperNumber = (number || '').toUpperCase();
-  if (upperNumber.startsWith('SEARCH:') || upperNumber.startsWith('PATENTSEARCH:')) return false;
-  const normalised = upperNumber.replace(/[^A-Z0-9]/g, '');
-  return /^[A-Z]{2}(?:RE|PP|D|T|H)?\d{4,}(?:[A-Z]\d*)?$/.test(normalised);
-}
 
 /**
  * Patent rows recovered from a graph response.
@@ -875,7 +854,7 @@ export function patentsFromGraph(graph: SearchGraph): SearchPatents {
       year: patentYear(node.data.id, node.data.name, node.data.canonical_id),
       assignee: '',
       compound: '',
-      url: `https://patents.google.com/patent/${number}`,
+      url: patentLink(number).href,
     });
   }
 
@@ -954,9 +933,9 @@ export async function getSearchPatents(
       year: patentYear(uid, name, row.canonical_id ?? '', row.publication_year ?? ''),
       assignee: (row.assignee ?? '').trim(),
       compound: (row.queried_compound ?? '').trim(),
-      url:
-        (row.google_patents_url ?? '').trim() ||
-        `https://patents.google.com/patent/${number}`,
+      // Canonical document link: the recorded value is hyphenated
+      // (`US-2019-0021252-A1`), which is not a Google Patents document URL.
+      url: patentLink(number, row.google_patents_url).href,
     });
   }
 

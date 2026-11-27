@@ -35,3 +35,6 @@ tsconfig.tsbuildinfo
 
 # Runtime state (search persistence)
 .scigraph_searches.json
+
+# Python virtualenv (local test runs)
+.venv/

@@ -110,6 +110,40 @@ class PatentEndpoint(unittest.TestCase):
         for patent in body["patents"]:
             self.assertTrue(patent["url"].startswith("https://patents.google.com/patent/"))
 
+        # The recorded URL is the punctuated form the source uses
+        # (`US-20190021252-A1`); Google Patents addresses the document without
+        # punctuation, so that is the URL a browser has to be given.
+        by_number = {p["number"]: p for p in body["patents"]}
+        self.assertEqual(
+            by_number["US-20190021252-A1"]["url"],
+            "https://patents.google.com/patent/US20190021252A1",
+        )
+        self.assertEqual(
+            by_number["EP0248548B1"]["url"],
+            "https://patents.google.com/patent/EP0248548B1",
+        )
+
+    def test_a_placeholder_or_unreadable_row_never_yields_a_dead_link(self):
+        import decision
+
+        self.assertEqual(
+            decision.google_patents_url("US 6,280,349 B1"),
+            "https://patents.google.com/patent/US6280349B1",
+        )
+        # A recorded link that is only a search is not a document link.
+        self.assertEqual(
+            decision.google_patents_url(
+                "US-20190021252-A1", "https://patents.google.com/?q=aspirin"
+            ),
+            "https://patents.google.com/patent/US20190021252A1",
+        )
+        # Anything unparseable still goes to a patent search, not to nowhere.
+        self.assertTrue(
+            decision.google_patents_url("not a number").startswith(
+                "https://patents.google.com/?q="
+            )
+        )
+
     def test_newest_first_and_the_year_comes_from_the_identifier(self):
         body = self.client.get("/api/search/pat3nts1/patents").json()
         self.assertEqual(body["patents"][0]["number"], "US-20190021252-A1")

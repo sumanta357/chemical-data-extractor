@@ -81,13 +81,11 @@ export async function GET(
         });
         if (remoteRes.ok) {
           const buf = Buffer.from(await remoteRes.arrayBuffer());
-          return new NextResponse(new Uint8Array(buf), {
-            headers: {
-              'Content-Type': remoteRes.headers.get('content-type') || guessMime(filename),
-              'Content-Disposition': `attachment; filename="${filename}"`,
-              'Content-Length': String(buf.length),
-            },
-          });
+          return fileResponse(
+            buf,
+            filename,
+            remoteRes.headers.get('content-type') || guessMime(filename)
+          );
         }
       } catch {
         // fall through to 404 below
@@ -103,13 +101,29 @@ export async function GET(
   }
 
   const body = new Uint8Array(fileBuffer);
-  const mime = guessMime(filename);
+  return fileResponse(fileBuffer, filename, guessMime(filename));
+}
 
+/**
+ * One download response, with the headers a browser needs to save the file.
+ *
+ * `Content-Disposition` must be set explicitly: a route cannot rely on the
+ * filename alone, and without it Chrome can preview a `.txt`/`.cyjs` payload
+ * instead of saving it. RFC 5987's `filename*` carries non-ASCII names, and
+ * `nosniff` stops the browser from second-guessing the declared type.
+ */
+function fileResponse(buffer: Buffer, filename: string, mime: string) {
+  const ascii = filename.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'");
+  const body = new Uint8Array(buffer);
   return new NextResponse(body, {
     headers: {
       'Content-Type': mime,
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(fileBuffer.length),
+      'Content-Disposition':
+        `attachment; filename="${ascii}"; ` +
+        `filename*=UTF-8''${encodeURIComponent(filename)}`,
+      'Content-Length': String(buffer.length),
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

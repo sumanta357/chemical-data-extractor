@@ -92,6 +92,49 @@ def _export_link_is_valid(
         return False
     expected = _export_link_signature(search_id, filename, expires_at)
     return hmac.compare_digest(expected, signature or "")
+
+
+def _public_origin(http_request: Optional[Request]) -> str:
+    """The origin the *browser* sees, not the one uvicorn sees.
+
+    Render (and every reverse proxy) terminates TLS and forwards the request to
+    uvicorn over plain HTTP, so ``request.base_url`` reports ``http://`` for a
+    site that is actually served over HTTPS. A signed export link minted from
+    that origin points at ``http://…``, and Chrome then refuses the download
+    with "can't be downloaded securely" (its mixed-content download block).
+
+    ``PUBLIC_BASE_URL`` wins when it is set — the reliable answer for hosts that
+    do not forward proxy headers — otherwise the forwarded scheme and host are
+    used, and only then the request's own URL.
+    """
+    configured = (os.environ.get("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if configured:
+        parsed = urlparse(configured)
+        if (
+            parsed.scheme in ("http", "https")
+            and parsed.netloc
+            and parsed.path in ("", "/")
+        ):
+            return configured
+
+    if http_request is None:
+        return ""
+
+    def _first_header(name: str) -> str:
+        raw = http_request.headers.get(name) or ""
+        return raw.split(",")[0].strip()
+
+    scheme = _first_header("x-forwarded-proto") or http_request.url.scheme or "http"
+    if scheme not in ("http", "https"):
+        scheme = http_request.url.scheme or "http"
+    host = (
+        _first_header("x-forwarded-host")
+        or http_request.headers.get("host")
+        or http_request.url.netloc
+    ).strip()
+    if not host:
+        return ""
+    return f"{scheme}://{host}".rstrip("/")
 LOG.setLevel(logging.DEBUG)
 if not LOG.handlers:
     h = logging.StreamHandler(sys.stderr)
@@ -1416,8 +1459,8 @@ async def search_export_link(
                 status_code=400,
                 detail="base_url must be an http(s) origin, e.g. https://app.example.com",
             )
-    elif http_request is not None:
-        origin = str(http_request.base_url).rstrip("/")
+    else:
+        origin = _public_origin(http_request)
 
     expires_at = int(time.time()) + EXPORT_LINK_TTL_SECONDS
     signature = _export_link_signature(search_id, filename, expires_at)
@@ -1496,6 +1539,13 @@ async def download_export(
         path=str(file_path),
         filename=filename,
         media_type=_guess_mime(filename),
+        headers={
+            # The file is private to this search; never let a shared cache hold
+            # it, and never let a browser guess a different type and render a
+            # downloaded graph as a page.
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

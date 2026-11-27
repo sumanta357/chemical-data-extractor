@@ -286,34 +286,35 @@ export default function HomePage() {
       />
 
       <main className="mx-auto w-full max-w-content flex-1 px-4 py-7 sm:px-6 sm:py-9">
-        {/* Page introduction. Left-aligned and short: this is a tool, so the
-            query box stays within one screen of the top. */}
-        <div className="max-w-3xl">
-          <h1 className="text-2xl font-semibold tracking-tight text-fg sm:text-[28px] sm:leading-[1.2]">
-            Build a multi-hop knowledge graph from any protein or compound
-          </h1>
-          <p className="mt-2 text-[15px] leading-relaxed text-fg-muted">
-            Chemical Data Extractor traverses public chemistry, proteomics and
-            pathway sources from a single query, then exports the assembled
-            graph as a workbook, CSV, GraphML, Cypher and more.
-          </p>
-          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
-            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
-              Up to 4 hops
-            </span>
-            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
-              15 export files
-            </span>
-            <span className="rounded border border-line bg-surface-2 px-1.5 py-0.5 font-medium">
-              7 formats
-            </span>
-          </p>
+        {/* Workspace header. Left-aligned and short: this is a tool, so the
+            query box and the results stay within one screen of the top. */}
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <p className="eyebrow">Research workspace</p>
+            <h1 className="mt-1 text-[24px] font-semibold leading-tight tracking-tight text-fg sm:text-[27px]">
+              Knowledge graph explorer
+            </h1>
+            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-fg-muted">
+              One query expands across chemistry, proteomics and pathway sources;
+              the assembled graph, its verdict and every export land here.
+            </p>
+          </div>
+          <ul className="flex flex-wrap items-center gap-1.5 text-[11px] text-fg-subtle">
+            {['Up to 4 hops', '19 sources', '15 export formats'].map((chip) => (
+              <li
+                key={chip}
+                className="rounded-md border border-line bg-surface px-2 py-1 font-medium"
+              >
+                {chip}
+              </li>
+            ))}
+          </ul>
         </div>
 
         {activeTab === 'search' && (
-          <div className="mt-7 grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
+          <div className="mt-6 grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
             {/* Query + assistant column */}
-            <div className="space-y-5 lg:col-span-5 xl:col-span-4">
+            <div className="space-y-4 lg:col-span-4 lg:sticky lg:top-[4.5rem] 2xl:col-span-3">
               <SearchForm onSearch={handleSearch} isRunning={isRunning} />
               <AIAssistant
                 searchId={search && search.search_id !== 'error' ? search.search_id : null}
@@ -322,24 +323,57 @@ export default function HomePage() {
             </div>
 
             {/* Output column */}
-            <div className="space-y-5 lg:col-span-7 xl:col-span-8">
+            <div className="space-y-4 lg:col-span-8 2xl:col-span-9">
               {hasResults && <ResultsView search={search!} />}
               {search ? (
                 <ProgressView search={search} logLines={logLines} />
               ) : (
-                <div className="panel px-5 py-8 sm:px-7 sm:py-10">
-                  <h2 className="text-base font-semibold text-fg">
-                    Ready when you are
+                <div className="panel px-5 py-7 sm:px-7 sm:py-8">
+                  <p className="eyebrow">No search open</p>
+                  <h2 className="mt-1 text-lg font-semibold text-fg">
+                    Start from a target or a compound
                   </h2>
                   <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-fg-muted">
-                    Enter a protein or compound on the left and run a search. The
-                    engine expands the query across every connected database and
-                    streams its progress here, then lists the files you can
-                    download.
+                    Enter a protein or compound on the left. The engine expands it
+                    across every connected source, streams its progress here, then
+                    opens a workspace with the network, verdict, patents and
+                    exports.
                   </p>
-                  <p className="mt-5 text-xs text-fg-subtle">
-                    Searches run in parallel. If the engine is already at its
-                    concurrency limit, yours is queued and starts automatically.
+                  <ol className="mt-5 grid gap-2 sm:grid-cols-3">
+                    {[
+                      {
+                        n: '1',
+                        title: 'Describe the entity',
+                        body: 'A protein such as tubulin, or a compound such as aspirin.',
+                      },
+                      {
+                        n: '2',
+                        title: 'Choose a depth',
+                        body: 'Each extra hop follows one more relationship outward.',
+                      },
+                      {
+                        n: '3',
+                        title: 'Analyse and export',
+                        body: 'Inspect the network, read the verdict, download the graph.',
+                      },
+                    ].map((step) => (
+                      <li
+                        key={step.n}
+                        className="rounded-lg border border-line bg-surface-2 px-3 py-2.5"
+                      >
+                        <span className="font-mono text-[10px] font-semibold text-accent">
+                          0{step.n}
+                        </span>
+                        <p className="mt-1 text-xs font-medium text-fg">{step.title}</p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-fg-muted">
+                          {step.body}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="mt-4 text-[11px] text-fg-subtle">
+                    Searches run in parallel. If the engine is at its concurrency
+                    limit, yours queues and starts automatically.
                   </p>
                 </div>
               )}

@@ -28,6 +28,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 # Grade bands on the pChEMBL scale (-log10 molar), the convention ChEMBL
 # itself uses: 9.0 is sub-nanomolar territory, 6.0 is around 1 uM.
@@ -73,8 +74,57 @@ _PATENT_DOCUMENT_RE = re.compile(r"^[A-Z]{2}(?:RE|PP|D|T|H)?\d{4,}(?:[A-Z]\d*)?$
 _PATENT_PLACEHOLDER_PREFIXES = ("PATENTSEARCH:", "SEARCH:")
 
 
+GOOGLE_PATENTS_DOCUMENT = "https://patents.google.com/patent/"
+GOOGLE_PATENTS_SEARCH = "https://patents.google.com/?q="
+
+
 def _now_year() -> int:
     return datetime.now(timezone.utc).year
+
+
+def canonical_patent_number(number: str) -> str:
+    """The publication id Google Patents resolves, or an empty string.
+
+    Sources record numbers with their own punctuation (PubChem says
+    ``US-20190021252-A1``), while Google Patents addresses the document by the
+    same id with the punctuation removed (``US20190021252A1``). Pasting the
+    punctuated value into the document path produced a link that landed on "no
+    results", which is what "the patent links do not open" was.
+    """
+    compact = re.sub(r"[^A-Z0-9]", "", (number or "").upper())
+    if not compact:
+        return ""
+    for prefix in _PATENT_PLACEHOLDER_PREFIXES:
+        if compact.startswith(prefix.replace(":", "")):
+            return ""
+    if compact.startswith("PATENT"):
+        compact = compact[len("PATENT") :]
+    return compact if _PATENT_DOCUMENT_RE.match(compact) else ""
+
+
+def google_patents_url(number: str, recorded: str = "") -> str:
+    """A patent link that always goes somewhere useful.
+
+    A recorded URL is kept only when it is already a document URL. A search
+    URL, a placeholder or an empty cell is replaced by the canonical document
+    link; a number that cannot be parsed falls back to a patent search, so a row
+    never renders a link that goes nowhere.
+    """
+    recorded = (recorded or "").strip()
+    if recorded.startswith(GOOGLE_PATENTS_DOCUMENT):
+        # Rebuild it rather than trusting it: the recorded form can still be
+        # punctuated, and that is not a document URL.
+        tail = recorded[len(GOOGLE_PATENTS_DOCUMENT) :].split("?", 1)[0]
+        from_recorded = canonical_patent_number(tail)
+        if from_recorded:
+            return f"{GOOGLE_PATENTS_DOCUMENT}{from_recorded}"
+    canonical = canonical_patent_number(number)
+    if canonical:
+        return f"{GOOGLE_PATENTS_DOCUMENT}{canonical}"
+    query = (number or "").strip()
+    if not query:
+        return GOOGLE_PATENTS_SEARCH.rstrip("?")
+    return f"{GOOGLE_PATENTS_SEARCH}{quote(query)}"
 
 
 def _read_csv(path: Path) -> List[Dict[str, str]]:
@@ -458,8 +508,9 @@ def patent_register(
             ),
             "assignee": (row.get("assignee") or "").strip(),
             "compound": (row.get("queried_compound") or "").strip(),
-            "url": (row.get("google_patents_url") or "").strip()
-            or f"https://patents.google.com/patent/{number}",
+            "url": google_patents_url(
+                number, row.get("google_patents_url") or ""
+            ),
         })
 
     patent_uids = {p["uid"] for p in patents}

@@ -535,6 +535,25 @@ def validate_pmid(pmid: Optional[str]) -> Optional[str]:
     return pmid_str
 
 
+def patent_document_url(raw: str) -> str:
+    """The Google Patents *document* URL for a publication number.
+
+    Google Patents addresses a document by its publication number with the
+    punctuation removed (`US20190021252A1`). Sources hand over the punctuated
+    form — PubChem's patent xrefs look like `US-20190021252-A1` — and pasting
+    that into the document path lands on "no results", which is what "the
+    patent links don't open" looked like. Anything we cannot read as a document
+    falls back to a patent search, so an exported link never dead-ends.
+    """
+    value = (raw or "").strip().upper()
+    compact = re.sub(r"[^A-Z0-9]", "", value)
+    if compact.startswith("PATENT"):
+        compact = compact[len("PATENT"):]
+    if compact and PATENT_REGEX.match(compact):
+        return f"https://patents.google.com/patent/{compact}"
+    return f"https://patents.google.com/?q={quote(value)}"
+
+
 def validate_patent_number(patent_number: Optional[str]) -> Optional[str]:
     if patent_number is None: return None
     p_str = patent_number.strip().upper()
@@ -1498,14 +1517,14 @@ def export_to_excel(entities: List[Entity], relations: List[Relation], filepath:
         assignee = p.attributes.get("assignee", "")
         year = p.attributes.get("publication_year", "")
         compound = p.attributes.get("queried_compound", "")
-        link = f"https://patents.google.com/patent/{pat_id}"
+        link = patent_document_url(pat_id)
         pat_rows.add((pat_id, title, assignee, year, compound, link))
 
     for e in entities:
         for xr in e.cross_references:
             if str(xr.database).upper() in ("PATENT", "PATENTSVIEW", "LENSPATENT"):
                 pat_id = xr.accession.upper()
-                link = f"https://patents.google.com/patent/{pat_id}"
+                link = patent_document_url(pat_id)
                 pat_rows.add((pat_id, f"Patent for {e.preferred_name}", "", "", e.preferred_name, link))
 
     for r in sorted(list(pat_rows), key=lambda x: x[0]):
@@ -2531,7 +2550,7 @@ class PatentConnector(BaseConnector):
             m = re.search(r"(\d{4})", filing or grant)
             if m:
                 year = m.group(1)
-            patent_url = f"https://patents.google.com/patent/{pub}"
+            patent_url = patent_document_url(pub)
             pat_ent = Entity(
                 uid=f"PATENT:{pub}",
                 entity_type=EntityType.PATENT,
@@ -2644,7 +2663,7 @@ class PatentConnector(BaseConnector):
             m = re.search(r"(\d{4})", filing)
             if m:
                 year = m.group(1)
-            patent_url = f"https://patents.google.com/patent/{pub}"
+            patent_url = patent_document_url(pub)
             pat_ent = Entity(
                 uid=f"PATENT:{pub}",
                 entity_type=EntityType.PATENT,
@@ -2676,7 +2695,7 @@ class PatentConnector(BaseConnector):
     def _create_patent_entities(self, pid_clean: str, compound_name: str,
                                 entities: List[Entity], relations: List[Relation]) -> None:
         """Create patent entity and PATENTED_IN relation for a single patent ID."""
-        patent_url = f"https://patents.google.com/patent/{pid_clean}"
+        patent_url = patent_document_url(pid_clean)
         pat_type = "US Patent" if pid_clean.startswith("US") else "WO Patent" if pid_clean.startswith("WO") else "EP Patent" if pid_clean.startswith("EP") else "CN Patent" if pid_clean.startswith("CN") else "JP Patent" if pid_clean.startswith("JP") else "Patent"
         pat_ent = Entity(
             uid=f"PATENT:{pid_clean}",
@@ -2741,7 +2760,7 @@ class PatentConnector(BaseConnector):
                         pid_clean = pid.strip().upper()
                         if pid_clean and pid_clean not in seen_patents:
                             seen_patents.add(pid_clean)
-                            patent_url = f"https://patents.google.com/patent/{pid_clean}"
+                            patent_url = patent_document_url(pid_clean)
                             pat_type = "US Patent" if pid_clean.startswith("US") else "WO Patent" if pid_clean.startswith("WO") else "EP Patent" if pid_clean.startswith("EP") else "Patent"
                             pat_ent = Entity(
                                 uid=f"PATENT:{pid_clean}",
