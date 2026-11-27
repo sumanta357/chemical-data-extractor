@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Security
+- **Removed the AI provider keys that were committed to the repository.**
+  `python-api/app.py` shipped literal fallbacks for AgentRouter, Google AI
+  Studio and OpenCode Zen, and `app/api/analyze/route.ts` repeated two of them,
+  so anyone who could read the repo could spend those credentials and a fresh
+  clone worked with no configuration. All three are gone; the analyst now reads
+  `OPENCODE_API_KEY`, `AGENTROUTER_API_KEY` and `GEMINI_API_KEY`
+  (`GOOGLE_AI_STUDIO_API_KEY` also accepted) from the environment only, and with
+  none set `/api/analyze` answers 503 "AI service is not configured" instead of
+  calling out with a key nobody can see. **The old values remain in the Git
+  history and must be rotated in each provider console** — deleting them from
+  HEAD does not revoke them. `tests/test_secrets.py` now fails the build if a
+  key-shaped literal is committed again.
+
 ### Fixed
 - **Downloads failed with "… can't be downloaded securely".** Signed export
   links were built from `request.base_url`, which is `http://` behind Render's

@@ -1626,13 +1626,18 @@ STATIC_DIR = Path(
 
 # ── AI Analyst (ported from app/api/analyze/route.ts) ────────────────────────
 
-# Built-in provider keys (user-supplied, committed by explicit request so the
-# deployed app works with zero environment configuration). Env vars override.
-# NOTE: keep the repository private; anyone who can read this file can use
-# these keys. If the repo ever goes public, rotate them in their consoles.
-DEFAULT_AGENTROUTER_KEY = "sk-W0U5Yo0MM3wbY3xB0ZpS1f19iyABhATRCBK7N3hyJYjbF6ez"
-DEFAULT_GEMINI_KEY = "AQ.Ab8RN6KLITc78xyz1ke-xlDGzavLpKWrka-gmVcHlkI8njvDJA"
-DEFAULT_OPENCODE_KEY = "sk-y2338SzSUvBqPKHmjQ75DbWY0D78CfTbzl6jcBqMnthziB0XaEmGI9QJ6a6IpOum"
+# Provider keys come from the environment only.
+#
+# They used to be committed here as built-in fallbacks "so the deployed app
+# works with zero environment configuration". That put live credentials in a
+# public repository history, and deleting them from HEAD does not revoke them:
+# each key must also be rotated in its provider console. A deployment that has
+# been given no key now reports the analyst as unconfigured (HTTP 503) instead
+# of spending a credential nobody can see.
+#
+#   OPENCODE_API_KEY        OpenCode Zen
+#   AGENTROUTER_API_KEY     AgentRouter
+#   GEMINI_API_KEY          Google AI Studio (GOOGLE_AI_STUDIO_API_KEY also read)
 
 _COOLDOWN_S = 300.0  # 5 minutes
 _provider_cooldowns: dict[str, float] = {}
@@ -1689,7 +1694,7 @@ def _get_providers() -> list[dict]:
     # "OpenCode's free tier can only be used from within OpenCode", and
     # deepseek-v4-flash-free answers 400 "Model is unavailable". Listing them
     # cost three dead round-trips on every request and then failed anyway.
-    oc_key = os.environ.get("OPENCODE_API_KEY") or DEFAULT_OPENCODE_KEY
+    oc_key = (os.environ.get("OPENCODE_API_KEY") or "").strip()
     if oc_key:
         oc_models = [os.environ.get("OPENCODE_MODEL") or "space-bunny-free"]
         for model in oc_models:
@@ -1711,7 +1716,7 @@ def _get_providers() -> list[dict]:
 
     # AgentRouter (OpenAI-compatible). Datacenter IPs are usually rejected,
     # so in production this trips the breaker and the next provider takes over.
-    ar_key = os.environ.get("AGENTROUTER_API_KEY") or DEFAULT_AGENTROUTER_KEY
+    ar_key = (os.environ.get("AGENTROUTER_API_KEY") or "").strip()
     if ar_key:
         providers.append(
             {
@@ -1729,8 +1734,8 @@ def _get_providers() -> list[dict]:
     gemini_key = (
         os.environ.get("GEMINI_API_KEY")
         or os.environ.get("GOOGLE_AI_STUDIO_API_KEY")
-        or DEFAULT_GEMINI_KEY
-    )
+        or ""
+    ).strip()
     if gemini_key:
         providers.append(
             {

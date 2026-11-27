@@ -4,18 +4,16 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * Built-in provider keys (user-supplied, committed by explicit request so the
- * deployed app works with zero environment configuration).
+ * Provider keys come from the environment only.
  *
- * Priority: env var → built-in default.
- *   AGENTROUTER_API_KEY / GEMINI_API_KEY override these when set.
+ * They used to be committed here as built-in fallbacks, which put live
+ * credentials in a public repository history; deleting them from HEAD does not
+ * revoke them, so each key must also be rotated in its provider console. With
+ * no key configured this route answers 503 "AI service is not configured"
+ * instead of spending a credential nobody can see.
  *
- * NOTE: keep the repository private; anyone who can read this file can use
- * these keys. If the repo ever goes public, rotate them in their consoles.
+ *   OPENCODE_API_KEY, AGENTROUTER_API_KEY, GEMINI_API_KEY
  */
-const DEFAULT_AGENTROUTER_KEY = 'sk-W0U5Yo0MM3wbY3xB0ZpS1f19iyABhATRCBK7N3hyJYjbF6ez';
-const DEFAULT_GEMINI_KEY = 'AQ.Ab8RN6KLITc78xyz1ke-xlDGzavLpKWrka-gmVcHlkI8njvDJA';
-const DEFAULT_OPENCODE_KEY = 'sk-y2338SzSUvBqPKHmjQ75DbWY0D78CfTbzl6jcBqMnthziB0XaEmGI9QJ6a6IpOum';
 
 /**
  * Circuit breaker: when a provider fails with a permanent-looking error
@@ -75,7 +73,7 @@ function getProviders(): ProviderConfig[] {
   // x-opencode-session header; a per-request id satisfies it. Several free
   // models sit behind DIFFERENT upstream pools, so if one is overloaded
   // (Nvidia 502s) the next one often still works.
-  const ocKey = process.env.OPENCODE_API_KEY || DEFAULT_OPENCODE_KEY;
+  const ocKey = process.env.OPENCODE_API_KEY?.trim();
   if (ocKey) {
     // Only models the free tier actually serves to third-party callers belong
     // here. The nemotron free models answer HTTP 403 "OpenCode's free tier can
@@ -102,7 +100,7 @@ function getProviders(): ProviderConfig[] {
   // swap models (e.g. claude-3-5-haiku, gpt-4.1-mini) without a code change.
   // Note: AgentRouter rejects datacenter IPs — from server hosts it always
   // trips the breaker and Gemini takes over. It only works from local runs.
-  const arKey = process.env.AGENTROUTER_API_KEY || DEFAULT_AGENTROUTER_KEY;
+  const arKey = process.env.AGENTROUTER_API_KEY?.trim();
   if (arKey) {
     providers.push({
       name: 'agentrouter',
@@ -115,10 +113,9 @@ function getProviders(): ProviderConfig[] {
 
   // Google Gemini via AI Studio (OpenAI-compatible endpoint) — the reliable
   // provider in production; AgentRouter above falls through to this.
-  const geminiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_AI_STUDIO_API_KEY ||
-    DEFAULT_GEMINI_KEY;
+  const geminiKey = (
+    process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_STUDIO_API_KEY
+  )?.trim();
   if (geminiKey) {
     providers.push({
       name: 'gemini',
