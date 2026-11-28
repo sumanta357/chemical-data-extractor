@@ -17,6 +17,16 @@
   key-shaped literal is committed again.
 
 ### Fixed
+- **Only twelve patents were ever shown, and the enriched workbook had none.**
+  The patent register was capped at 12 rows in both the Python engine and the
+  Next.js reader, so a 30-patent search displayed "12 of 30" — which reads as
+  missing data rather than a preview. Every patent is now returned, newest
+  first, and the worksheet's note only appears if a caller deliberately asks
+  for a preview. `enriched_data.xlsx` also gains a **Patents** sheet (number,
+  title, assignee, year, linked compound, Google Patents hyperlink) built from
+  the same `decision.patent_register` rows the results screen lists, so the
+  workbook a reader downloads carries the patent data too. Covered by
+  `tests/test_patents_api.py` (30-row case) and `tests/test_excel_patents.py`.
 - **Downloads failed with "… can't be downloaded securely".** Signed export
   links were built from `request.base_url`, which is `http://` behind Render's
   TLS-terminating proxy (uvicorn only trusts forwarded headers from localhost,

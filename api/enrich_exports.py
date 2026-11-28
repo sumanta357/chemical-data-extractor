@@ -763,10 +763,79 @@ def write_relations_sheet(wb, nodes, edges):
     return ws
 
 
+# ── Patents Sheet ───────────────────────────────────────────────────────────
+
+def _patent_register(nodes, edges):
+    """The patent rows for this export, from the module the results screen uses.
+
+    `python-api/decision.py` owns patent identification and the Google Patents
+    URL rules, so reusing it here means the workbook and the UI cannot disagree
+    about which rows are patents or where they link. Enrichment is best-effort:
+    if the module is not importable (the engine run on its own, outside the
+    repo), the sheet is skipped rather than failing the whole run.
+    """
+    try:
+        api_dir = os.path.dirname(os.path.abspath(__file__))
+        decision_dir = os.path.join(os.path.dirname(api_dir), "python-api")
+        if decision_dir not in sys.path:
+            sys.path.insert(0, decision_dir)
+        import decision  # noqa: E402  (path is set up directly above)
+        return decision.patent_register(list(nodes.values()), edges)
+    except Exception as exc:  # pragma: no cover - standalone engine run
+        print(f"  [!] Patent sheet skipped: patent module unavailable ({exc})")
+        return None
+
+
+def write_patents_sheet(wb, register):
+    """Sheet: every patent the search surfaced, with its Google Patents link.
+
+    The engine's own workbook has a patent tab, but the enriched workbook — the
+    one with SMILES, activities and publications — did not, so a reader who
+    downloaded the enriched Excel had no patent information in it at all.
+    """
+    if register is None:
+        return None
+
+    ws = wb.create_sheet("Patents")
+    headers = [
+        "Patent Number", "Title", "Assignee / Applicant", "Publication Year",
+        "Linked Compound", "Google Patents Link",
+    ]
+    for col, header in enumerate(headers, 1):
+        ws.cell(row=1, column=col, value=header)
+    style_header(ws, len(headers))
+
+    rows = register.get("patents", [])
+    for offset, patent in enumerate(rows):
+        row = 2 + offset
+        ws.cell(row=row, column=1, value=patent.get("number", ""))
+        ws.cell(row=row, column=2, value=patent.get("title", ""))
+        ws.cell(row=row, column=3, value=patent.get("assignee", ""))
+        ws.cell(row=row, column=4, value=patent.get("year") or "")
+        ws.cell(row=row, column=5, value=patent.get("compound", ""))
+        ws.cell(row=row, column=6, value=patent.get("url", ""))
+
+    style_data(ws, len(rows), len(headers))
+
+    # Applied after style_data, which resets every cell's font.
+    for offset, patent in enumerate(rows):
+        url = patent.get("url") or ""
+        if not url:
+            continue
+        cell = ws.cell(row=2 + offset, column=6)
+        cell.hyperlink = url
+        cell.font = Font(name="Calibri", size=10, color="0563C1", underline="single")
+
+    auto_width(ws, len(headers))
+    print(f"  Sheet 'Patents': {len(rows)} rows")
+    return ws
+
+
 # ── Summary Sheet ───────────────────────────────────────────────────────────
 
 def write_summary_sheet(wb, compound_count, compound_enriched, inhibitor_count,
-                         pub_count, pub_enriched, pdb_count, img_count, runtime):
+                         pub_count, pub_enriched, pdb_count, patent_count,
+                         img_count, runtime):
     """Write a summary/README sheet."""
     ws = wb.create_sheet("Summary", 0)
 
@@ -785,6 +854,7 @@ def write_summary_sheet(wb, compound_count, compound_enriched, inhibitor_count,
         ("Publications", str(pub_count)),
         ("Publications with CrossRef Metadata", str(pub_enriched)),
         ("PDB Structures", str(pdb_count)),
+        ("Patents", str(patent_count)),
         ("2D Structure Images Downloaded", str(img_count)),
         ("Runtime", f"{runtime:.1f} seconds"),
     ]
@@ -799,6 +869,7 @@ def write_summary_sheet(wb, compound_count, compound_enriched, inhibitor_count,
         "Inhibitor Activities — Compound → Target inhibition/binding data with Ki/IC50 values",
         "Publications — Papers with DOIs, authors, abstracts, and citation counts",
         "PDB Structures — Protein-to-structure mappings with method and resolution",
+        "Patents — Every patent the search surfaced, with its Google Patents link",
         "All Relations — Complete edge table for all relationships",
     ]
     for i, s in enumerate(sheets):
@@ -864,14 +935,19 @@ def _run_pipeline(skip_images: bool = False):
     if "Sheet" in wb.sheetnames:
         del wb["Sheet"]
 
+    patent_register = _patent_register(nodes, edges)
+    patent_count = len((patent_register or {}).get("patents", []))
+
     write_summary_sheet(wb, len(compound_nodes), compound_enriched,
                          len(inhibitor_edges), len(pub_nodes), pub_enriched,
-                         len(pdb_edges), img_count, time.time() - start_time)
+                         len(pdb_edges), patent_count, img_count,
+                         time.time() - start_time)
     write_compounds_sheet(wb, compound_nodes, nodes)
     write_inhibitors_sheet(wb, nodes, edges)
     write_publications_sheet(wb, pub_nodes)
     write_pdb_sheet(wb, nodes, edges)
     write_relations_sheet(wb, nodes, edges)
+    write_patents_sheet(wb, patent_register)
 
     wb.save(OUTPUT_XLSX)
     elapsed = time.time() - start_time
@@ -887,6 +963,7 @@ def _run_pipeline(skip_images: bool = False):
     print(f"  Inhibitor Edges: {len(inhibitor_edges):3d}")
     print(f"  Publications   : {len(pub_nodes):3d} ({pub_enriched} enriched)")
     print(f"  PDB Structures : {len(pdb_edges):3d}")
+    print(f"  Patents        : {patent_count:3d}")
     print(f"  2D Images      : {img_count:3d}")
     print(f"{'─' * 60}")
     print(f"  Output file: {OUTPUT_XLSX}")

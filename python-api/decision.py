@@ -474,7 +474,7 @@ def dark_literature(nodes: List[Dict[str, str]], edges: List[Dict[str, str]]) ->
 def patent_register(
     nodes: List[Dict[str, str]],
     edges: List[Dict[str, str]],
-    limit: int = 12,
+    limit: Optional[int] = None,
 ) -> Dict[str, Any]:
     """The patents this search surfaced, newest first, with their links.
 
@@ -483,6 +483,10 @@ def patent_register(
     patent number. This is the same data the export holds, shaped for a list:
     one entry per patent with what the source actually supplied, and an empty
     register when there is nothing rather than a placeholder row.
+
+    Every patent is returned by default. An earlier twelve-row cap made a
+    search with thirty patents read as "12 of 30", which looks like missing
+    data; `limit` remains for callers that genuinely want a preview.
     """
     patents: List[Dict[str, Any]] = []
     for row in nodes:
@@ -523,12 +527,13 @@ def patent_register(
             linked.add((edge.get(":START_ID") or "").strip())
 
     patents.sort(key=lambda p: (-(p["year"] or 0), p["number"]))
+    listed = patents if limit is None else patents[:max(0, limit)]
     return {
         "patent_count": len(patents),
         "compound_count": len(linked),
         "compounds": [names.get(uid, uid) for uid in sorted(linked)][:8],
-        "patents": patents[:limit],
-        "truncated": len(patents) > limit,
+        "patents": listed,
+        "truncated": len(listed) < len(patents),
     }
 
 

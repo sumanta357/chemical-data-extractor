@@ -278,7 +278,7 @@ A completed search produces up to 15 files:
 | `vector_index_metadata.json` | JSON | Metadata for building an embedding index |
 | `triples.json` | JSON | Flat subject–predicate–object triples |
 | `search_library.json` | JSON | The resolved query terms and routing decisions |
-| `enriched_data.xlsx` | Excel workbook | Enriched compounds, properties and publications |
+| `enriched_data.xlsx` | Excel workbook | Enriched compounds, properties, publications and the patents found |
 | `structure_images/` | Folder | Rendered 2D structures, one image per compound |
 
 The exact list for your search is always shown in the interface — the table

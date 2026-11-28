@@ -98,6 +98,41 @@ class PatentEndpoint(unittest.TestCase):
         engine_app.SEARCH_DB = self._orig_db
         self.tmp.cleanup()
 
+    def test_no_patent_is_hidden_behind_a_row_cap(self):
+        """A search with more patents than used to fit returns all of them.
+
+        The register was capped at twelve rows, so a 30-patent search read as
+        "12 of 30" on screen — indistinguishable from data going missing.
+        """
+        header = NODES_CSV.split("\n")[0]
+        rows = [
+            f"PATENT:US-{20200000 + i}-A1,US Patent {i},Entity;Patent,"
+            f"US-{20200000 + i}-A1,,,,,,,,,Atrazine,,,"
+            for i in range(30)
+        ]
+        directory = Path(engine_app.EXPORTS_DIR) / "pat3nts3"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "nodes.csv").write_text(
+            header + "\n" + "\n".join(rows) + "\n", encoding="utf-8"
+        )
+        (directory / "edges.csv").write_text(
+            EDGES_CSV.split("\n")[0] + "\n", encoding="utf-8"
+        )
+        engine_app.searches["pat3nts3"] = {
+            "search_id": "pat3nts3",
+            "query": "Atrazine",
+            "hops": 1,
+            "status": "completed",
+            "export_dir": str(directory),
+            "export_files": [],
+            "owner_user_id": self.account["id"],
+        }
+
+        body = self.client.get("/api/search/pat3nts3/patents").json()
+        self.assertEqual(body["patent_count"], 30)
+        self.assertEqual(len(body["patents"]), 30)
+        self.assertFalse(body["truncated"])
+
     def test_every_patent_row_is_listed_with_its_link(self):
         body = self.client.get("/api/search/pat3nts1/patents").json()
         self.assertEqual(body["patent_count"], 3)

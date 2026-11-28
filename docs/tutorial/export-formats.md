@@ -49,10 +49,11 @@ The multi-sheet workbook. It is the most convenient file for most people.
 
 | Sheet | Contents |
 | --- | --- |
-| Summary | Entity counts, relationship counts, ranking summary |
-| Nodes | The same data as `nodes.csv`, formatted for reading |
-| Edges | The same data as `edges.csv` |
-| Bioactivity | Potency values with pChEMBL ranking |
+| Entities & Compounds | Every entity with its identifiers, SMILES, formula and bioactivity summary |
+| Relationships & Patents | The edge table, including patent references on the relationships that carry them |
+| Patents & Patented Molecules | Every patent the search surfaced: number, title, assignee, year, the compound it is linked to, and its Google Patents link |
+| PDB 3D Structures | Protein-to-structure mappings |
+| Literature & Web Links | Publications and their source links |
 
 ---
 
@@ -143,7 +144,9 @@ directly in DuckDB, Spark, R and Python-based tools.
 Produced by the enrichment stage near the end of a run.
 
 - `enriched_data.xlsx` — compounds with SMILES, molecular properties and
-  publication metadata added after extraction.
+  publication metadata added after extraction, plus a **Patents** sheet listing
+  every patent the search surfaced with its Google Patents link (the same rows
+  the results screen shows).
 - `structure_images/` — one rendered 2D structure image per compound, for
   figures and visual screening.
 

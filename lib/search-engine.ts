@@ -887,7 +887,7 @@ export function patentsFromGraph(graph: SearchGraph): SearchPatents {
  */
 export async function getSearchPatents(
   searchId: string,
-  limit: number = 12
+  limit?: number
 ): Promise<SearchPatents | null> {
   const state = searches.get(searchId);
   if (!state) return null;
@@ -950,6 +950,10 @@ export async function getSearchPatents(
   }
 
   patents.sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.number.localeCompare(b.number));
+  // Every patent by default: a twelve-row cap made a 30-patent search read as
+  // "12 of 30", which looks like data went missing. `limit` stays available
+  // for callers that want a preview.
+  const listed = typeof limit === 'number' ? patents.slice(0, limit) : patents;
   return {
     patent_count: patents.length,
     compound_count: linked.size,
@@ -957,8 +961,8 @@ export async function getSearchPatents(
       .sort()
       .map((uid) => names.get(uid) || uid)
       .slice(0, 8),
-    patents: patents.slice(0, limit),
-    truncated: patents.length > limit,
+    patents: listed,
+    truncated: listed.length < patents.length,
   };
 }
 

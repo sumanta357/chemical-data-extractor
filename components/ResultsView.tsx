@@ -39,7 +39,7 @@ interface FileInfo {
 const FILE_INFO: Record<string, FileInfo> = {
   '.xlsx': {
     label: 'Excel workbook',
-    contains: 'Every sheet of the graph — nodes, edges, bioactivity, summary',
+    contains: 'Every sheet of the graph — nodes, edges, patents, bioactivity, summary',
     group: 'Tables',
   },
   '.csv': {
