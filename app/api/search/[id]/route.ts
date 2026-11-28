@@ -20,6 +20,11 @@ export async function GET(
   return NextResponse.json({
     search_id: state.search_id,
     query: state.query,
+    // Without the depth a search reopened from History rendered "-hop
+    // expansion": the response carried everything except the one number the
+    // header prints.
+    hops: state.hops,
+    query_type: state.query_type,
     status: state.status,
     progress: state.progress,
     step: state.step ?? null,

@@ -5,6 +5,44 @@ import { requestOwnsSearch } from '@/lib/search-owner';
 export const dynamic = 'force-dynamic';
 
 /**
+ * The origin a browser (or Cytoscape importing from a URL) can reach.
+ *
+ * `request.url` inside a route handler is built from the server's bind
+ * address, so minting a link from it produced `http://0.0.0.0:3001/...` behind
+ * the preview proxy: a URL that works on the server and nowhere else. Mirrors
+ * python-api/app.py's origin fallback — PUBLIC_BASE_URL when configured, then
+ * the forwarded scheme/host, then the Host header.
+ */
+function publicOrigin(request: NextRequest, fallback: string): string {
+  const configured = (process.env.PUBLIC_BASE_URL ?? '').trim().replace(/\/+$/, '');
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (
+        (url.protocol === 'http:' || url.protocol === 'https:') &&
+        (url.pathname === '/' || url.pathname === '')
+      ) {
+        return configured;
+      }
+    } catch {
+      // Malformed value: fall back to the request's own headers.
+    }
+  }
+
+  const first = (value: string | null) => (value ?? '').split(',')[0].trim();
+  const forwardedScheme = first(request.headers.get('x-forwarded-proto'));
+  const scheme = forwardedScheme === 'http' || forwardedScheme === 'https'
+    ? forwardedScheme
+    : request.nextUrl.protocol === 'http:'
+      ? 'http'
+      : 'https';
+  const host =
+    first(request.headers.get('x-forwarded-host')) ||
+    first(request.headers.get('host'));
+  return host ? `${scheme}://${host}` : fallback;
+}
+
+/**
  * A signed, expiring URL for one export file.
  *
  * This is what lets a finished search open directly in Cytoscape: the owner
@@ -34,7 +72,7 @@ export async function GET(
   const link = await getSearchExportLink(
     params.id,
     filename,
-    url.origin,
+    publicOrigin(request, url.origin),
     request.headers.get('authorization')
   );
 

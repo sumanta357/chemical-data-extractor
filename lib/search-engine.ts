@@ -18,7 +18,22 @@ import type {
 const PY_API_DIR = path.join(process.cwd(), 'python-api');
 
 // ── In-memory search state ──────────────────────────────────────────────
-const searches = new Map<string, SearchState>();
+//
+// Next bundles every route handler separately, so a module-level Map is
+// duplicated per route: the POST /api/search handler kept the only copy of a
+// running search, and GET /api/search/{id} — a different bundle — answered 404
+// for the search it had just created. The UI therefore reported "Search lost —
+// engine restarted" for a run that completed and wrote all its exports, and
+// History listed nothing. Process-wide state in route handlers belongs on
+// globalThis, which every bundle in the process shares and a dev recompile does
+// not reset.
+type SearchStore = Map<string, SearchState>;
+const globalForSearches = globalThis as unknown as {
+  __scigraphSearches?: SearchStore;
+};
+const searches: SearchStore =
+  globalForSearches.__scigraphSearches ?? new Map<string, SearchState>();
+globalForSearches.__scigraphSearches = searches;
 
 // ── Persistence ─────────────────────────────────────────────────────────
 const PERSIST_FILE = path.join(process.cwd(), '.scigraph_searches.json');
@@ -56,6 +71,31 @@ function loadPersistedSearches(): void {
   } catch {
     // Corrupt file or read error — start fresh
   }
+}
+
+/** Re-read one finished search from disk.
+ *
+ * A route bundle compiled or first hit before the search started has no entry
+ * for it in memory, and after a server restart nothing does. The persisted
+ * file is the same record History is built from, so reads fall back to it
+ * instead of pretending the search never existed. */
+function loadPersistedSearch(searchId: string): SearchState | undefined {
+  try {
+    if (!fs.existsSync(PERSIST_FILE)) return undefined;
+    const data: SearchState[] = JSON.parse(fs.readFileSync(PERSIST_FILE, 'utf-8'));
+    const found = data.find((s) => s.search_id === searchId);
+    if (!found) return undefined;
+    if (found.status !== 'completed' && found.status !== 'failed') return undefined;
+    searches.set(found.search_id, found);
+    return found;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The search, from memory when this bundle has it and from disk otherwise. */
+function findSearch(searchId: string): SearchState | undefined {
+  return searches.get(searchId) ?? loadPersistedSearch(searchId);
 }
 
 function persistSearches(): void {
@@ -632,7 +672,7 @@ export function createSearch(
 }
 
 export async function getSearch(searchId: string): Promise<SearchState | undefined> {
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (!state) return undefined;
 
   // Hosted engine: refresh from the Python host on every poll.
@@ -731,7 +771,7 @@ const TYPE_COLOR: Record<string, string> = {
 export async function getSearchGraph(
   searchId: string
 ): Promise<SearchGraph | null> {
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (!state) return null;
 
   if (state.remote_engine_url && state.remote_search_id) {
@@ -889,7 +929,7 @@ export async function getSearchPatents(
   searchId: string,
   limit?: number
 ): Promise<SearchPatents | null> {
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (!state) return null;
 
   if (state.remote_engine_url && state.remote_search_id) {
@@ -978,7 +1018,7 @@ export async function getSearchPatents(
 export async function getDecisionIntel(
   searchId: string
 ): Promise<DecisionIntel | null> {
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (!state) return null;
 
   if (state.remote_engine_url && state.remote_search_id) {
@@ -999,15 +1039,20 @@ export async function getDecisionIntel(
     'import json, sys, pathlib',
     'sys.path.insert(0, sys.argv[1])',
     'import decision',
-    'bundle = decision.decision_intel(sys.argv[2], sys.argv[3])',
+    'bundle = decision.decision_intel(sys.argv[2], sys.argv[3], exports_root=sys.argv[4])',
     'print(json.dumps(bundle) if bundle else "null")',
   ].join('\n');
 
   try {
     const out = await new Promise<string>((resolve, reject) => {
-      const child = spawn('python3', ['-c', script, PY_API_DIR, dir, state.query], {
-        cwd: path.dirname(PY_API_DIR),
-      });
+      // Pass this app's own exports root: decision.py otherwise validates
+      // against the FastAPI service's EXPORTS_DIR, which is a different
+      // directory in the two-process layout, so every verdict 404'd.
+      const child = spawn(
+        'python3',
+        ['-c', script, PY_API_DIR, dir, state.query, EXPORTS_DIR],
+        { cwd: path.dirname(PY_API_DIR) }
+      );
       let stdout = '';
       let stderr = '';
       child.stdout.on('data', (chunk) => {
@@ -1048,7 +1093,7 @@ export function listSearches(limit: number = 20): SearchState[] {
 export function getSearchOwnership(
   searchId: string
 ): { ownerKey: string | null; hosted: boolean } | undefined {
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (!state) return undefined;
   return {
     ownerKey: state.owner_key ?? null,
@@ -1064,7 +1109,7 @@ export function getExportFilePath(
     // Scoped to one search: never fall through to another search's directory,
     // or an identically named file (nodes.csv, graph.graphml) would be served
     // from whichever run happened to be scanned first.
-    const state = searches.get(searchId);
+    const state = findSearch(searchId);
     if (!state?.export_dir) return null;
     const base = path.resolve(state.export_dir);
     const p = path.resolve(base, filename);
@@ -1095,7 +1140,7 @@ export function getBase64File(
   filename: string
 ): string | null {
   if (!searchId) return null;
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (state?.base64_files) {
     const b64 = state.base64_files[filename];
     if (b64) return b64;
@@ -1112,7 +1157,7 @@ export function getRemoteExportUrl(
   filename: string
 ): string | null {
   if (!searchId) return null;
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (state?.remote_engine_url && state.remote_search_id) {
     return `${state.remote_engine_url}/api/exports/${encodeURIComponent(
       filename
@@ -1134,7 +1179,7 @@ export async function getSearchExportLink(
   origin: string,
   authorization?: string | null
 ): Promise<ExportLink | null> {
-  const state = searches.get(searchId);
+  const state = findSearch(searchId);
   if (!state) return null;
 
   if (state.remote_engine_url && state.remote_search_id) {

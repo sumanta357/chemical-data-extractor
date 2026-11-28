@@ -9,6 +9,7 @@ import {
   SpinnerIcon,
 } from '@/components/icons';
 import CytoscapeNetwork from '@/components/CytoscapeNetwork';
+import { sameOriginLink } from '@/components/export-link';
 import { cx, note } from '@/components/ui';
 import { patentLink } from '@/lib/patents';
 import { authHeaders } from '@/lib/billing';
@@ -218,19 +219,13 @@ function SectionHead({
  * (which also works when the file lives on a hosted engine) and follows it in a
  * detached anchor, so the page keeps its state.
  *
- * The link must be https: Chrome blocks a download from an http URL on an https
- * page ("… can't be downloaded securely"), which is exactly what the engine
- * minted before it read the proxy's X-Forwarded-Proto. `safeDownloadUrl` is the
- * guard for any host that still returns a plain-http origin — it falls back to
- * the same-origin route rather than triggering a blocked download.
+ * The link is served from the page's own origin. A route handler only sees the
+ * deployment's internal address, so the minted URL can name a host the browser
+ * cannot reach (0.0.0.0, or a private 10.x address behind a proxy); the
+ * signature covers the search, file and expiry, so the path is portable.
  */
 function safeDownloadUrl(minted: string | null, fallback: string): string {
-  if (!minted) return fallback;
-  const insecure =
-    minted.startsWith('http://') &&
-    typeof window !== 'undefined' &&
-    window.location.protocol === 'https:';
-  return insecure ? fallback : minted;
+  return minted ? sameOriginLink(minted) : fallback;
 }
 
 function followUrl(url: string) {
@@ -329,7 +324,7 @@ function CytoscapeLink({ searchId, filename }: { searchId: string; filename: str
       );
       const body = await res.json().catch(() => null);
       if (!res.ok || typeof body?.url !== 'string') throw new Error('no link');
-      await navigator.clipboard.writeText(body.url);
+      await navigator.clipboard.writeText(sameOriginLink(body.url));
       setState('copied');
       window.setTimeout(() => setState('idle'), 3500);
     } catch {

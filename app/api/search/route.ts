@@ -41,6 +41,8 @@ export async function POST(request: NextRequest) {
       NextResponse.json({
         search_id: current.search_id,
         query: current.query,
+        hops: current.hops,
+        query_type: current.query_type,
         status: current.status,
         progress: current.progress,
         log: current.log,

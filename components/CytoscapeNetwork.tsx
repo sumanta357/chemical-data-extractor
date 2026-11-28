@@ -5,6 +5,7 @@ import type cytoscape from 'cytoscape';
 import { AlertIcon, ChevronIcon, DownloadIcon, SpinnerIcon } from '@/components/icons';
 import { cx, note } from '@/components/ui';
 import { authHeaders } from '@/lib/billing';
+import { sameOriginLink } from '@/components/export-link';
 import type { ExportFile, GraphNodeData, SearchGraph, SearchState } from '@/lib/types';
 
 /*
@@ -472,7 +473,7 @@ export default function CytoscapeNetwork({ search, files }: Props) {
       );
       const body = await res.json().catch(() => null);
       if (!res.ok || typeof body?.url !== 'string') throw new Error('no link');
-      await navigator.clipboard.writeText(body.url);
+      await navigator.clipboard.writeText(sameOriginLink(body.url));
       setLinkState('copied');
       window.setTimeout(() => setLinkState('idle'), 4000);
     } catch {

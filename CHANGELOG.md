@@ -17,6 +17,51 @@
   key-shaped literal is committed again.
 
 ### Fixed
+- **A finished search was reported as "Search lost — engine restarted" and
+  disappeared from History.** Next compiles every route handler into its own
+  bundle, so the module-level `searches` Map in `lib/search-engine.ts` was
+  duplicated: `POST /api/search` kept the only copy of the run, and
+  `GET /api/search/{id}` (a different bundle, initialised before the search)
+  answered 404 for a job that had completed and written all its exports. The
+  search store in `lib/search-engine.ts` is now shared through `globalThis`, and
+  reads fall back to the persisted search file, so polling, History and reopened
+  results survive both the bundle boundary and a process restart.
+- **The Overview verdict 404'd on every locally hosted search.** `decision_intel`
+  validated the export directory against the FastAPI service's `EXPORTS_DIR`
+  (`/tmp/scigraph_exports`), while the Next app writes to `./exports` — so every
+  verdict was refused as out-of-tree — and it imported the web app (and
+  FastAPI) to do the check, which a plain `python3` cannot satisfy. The exports
+  root is now an explicit argument: the Next reader passes its own directory,
+  the FastAPI endpoint keeps its default, and the containment check is
+  unchanged.
+- **Signed export links pointed at a host the browser could not reach.** The
+  link route built its origin from `request.url` (the bind address) and the
+  token module generated a random secret per route bundle, so links named
+  `http://0.0.0.0:3001/...` (or a private proxy address) and the download route
+  verified them with a different key. The fallback secret is now shared
+  process-wide, `PUBLIC_BASE_URL`/forwarded headers are honoured server-side,
+  and the client serves the signed path from the page's own origin — downloads
+  and Cytoscape "Network from URL" imports both work.
+- **Cross-references exported as `DatabaseSource.PUBCHEM:2244`.** The CSV writer
+  formatted the enum itself, so no consumer could key on it and the vendor
+  panel fell back to a SMILES search even where a PubChem CID existed. The
+  writer uses the enum's value; the reader also strips the old prefix, so saved
+  searches resolve their CIDs without being re-run.
+- **Japanese Showa/Reiwa patents were dropped from the register.** `S` and `R`
+  were missing from the publication-series letters, so `JP-S5534457-A` was
+  counted as prior art but filtered out of the patent list — a real imatinib
+  run showed 200 prior-art records and 195 listed patents.
+- **Prior-art overlap counted one compound's patent portfolio as shared prior
+  art.** The metric summed compounds with two or more patents while the reading
+  claimed the patents were linked to multiple compounds. It now counts patent
+  records shared by two or more compounds of the query, and the narrative states
+  what was measured.
+- **A search reopened from History lost its depth** — the search responses
+  omitted `hops`/`query_type`, so the header rendered "-hop expansion".
+- **BindingDB results were named after BindingDB's internal label**
+  (`Cobweb_bdb`) instead of the compound that was queried, because the row name
+  came from `bdb.inhibitor`. The compound's own name is used for the endpoint
+  that is queried by its SMILES.
 - **Compound potency read raw nanomolar activities as pChEMBL.** BindingDB,
   BRENDA and PDBbind report `activity_value` in nM (or µM, mM) and do not set
   `pchembl_value`, so `decision._affinity_edges` fell back to the raw number and

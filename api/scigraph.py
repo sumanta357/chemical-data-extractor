@@ -1273,7 +1273,14 @@ def export_to_csv(entities: List[Entity], relations: List[Relation], entity_file
             w = csv.writer(f)
             w.writerow(NODE_BASE_COLUMNS + extra_node_columns)
             for e in entities:
-                xr_str = "|".join([f"{xr.database}:{xr.accession}" for xr in e.cross_references])
+                # `database` is a DatabaseSource enum; formatting it directly
+                # writes "DatabaseSource.PUBCHEM:2244", which no consumer can
+                # key on — the vendor panel fell back to a SMILES search even
+                # though the compound had a PubChem CID. Use its value.
+                xr_str = "|".join(
+                    f"{getattr(xr.database, 'value', xr.database)}:{xr.accession}"
+                    for xr in e.cross_references
+                )
                 base_row = [
                     e.uid,
                     e.preferred_name,
@@ -2986,7 +2993,12 @@ class BindingDBConnector(BaseConnector):
                                     bdb_items = []
                                 for item in bdb_items[:50]:
                                     lig_id = str(item.get("bdb.monomerid", cid))
-                                    lig_name = item.get("bdb.inhibitor", q_clean)
+                                    # This endpoint is queried by the compound's
+                                    # own SMILES, so every row is that compound.
+                                    # `bdb.inhibitor` is BindingDB's internal
+                                    # label ("Cobweb_bdb") — naming the results
+                                    # after it hid the compound the user typed.
+                                    lig_name = q_clean
                                     target_name = item.get("bdb.target", "Unknown Target")
                                     target_id = f"BINDINGDB:{lig_id}"
                                     bdb_smiles = item.get("bdb.smiles", smiles)

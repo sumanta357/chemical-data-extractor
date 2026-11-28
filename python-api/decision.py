@@ -70,7 +70,10 @@ _PATENT_PREFIXES = ("PATENT:",)
 # link entity the connector emits when it finds no document. That entity is
 # typed PATENT as well, so without this check it was listed, counted and even
 # used to colour the IP verdict.
-_PATENT_DOCUMENT_RE = re.compile(r"^[A-Z]{2}(?:RE|PP|D|T|H)?\d{4,}(?:[A-Z]\d*)?$")
+# The series letters include Japan's era prefixes (S = Showa, H = Heisei,
+# R = Reiwa): JP-S5534457-A is a real 1980 publication, and without S those
+# documents were dropped from the register while still counted as prior art.
+_PATENT_DOCUMENT_RE = re.compile(r"^[A-Z]{2}(?:RE|PP|D|T|H|S|R)?\d{4,}(?:[A-Z]\d*)?$")
 # Non-document entities: a search link, not a patent.
 _PATENT_PLACEHOLDER_PREFIXES = ("PATENTSEARCH:", "SEARCH:")
 
@@ -499,12 +502,17 @@ def dark_literature(nodes: List[Dict[str, str]], edges: List[Dict[str, str]]) ->
             patent_ids.setdefault(tgt, {"uid": tgt})
 
     by_compound: Dict[str, List[str]] = {}
+    by_patent: Dict[str, set] = {}
     for src, tgt in links:
         by_compound.setdefault(src, []).append(tgt)
+        by_patent.setdefault(tgt, set()).add(src)
 
-    overlapping = [
-        uid for uid, pats in by_compound.items() if len(pats) >= 2
-    ]
+    # "Overlap" is prior art shared between compounds of this query — a patent
+    # document that names more than one of them. Counting one compound's long
+    # patent list as overlap made a single well-covered drug look like a shared
+    # scaffold, and the reading claimed records were "linked to more than one
+    # compound" when they were not.
+    overlapping = [uid for uid, compounds in by_patent.items() if len(compounds) >= 2]
 
     tried_compounds = [
         {
@@ -523,12 +531,14 @@ def dark_literature(nodes: List[Dict[str, str]], edges: List[Dict[str, str]]) ->
         "overlap_signals": len(overlapping),
         "compounds": tried_compounds,
         "reading": (
-            "Patent records are linked to more than one compound from this "
-            "query — the scaffold space has prior art and family filings, so "
-            "novelty around it is contested."
+            f"{len(overlapping)} patent record"
+            f"{'s are' if len(overlapping) != 1 else ' is'} linked to more than "
+            "one compound from this query — the scaffold space has prior art "
+            "and family filings, so novelty around it is contested."
             if overlapping
-            else "No compound in this graph is linked to multiple patent "
-            "records; heavy prior-art overlap was not detected at graph level."
+            else "No patent record in this graph is linked to more than one "
+            "compound from this query; shared prior-art overlap was not "
+            "detected at graph level."
         ),
         "caveat": (
             "This reads structured patent metadata, not full claim text or "
@@ -789,6 +799,10 @@ def _cross_refs(row: Dict[str, str]) -> Dict[str, str]:
             continue
         database, accession = ref.split(":", 1)
         database = database.strip().upper().replace(" ", "")
+        # Exports written before the fix serialised the enum itself
+        # ("DatabaseSource.PUBCHEM:2244"); keep those saved searches working.
+        if database.startswith("DATABASESOURCE."):
+            database = database.split(".", 1)[1]
         accession = accession.strip()
         if database and accession and database not in refs:
             refs[database] = accession
@@ -889,19 +903,38 @@ def quote_plus(value: str) -> str:
 
 
 def decision_intel(
-    export_dir: str, query: str, now_year: Optional[int] = None
+    export_dir: str,
+    query: str,
+    now_year: Optional[int] = None,
+    exports_root: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Everything above, computed from one search's export directory.
 
-    Returns None when the directory is missing or outside EXPORTS_DIR — the
-    caller turns that into a 404, never a traversal.
-    """
-    from app import EXPORTS_DIR, _export_dir_is_safe  # late import: no cycle at load
+    Returns None when the directory is missing or outside the exports root —
+    the caller turns that into a 404, never a traversal.
 
+    `exports_root` defaults to the FastAPI app's EXPORTS_DIR, which is where the
+    engine writes. The Next.js reader passes its own `exports/` directory
+    instead: the two processes keep their files in different places, so the
+    app's default rejected every Next export as out-of-tree, and importing the
+    web app also dragged FastAPI into a bare `python3` that does not have it.
+    """
     root = str(export_dir or "")
-    if not root or not _export_dir_is_safe(root):
+    if not root:
         return None
-    directory = Path(root)
+    if exports_root is None:
+        from app import EXPORTS_DIR as exports_root  # late import: no cycle at load
+
+    try:
+        base = Path(exports_root).resolve()
+        directory = Path(root).resolve()
+    except (OSError, ValueError):
+        return None
+    if directory != base and base not in directory.parents:
+        return None
+    if not directory.is_dir():
+        return None
+
     nodes_file = directory / "nodes.csv"
     edges_file = directory / "edges.csv"
     if not nodes_file.exists() or not edges_file.exists():

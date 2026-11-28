@@ -205,6 +205,38 @@ COMPOUND:CHEMBL111,TARGET:EGFR,INHIBITS,IC50,2.1,nM,
         )
         self.assertEqual(register["patent_count"], 2)
 
+    def test_japanese_era_series_documents_are_patents(self):
+        """JP Showa (S) and Reiwa (R) numbers are real publications. S was not
+        in the series list, so five 1980s JP patents were counted as prior art
+        but dropped from the register, making the two counts disagree."""
+        for number in ("JP-S5534457-A", "JP-S60188338-A", "JP-R123456-A"):
+            with self.subTest(number=number):
+                row = {
+                    "uid:ID": f"PATENT:{number}",
+                    "name": f"JP Patent {number}",
+                    ":LABEL": "Entity;Patent",
+                    "canonical_id": number,
+                }
+                register = decision.patent_register([row], [])
+                self.assertEqual([p["number"] for p in register["patents"]], [number])
+
+    def test_enum_serialised_cross_refs_still_resolve(self):
+        """Older exports wrote `DatabaseSource.PUBCHEM:2244`; those saved
+        searches must still resolve their PubChem CID for the vendor link."""
+        rows = [
+            {
+                "uid:ID": "COMPOUND:BSYNRYMUTXBXSQ-UHFFFAOYSA-N",
+                "name": "2-acetyloxybenzoic acid",
+                "canonical_id": "BSYNRYMUTXBXSQ-UHFFFAOYSA-N",
+                "cross_references": "DatabaseSource.PUBCHEM:2244|DatabaseSource.OTHER:BSYNRYMUTXBXSQ-UHFFFAOYSA-N",
+                "smiles": "CC(=O)OC1=CC=CC=C1C(=O)O",
+            }
+        ]
+        compound = decision.vendor_sourcing(rows)["compounds"][0]
+        self.assertEqual(compound["identifier"], "2244")
+        self.assertEqual(compound["identifier_kind"], "pubchem_cid")
+        self.assertTrue(compound["vendors_url"].endswith("2244#section=Chemical-Vendors"))
+
     def test_us_series_documents_are_still_patents(self):
         """Reissues, designs, plant patents, SIRs and defensive publications put
         a letter series after the office code. They are real documents and used
@@ -257,6 +289,16 @@ COMPOUND:CHEMBL111,TARGET:EGFR,INHIBITS,IC50,2.1,nM,
         self.assertEqual(result["overlap_signals"], 1)  # US5444444 has 2 compounds
         self.assertEqual(result["compounds"][0]["name"], "Failtolinib")  # 2 patents
         self.assertIn("prior art", result["reading"])
+
+    def test_dark_literature_does_not_call_one_compounds_portfolio_overlap(self):
+        """One compound linked to many patents is coverage, not shared prior art.
+        The reading used to claim records were linked to multiple compounds."""
+        edges = [e for e in self.edges if e[":START_ID"] == "COMPOUND:CHEMBL222"]
+        result = decision.dark_literature(self.nodes, edges)
+        self.assertEqual(result["compounds_with_patents"], 1)
+        self.assertEqual(result["overlap_signals"], 0)
+        self.assertIn("not detected", result["reading"])
+        self.assertNotIn("more than one compound from this query —", result["reading"])
 
     def test_dark_literature_quiet_when_no_overlap(self):
         edges = [e for e in self.edges if e[":START_ID"] != "COMPOUND:CHEMBL222"]
@@ -321,6 +363,24 @@ COMPOUND:CHEMBL111,TARGET:EGFR,INHIBITS,IC50,2.1,nM,
     def test_decision_intel_rejects_outside_dirs(self):
         self.assertIsNone(decision.decision_intel("/etc", "q"))
         self.assertIsNone(decision.decision_intel("", "q"))
+
+    def test_explicit_exports_root_is_honoured(self):
+        """The Next.js reader keeps its exports outside the FastAPI app's
+        EXPORTS_DIR. Passing its root explicitly must both accept that
+        directory and still refuse anything outside it."""
+        with TemporaryDirectory(dir=engine_app.EXPORTS_DIR) as tmp:
+            (Path(tmp) / "nodes.csv").write_text(NODES_CSV, encoding="utf-8")
+            (Path(tmp) / "edges.csv").write_text(EDGES_CSV, encoding="utf-8")
+            bundle = decision.decision_intel(
+                tmp, "kinase y", exports_root=str(engine_app.EXPORTS_DIR)
+            )
+            self.assertIsNotNone(bundle)
+            self.assertEqual(bundle["feasibility"]["grade"], "B")
+            self.assertIsNone(
+                decision.decision_intel(
+                    "/etc", "q", exports_root=str(engine_app.EXPORTS_DIR)
+                )
+            )
 
 
 class DecisionEndpoint(unittest.TestCase):

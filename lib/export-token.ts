@@ -22,10 +22,23 @@ let secret = (process.env.EXPORT_SIGNING_SECRET ?? '').trim();
 if (!secret) {
   // Local development still works, but links die with the process. Say so
   // rather than silently minting links that will mysteriously stop working.
-  secret = crypto.randomBytes(32).toString('base64url');
-  console.warn(
-    '[export-link] EXPORT_SIGNING_SECRET is not set; signed export links expire on restart.'
-  );
+  //
+  // The fallback must be shared process-wide: Next bundles each route
+  // separately, so a module-local random secret meant the export-link route
+  // signed with one key and the exports route verified with another, and every
+  // signed download 404'd unless EXPORT_SIGNING_SECRET happened to be set.
+  const shared = globalThis as unknown as {
+    __scigraphExportSecret?: string;
+    __scigraphExportSecretWarned?: boolean;
+  };
+  secret = shared.__scigraphExportSecret ?? crypto.randomBytes(32).toString('base64url');
+  shared.__scigraphExportSecret = secret;
+  if (!shared.__scigraphExportSecretWarned) {
+    shared.__scigraphExportSecretWarned = true;
+    console.warn(
+      '[export-link] EXPORT_SIGNING_SECRET is not set; signed export links expire on restart.'
+    );
+  }
 }
 
 export function signExportToken(
