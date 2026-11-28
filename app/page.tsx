@@ -111,6 +111,9 @@ export default function HomePage() {
   );
 
   const startPolling = useCallback((searchId: string) => {
+    // One interval per run: a second search must not leave the previous poller
+    // alive, or the older id keeps overwriting the newer search's state.
+    if (pollingRef.current) clearInterval(pollingRef.current);
     let offset = 0;
     let consecutiveErrors = 0;
 
@@ -205,16 +208,45 @@ export default function HomePage() {
   }, []);
 
   const handleViewSearch = useCallback(async (searchId: string) => {
-    // Owner-scoped like the poll: without the token this 404s and the history
-    // click-through silently loads nothing.
-    fetch(`/api/search/${searchId}`, { headers: await authHeaders() })
-      .then((res) => res.json())
-      .then((data) => {
-        setSearch(data);
-        setLogLines(data.log || []);
+    // Owner-scoped like the poll: without the token this 404s. A 404 is also
+    // what the engine answers once a search is gone (restart, or the 24-hour
+    // export cleanup), and its error body has no `export_files` or `log` —
+    // handing that to the view crashed the page on `lines.length`. So a failed
+    // load is shown as a failed run instead.
+    try {
+      const res = await fetch(`/api/search/${searchId}`, {
+        headers: await authHeaders(),
+      });
+      if (!res.ok) {
+        setSearch({
+          search_id: searchId,
+          query: 'Search unavailable',
+          query_type: 'auto',
+          hops: 0,
+          status: 'failed',
+          progress: 'Not available',
+          log: [],
+          export_files: [],
+          export_dir: '',
+          created_at: new Date().toISOString(),
+          elapsed_seconds: null,
+          error:
+            res.status === 404
+              ? 'This search is no longer available. The server may have restarted, or its export files were deleted 24 hours after it finished.'
+              : `This search could not be loaded (HTTP ${res.status}). Please try again.`,
+        });
+        setLogLines([]);
         setActiveTab('search');
-      })
-      .catch(() => {});
+        return;
+      }
+      const data = await res.json();
+      setSearch(data);
+      setLogLines(data.log || []);
+      setActiveTab('search');
+    } catch {
+      // A network blip should leave what is already on screen alone rather
+      // than replacing it with a half-built state.
+    }
   }, []);
 
   const tabs = (

@@ -11,7 +11,12 @@ interface Props {
 }
 
 function formatWhen(iso: string) {
-  const date = new Date(iso);
+  // Rows written before the engine emitted a timezone were naive UTC. A bare
+  // ISO string is parsed as *local* time by the browser, so those rows showed a
+  // time shifted by the viewer's UTC offset; make the UTC explicit. Values that
+  // already carry an offset ("…Z", "…+05:30") are left untouched.
+  const normalized = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return '';
   const today = new Date();
   const sameDay = date.toDateString() === today.toDateString();

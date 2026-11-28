@@ -260,13 +260,21 @@ function DownloadButton({
         { headers: await authHeaders() }
       );
       const body = await res.json().catch(() => null);
-      const minted = typeof body?.url === 'string' ? body.url : null;
+      const minted = res.ok && typeof body?.url === 'string' ? body.url : null;
+      if (!minted) {
+        // The direct route also needs proof of ownership, so falling back to it
+        // would 404 silently — and the button would still say "Started". Report
+        // the failure instead of pretending a download began.
+        setState('error');
+        window.setTimeout(() => setState('idle'), 4000);
+        return;
+      }
       followUrl(safeDownloadUrl(minted, fallback));
       setState('done');
       window.setTimeout(() => setState('idle'), 2500);
     } catch {
-      followUrl(fallback);
       setState('error');
+      window.setTimeout(() => setState('idle'), 4000);
     }
   }, [fallback, file.name, searchId]);
 
@@ -275,16 +283,29 @@ function DownloadButton({
       type="button"
       onClick={download}
       disabled={state === 'busy'}
+      title={
+        state === 'error'
+          ? 'The download link could not be created. Reload the page and try again.'
+          : undefined
+      }
       className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-2.5 py-1.5 text-[11px] font-medium text-fg transition-colors hover:border-accent hover:text-accent disabled:opacity-55"
     >
       {state === 'busy' ? (
         <SpinnerIcon className="h-3 w-3 animate-spin-slow" />
       ) : state === 'done' ? (
         <CheckIcon className="h-3 w-3 text-success" />
+      ) : state === 'error' ? (
+        <AlertIcon className="h-3 w-3 text-danger" />
       ) : (
         <DownloadIcon className="h-3 w-3" />
       )}
-      {state === 'busy' ? 'Preparing…' : state === 'done' ? 'Started' : 'Download'}
+      {state === 'busy'
+        ? 'Preparing…'
+        : state === 'done'
+          ? 'Started'
+          : state === 'error'
+            ? 'Try again'
+            : 'Download'}
     </button>
   );
 }

@@ -27,7 +27,7 @@ import shutil
 import sys
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote, urlparse
@@ -1123,7 +1123,10 @@ async def start_search(request: SearchRequest, background_tasks: BackgroundTasks
         "export_files": [],
         "export_dir": export_dir,
         "owner_user_id": user["id"] if user else None,
-        "created_at": datetime.utcnow().isoformat(),
+        # Timezone-aware UTC: the browser parses this string directly, and a
+        # naive timestamp is read as *local* time there, which shifted every
+        # history entry by the viewer's UTC offset.
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "elapsed_seconds": None,
         "error": None,
     }
