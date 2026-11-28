@@ -703,17 +703,53 @@ def moa_storyboard(
 
 # ── 4. Vendor sourcing ───────────────────────────────────────────────────────
 
-_PUBCHEM_VENDOR_URL = (
-    "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/xref/RegistryID/JSON"
-)
+_PUBCHEM_COMPOUND_URL = "https://pubchem.ncbi.nlm.nih.gov/compound/"
 
 
-def _inchikey_from(row: Dict[str, str]) -> str:
-    """The cross_references column lists 'ChEMBL:...', 'PDB:...' style pairs."""
-    for ref in (row.get("cross_references") or "").split(";"):
+def _cross_refs(row: Dict[str, str]) -> Dict[str, str]:
+    """Parse the cross_references column into ``{DATABASE: accession}``.
+
+    Exports join the pairs with ``|`` (see ``scigraph.export_to_csv``); older
+    extracts used ``;``. Splitting on only one separator left the entire joined
+    string as the "accession" — e.g. ``CHEMBL25|PDB:1ABX|PUBCHEM:2244`` — so
+    every vendor link queried PubChem for a string that matches nothing.
+    """
+    refs: Dict[str, str] = {}
+    raw = (row.get("cross_references") or "").replace(";", "|")
+    for ref in raw.split("|"):
         ref = ref.strip()
-        if ref.upper().startswith(("INCHIKEY:", "PUBCHEM:")):
-            return ref.split(":", 1)[1].strip()
+        if ":" not in ref:
+            continue
+        database, accession = ref.split(":", 1)
+        database = database.strip().upper().replace(" ", "")
+        accession = accession.strip()
+        if database and accession and database not in refs:
+            refs[database] = accession
+    return refs
+
+
+def _vendor_url(identifier: str, kind: str) -> str:
+    """A PubChem page that shows who sells the compound.
+
+    A CID gets its compound summary's Chemical Vendors section directly; other
+    identifiers (InChIKey, ChEMBL id, SMILES, name) go through PubChem Quick
+    Search, which resolves them to the matching compound record.
+    """
+    if not identifier:
+        return ""
+    if kind == "pubchem_cid" and identifier.isdigit():
+        return f"{_PUBCHEM_COMPOUND_URL}{identifier}#section=Chemical-Vendors"
+    return "https://pubchem.ncbi.nlm.nih.gov/#query=" + quote_plus(identifier)
+
+
+def _chembl_id(row: Dict[str, str], refs: Dict[str, str], uid: str) -> str:
+    """The ChEMBL accession, from the xrefs or the node's own identifiers."""
+    cached = refs.get("CHEMBL", "")
+    if cached:
+        return cached
+    for candidate in ((row.get("canonical_id") or "").strip(), uid.split(":", 1)[-1].strip()):
+        if candidate.upper().startswith("CHEMBL") and candidate[6:].strip().isdigit():
+            return candidate.strip()
     return ""
 
 
@@ -731,29 +767,35 @@ def vendor_sourcing(nodes: List[Dict[str, str]]) -> Dict[str, Any]:
             continue
         smiles = (row.get("smiles") or "").strip()
         name = (row.get("name") or uid).strip()
-        ref = _inchikey_from(row)
-        chembl = ""
-        for candidate in (row.get("cross_references") or "").split(";"):
-            candidate = candidate.strip()
-            if candidate.upper().startswith("CHEMBL:"):
-                chembl = candidate.split(":", 1)[1].strip()
+        refs = _cross_refs(row)
+        pubchem = refs.get("PUBCHEM", "")
+        inchikey = refs.get("INCHIKEY", "")
+        if pubchem and not pubchem.isdigit():
+            # A non-numeric PubChem accession is usually an InChIKey or a name.
+            inchikey = inchikey or pubchem
+            pubchem = ""
+        chembl = _chembl_id(row, refs, uid)
+
+        identifier, kind = "", ""
+        for candidate, candidate_kind in (
+            (pubchem, "pubchem_cid"),
+            (inchikey, "inchikey"),
+            (chembl, "chembl"),
+            (smiles, "smiles"),
+            (name, "name"),
+        ):
+            if candidate:
+                identifier, kind = candidate, candidate_kind
                 break
-        lookup = ref or chembl or smiles
-        vendors_url = ""
-        if lookup:
-            vendors_url = (
-                "https://pubchem.ncbi.nlm.nih.gov/#query="
-                + quote_plus(lookup)
-                + "&tab=substance"
-            )
+
         compounds.append(
             {
                 "uid": uid,
                 "name": name,
                 "smiles": smiles,
-                "identifier": lookup,
-                "identifier_kind": ("inchikey/pubchem" if ref else ("chembl" if chembl else ("smiles" if smiles else ""))),
-                "vendors_url": vendors_url,
+                "identifier": identifier,
+                "identifier_kind": kind,
+                "vendors_url": _vendor_url(identifier, kind),
             }
         )
         if len(compounds) >= MAX_COMPOUND_VERDICTS:

@@ -17,6 +17,18 @@
   key-shaped literal is committed again.
 
 ### Fixed
+- **Vendor (xref) links per compound opened a PubChem search with no results.**
+  `cross_references` is written by the export as a `|`-separated list
+  (`ChEMBL:CHEMBL25|PUBCHEM:2244`), but `decision.vendor_sourcing` split it on
+  `;` only. The whole joined string therefore became the compound's
+  "identifier", and the Sourcing panel's **Vendors** link queried PubChem for
+  `ChEMBL:CHEMBL25|PUBCHEM:2244` — a search that matches nothing. The parser now
+  accepts both separators, resolves the accession per database (PubChem CID,
+  InChIKey, ChEMBL id), and links a CID straight to its compound page's
+  Chemical Vendors section. Compounds with no usable xref fall back to their
+  SMILES then their name instead of showing "No registry id", so the link
+  resolves for every compound in the graph. Covered by
+  `tests/test_decision_intel.py` (pipe-separated export case).
 - **Only twelve patents were ever shown, and the enriched workbook had none.**
   The patent register was capped at 12 rows in both the Python engine and the
   Next.js reader, so a 30-patent search displayed "12 of 30" — which reads as

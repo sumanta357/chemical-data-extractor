@@ -207,7 +207,46 @@ class DecisionMath(unittest.TestCase):
         dart = by_name["Dartacitinib"]
         self.assertTrue(dart["vendors_url"].startswith("https://pubchem.ncbi.nlm.nih.gov/"))
         self.assertEqual(dart["identifier"], "ABCDEFGHABCDEFGH-OOOOOO")
-        self.assertEqual(dart["identifier_kind"], "inchikey/pubchem")
+        self.assertEqual(dart["identifier_kind"], "inchikey")
+        self.assertTrue(dart["vendors_url"].endswith("query=ABCDEFGHABCDEFGH-OOOOOO"))
+        self.assertEqual(by_name["Failtolinib"]["identifier"], "CHEMBL222")
+
+    def test_vendors_parse_pipe_separated_export_refs(self):
+        # Exports join cross_references with "|" (scigraph.export_to_csv). The
+        # old parser split on ";" only, so the identifier became the whole
+        # "ChEMBL:CHEMBL25|PUBCHEM:2244" string and the vendor link matched
+        # nothing in PubChem — the broken links this guards against.
+        rows = [
+            {
+                "uid:ID": "COMPOUND:CHEMBL25",
+                "name": "Aspirin",
+                "canonical_id": "CHEMBL25",
+                "cross_references": "ChEMBL:CHEMBL25|PUBCHEM:2244",
+                "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+            },
+            {
+                "uid:ID": "COMPOUND:CHEMBL111",
+                "name": "Dartacitinib",
+                "canonical_id": "CHEMBL111",
+                "cross_references": "ChEMBL:CHEMBL111|PDB:1ABX|INCHIKEY:ABCDEFGHABCDEFGH-OOOOOO",
+                "smiles": "CCOc1cc2nccc(O)c2cc1",
+            },
+        ]
+        by_name = {c["name"]: c for c in decision.vendor_sourcing(rows)["compounds"]}
+
+        aspirin = by_name["Aspirin"]
+        self.assertEqual(aspirin["identifier"], "2244")
+        self.assertEqual(aspirin["identifier_kind"], "pubchem_cid")
+        self.assertEqual(
+            aspirin["vendors_url"],
+            "https://pubchem.ncbi.nlm.nih.gov/compound/2244#section=Chemical-Vendors",
+        )
+
+        dart = by_name["Dartacitinib"]
+        self.assertEqual(dart["identifier"], "ABCDEFGHABCDEFGH-OOOOOO")
+        self.assertEqual(dart["identifier_kind"], "inchikey")
+        self.assertNotIn("|", dart["vendors_url"])
+        self.assertNotIn("CHEMBL", dart["vendors_url"])
 
     def test_decision_intel_rejects_outside_dirs(self):
         self.assertIsNone(decision.decision_intel("/etc", "q"))
