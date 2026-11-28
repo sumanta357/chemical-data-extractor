@@ -17,6 +17,20 @@
   key-shaped literal is committed again.
 
 ### Fixed
+- **Compound potency read raw nanomolar activities as pChEMBL.** BindingDB,
+  BRENDA and PDBbind report `activity_value` in nM (or µM, mM) and do not set
+  `pchembl_value`, so `decision._affinity_edges` fell back to the raw number and
+  graded it on the pChEMBL scale. A 19,490,000 nM IC50 therefore showed as
+  **potency 19490000, grade A**, and the overview could claim "median pChEMBL
+  4994" — impossible for a −log10 molar score. Affinity values are now
+  converted to pChEMBL (`-log10(value × molar factor)`) using the edge's units,
+  log-scale `pKi`/`pIC50` values pass through unchanged, values that arrive in
+  the pChEMBL column but sit outside 0–14 are re-derived from the measurement,
+  and a number with no usable units is skipped instead of guessed at. The
+  Mechanism-of-action panel uses the same normalisation, so BindingDB edges now
+  yield targets there too. Covered by four new cases in
+  `tests/test_decision_intel.py` (nM and µM conversion, raw value in the pChEMBL
+  column, MoA from a derived value).
 - **Vendor (xref) links per compound opened a PubChem search with no results.**
   `cross_references` is written by the export as a `|`-separated list
   (`ChEMBL:CHEMBL25|PUBCHEM:2244`), but `decision.vendor_sourcing` split it on

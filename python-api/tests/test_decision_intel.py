@@ -18,6 +18,7 @@ os.environ["EXPORTS_DIR"] = str(os.path.join(_TEST_DIR, "exports"))
 os.environ["WORKSPACE_DIR"] = str(os.path.join(_TEST_DIR, "workspace"))
 os.environ["REQUIRE_AUTH"] = "1"
 
+import csv
 import sqlite3
 import sys
 import unittest
@@ -75,10 +76,79 @@ class DecisionMath(unittest.TestCase):
         self.assertEqual(by_name["Dartacitinib"]["datapoints"], 2)
 
     def test_no_affinity_data_degrades_honestly(self):
-        edges = [e for e in self.edges if not e["pchembl_value"]]
+        # Without a pChEMBL and without units a raw number cannot be placed on
+        # the potency scale, so it must not be graded.
+        edges = [dict(e, pchembl_value="", units="") for e in self.edges]
         result = decision.feasibility_verdict(self.nodes, edges)
         self.assertEqual(result["grade"], "N/A")
         self.assertIn("No quantitative affinity", result["note"])
+
+    def test_nanomolar_ic50_is_converted_to_pchembl(self):
+        """Connectors such as BindingDB report nM without a pChEMBL value, and
+        the raw measurement used to be graded as if it were one: 19,490,000 nM
+        displayed as potency 19490000 and grade A. It is 1.9e-2 M, pChEMBL 1.7."""
+        edges = list(
+            csv.DictReader(
+                """:START_ID,:END_ID,:TYPE,activity_type,activity_value,units,pchembl_value
+COMPOUND:CHEMBL111,TARGET:EGFR,INHIBITS,IC50,19490000,nM,
+COMPOUND:CHEMBL222,TARGET:EGFR,INHIBITS,IC50,2.1,nM,
+""".splitlines()
+            )
+        )
+        result = decision.feasibility_verdict(self.nodes, edges)
+        by_uid = {c["uid"]: c for c in result["compounds"]}
+        self.assertAlmostEqual(
+            by_uid["COMPOUND:CHEMBL111"]["potency_score"], 1.71, places=2
+        )
+        self.assertEqual(by_uid["COMPOUND:CHEMBL111"]["grade"], "F")
+        self.assertAlmostEqual(
+            by_uid["COMPOUND:CHEMBL222"]["potency_score"], 8.68, places=2
+        )
+        self.assertEqual(by_uid["COMPOUND:CHEMBL222"]["grade"], "B")
+        self.assertLess(result["median_pchembl"], 9)
+
+    def test_units_are_honoured_for_micromolar_and_log_values(self):
+        edges = list(
+            csv.DictReader(
+                """:START_ID,:END_ID,:TYPE,activity_type,activity_value,units,pchembl_value
+COMPOUND:CHEMBL111,TARGET:EGFR,BINDS,IC50,1.5,uM,
+COMPOUND:CHEMBL222,TARGET:EGFR,BINDS,pKi,7.4,,
+""".splitlines()
+            )
+        )
+        result = decision.feasibility_verdict(self.nodes, edges)
+        by_uid = {c["uid"]: c for c in result["compounds"]}
+        self.assertAlmostEqual(
+            by_uid["COMPOUND:CHEMBL111"]["potency_score"], 5.82, places=2
+        )
+        self.assertAlmostEqual(
+            by_uid["COMPOUND:CHEMBL222"]["potency_score"], 7.4, places=2
+        )
+
+    def test_raw_value_in_the_pchembl_column_is_not_trusted(self):
+        edges = [
+            dict(
+                self.edges[0],
+                pchembl_value="19490000",
+                activity_value="19490000",
+                units="nM",
+            )
+        ]
+        result = decision.feasibility_verdict(self.nodes, edges)
+        self.assertAlmostEqual(result["median_pchembl"], 1.71, places=2)
+        self.assertEqual(result["compounds"][0]["grade"], "F")
+
+    def test_moa_reads_activities_without_a_recorded_pchembl(self):
+        edges = list(
+            csv.DictReader(
+                """:START_ID,:END_ID,:TYPE,activity_type,activity_value,units,pchembl_value
+COMPOUND:CHEMBL111,TARGET:EGFR,INHIBITS,IC50,2.1,nM,
+""".splitlines()
+            )
+        )
+        result = decision.moa_storyboard(self.nodes, edges, "kinase y")
+        self.assertEqual(result["targets"][0]["name"], "TARGET:EGFR")
+        self.assertAlmostEqual(result["targets"][0]["best"]["pchembl"], 8.68, places=2)
 
     def test_ip_green_when_newest_patent_is_old(self):
         result = decision.ip_status(self.nodes, self.edges, now_year=2098)

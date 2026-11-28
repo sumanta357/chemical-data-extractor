@@ -24,6 +24,7 @@ no flag. The graph is the only input.
 from __future__ import annotations
 
 import csv
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -169,6 +170,75 @@ def _parse_number(value: str) -> Optional[float]:
         return None
 
 
+# Affinity measurements the grade may be built from. Other relation attributes
+# (a HAS_STRUCTURE "9.1", a confidence score) are not potency and are ignored.
+_AFFINITY_KINDS = ("IC50", "KI", "EC50", "POTENCY", "KD", "AC50")
+
+# Concentration unit -> molar factor. Connectors report affinity values in
+# their own units (BindingDB and BRENDA in nM, PDBbind sometimes none at all),
+# and a raw measurement is not a pChEMBL value until it is converted.
+_UNIT_TO_MOLAR = {
+    "M": 1.0,
+    "MM": 1e-3,
+    "UM": 1e-6,
+    "NM": 1e-9,
+    "PM": 1e-12,
+    "FM": 1e-15,
+}
+
+# pChEMBL is -log10(molar), so a real value sits roughly in 0–14 (1 M to
+# 1e-14 M). Anything outside that window is a raw measurement that leaked into
+# the column, not a potency score, and must not drive a grade.
+_PCHEMBL_MIN = 0.0
+_PCHEMBL_MAX = 14.0
+
+
+def _valid_pchembl(value: Optional[float]) -> Optional[float]:
+    if value is None or not (_PCHEMBL_MIN < value <= _PCHEMBL_MAX):
+        return None
+    return value
+
+
+def _pchembl_value(edge: Dict[str, str]) -> Optional[float]:
+    """One affinity edge on the pChEMBL scale, or None if it cannot be placed.
+
+    The recorded `pchembl_value` is preferred. Many connectors never supply it
+    (BindingDB and PDBbind report only activity_value + units, ChEMBL sometimes
+    omits it), so the fallback converts the measurement: 2.1 nM is pChEMBL 8.68.
+    The old fallback used the raw number, which made 19,490,000 nM read as
+    "potency 19490000, grade A" and median pChEMBL 4994 — the units were being
+    ignored, not the potency. A value with no usable units is skipped rather
+    than guessed at.
+    """
+    recorded = _valid_pchembl(_parse_number(edge.get("pchembl_value", "")))
+    if recorded is not None:
+        return recorded
+
+    kind = (edge.get("activity_type") or "").strip().upper().replace(" ", "")
+    value = _parse_number(edge.get("activity_value", ""))
+    if value is None:
+        return None
+    # GtoPdb labels the parameter pKi/pIC50 and already stores the log value.
+    if kind.startswith("P") and kind[1:] in _AFFINITY_KINDS:
+        return _valid_pchembl(value)
+    if kind not in _AFFINITY_KINDS:
+        return None
+    unit = (
+        (edge.get("units") or "")
+        .strip()
+        .replace("µ", "u")
+        .replace("μ", "u")
+        .upper()
+    )
+    factor = _UNIT_TO_MOLAR.get(unit)
+    if factor is None:
+        return None
+    molar = value * factor
+    if molar <= 0:
+        return None
+    return _valid_pchembl(round(-math.log10(molar), 2))
+
+
 def _label(value: str) -> str:
     """nodes.csv :LABEL values look like 'Entity;Compound'."""
     parts = [p.strip().upper() for p in (value or "").split(";")]
@@ -188,24 +258,19 @@ def _grade_for(score: float) -> Tuple[str, str]:
 def _affinity_edges(edges: List[Dict[str, str]]) -> Dict[str, List[float]]:
     """Compound uid -> every affinity value (pChEMBL scale) attached to it.
 
-    activity_value is only a fallback for edges that declare what they mean
-    (IC50/Ki/EC50): a bare number on a relation like HAS_STRUCTURE is not an
-    affinity and must never leak into the grade.
+    Every value is normalised through `_pchembl_value`, so a recorded ChEMBL
+    pChEMBL and a BindingDB nanomolar IC50 land on the same scale. A bare number
+    on a relation like HAS_STRUCTURE is not an affinity and never reaches the
+    grade.
     """
-    affinity_kinds = ("IC50", "KI", "EC50", "POTENCY", "KD", "AC50")
     by_compound: Dict[str, List[float]] = {}
     for edge in edges:
         src = (edge.get(":START_ID") or "").strip()
         if not _has_prefix(src, _COMPOUND_PREFIXES):
             continue
-        kind = (edge.get("activity_type") or "").strip().upper()
-        pchembl = _parse_number(edge.get("pchembl_value", ""))
+        pchembl = _pchembl_value(edge)
         if pchembl is None:
-            if kind not in affinity_kinds:
-                continue
-            pchembl = _parse_number(edge.get("activity_value", ""))
-            if pchembl is None:
-                continue
+            continue
         by_compound.setdefault(src, []).append(pchembl)
     return by_compound
 
@@ -274,7 +339,9 @@ def feasibility_verdict(
         "compounds": compounds,
         "note": (
             "Grade is the median pChEMBL across every affinity datapoint in "
-            "the graph: A >= 9.0, B >= 8.0, C >= 7.0, D >= 6.0, F below."
+            "the graph: A >= 9.0, B >= 8.0, C >= 7.0, D >= 6.0, F below. "
+            "IC50/Ki/Kd measurements reported in nM, uM or mM are converted "
+            "to pChEMBL (-log10 molar) before ranking."
         ),
     }
 
@@ -657,7 +724,7 @@ def moa_storyboard(
             ref = _pdb_ref(tgt_row.get("canonical_id", "") or tgt)
             if ref:
                 structures.append({"pdb_id": ref, "compound": src_row.get("name", src)})
-        pchembl = _parse_number(edge.get("pchembl_value", ""))
+        pchembl = _pchembl_value(edge)
         if pchembl is not None:
             potency_edges.append(
                 {
